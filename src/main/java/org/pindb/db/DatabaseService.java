@@ -415,7 +415,7 @@ public final class DatabaseService implements AutoCloseable {
         List<FieldDefinition> fields = fields();
         List<RecordData> records = activeRecords();
         LinkedHashMap<FieldDefinition, String> summaries = new LinkedHashMap<>();
-        NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(Locale.getDefault());
+        NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(Locale.US);
         for (FieldDefinition field : fields) {
             if (field.summaryType() == SummaryType.NONE) {
                 continue;
