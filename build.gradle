@@ -1,5 +1,3 @@
-import org.gradle.internal.os.OperatingSystem
-
 plugins {
     id 'java'
     id 'application'
@@ -84,43 +82,51 @@ jacocoTestReport {
     }
 }
 
-tasks.register('packageDeb') {
+tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
     group = 'distribution'
     description = 'Builds a self-contained Debian package with jpackage.'
     dependsOn tasks.installDist
-    onlyIf { OperatingSystem.current().isLinux() }
 
-    doLast {
-        def packagesDir = layout.buildDirectory.dir('packages').get().asFile
-        delete packagesDir
-        packagesDir.mkdirs()
+    onlyIf {
+        osName.contains('linux')
+    }
 
-        def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
-        def mainJar = "pindb-${project.version}.jar"
-        def iconFile = file('src/main/resources/org/pindb/app/icon.png')
-        def associations = file('packaging/pindb-file-associations.properties')
+    def packagesDir = layout.buildDirectory.dir('packages').get().asFile
+    def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
+    def mainJar = "pindb-${project.version}.jar"
+    def iconFile = file('src/main/resources/org/pindb/app/icon.png')
+    def associations = file('packaging/pindb-file-associations.properties')
 
-        exec {
-            commandLine 'jpackage',
-                    '--type', 'deb',
-                    '--dest', packagesDir.absolutePath,
-                    '--input', inputDir.absolutePath,
-                    '--name', 'PinDB',
-                    '--app-version', project.version.toString(),
-                    '--vendor', 'PinDB Project',
-                    '--description', 'A flexible personal database application.',
-                    '--main-jar', mainJar,
-                    '--main-class', application.mainClass.get(),
-                    '--icon', iconFile.absolutePath,
-                    '--install-dir', '/opt/pindb',
-                    '--linux-package-name', 'pindb',
-                    '--linux-menu-group', 'Office',
-                    '--linux-shortcut',
-                    '--file-associations', associations.absolutePath,
-                    '--java-options', '-Dfile.encoding=UTF-8',
-                    '--java-options', '-Dprism.order=es2,sw'
+    doFirst {
+        if (packagesDir.exists()) {
+            packagesDir.deleteDir()
+        }
+
+        if (!packagesDir.mkdirs() && !packagesDir.isDirectory()) {
+            throw new GradleException(
+                    "Unable to create package directory: ${packagesDir}"
+            )
         }
     }
+
+    commandLine 'jpackage',
+            '--type', 'deb',
+            '--dest', packagesDir.absolutePath,
+            '--input', inputDir.absolutePath,
+            '--name', 'PinDB',
+            '--app-version', project.version.toString(),
+            '--vendor', 'PinDB Project',
+            '--description', 'A flexible personal database application.',
+            '--main-jar', mainJar,
+            '--main-class', application.mainClass.get(),
+            '--icon', iconFile.absolutePath,
+            '--install-dir', '/opt/pindb',
+            '--linux-package-name', 'pindb',
+            '--linux-menu-group', 'Office',
+            '--linux-shortcut',
+            '--file-associations', associations.absolutePath,
+            '--java-options', '-Dfile.encoding=UTF-8',
+            '--java-options', '-Dprism.order=es2,sw'
 }
 
 tasks.register('verifyReleaseTag') {
