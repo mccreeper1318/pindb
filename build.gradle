@@ -42,7 +42,7 @@ dependencies {
 }
 
 application {
-    mainClass = 'org.pindb.PinDBApplication'
+    mainClass = 'org.pindb.PinDBLauncher'
     applicationName = 'PinDB'
     applicationDefaultJvmArgs = [
             '-Dfile.encoding=UTF-8',
