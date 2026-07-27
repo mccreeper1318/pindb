@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Added an **Add & Add Another** action for faster entry creation.
+- Reworked print pagination to account for wrapped content and reserved header/footer space.
+- Added an option to print configured field summaries for the visible entries.
+- Improved printer page-layout selection and print failure messaging.
+
 ## 0.1
 
 - Added the PinDB JavaFX launcher and multi-window database workspace.
