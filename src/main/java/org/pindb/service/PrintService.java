@@ -4,7 +4,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.print.PageLayout;
 import javafx.print.PageOrientation;
-import javafx.print.Paper;
 import javafx.print.Printer;
 import javafx.print.PrinterJob;
 import javafx.scene.Node;
@@ -14,25 +13,39 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.stage.Window;
 import org.pindb.model.DatabaseInfo;
 import org.pindb.model.FieldDefinition;
+import org.pindb.model.FieldType;
 import org.pindb.model.PrintArrangement;
 import org.pindb.model.PrintOptions;
 import org.pindb.model.RecordData;
+import org.pindb.model.SummaryType;
 import org.pindb.ui.UiUtil;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 public final class PrintService {
     private static final DateTimeFormatter PRINT_DATE = DateTimeFormatter.ofPattern("MMM d, uuuu h:mm a");
+    private static final double HEADER_RESERVE = 38;
+    private static final double FOOTER_RESERVE = 30;
+    private static final double PAGE_PADDING = 12;
+    private static final double CELL_BASE_HEIGHT = 25;
+    private static final double TEXT_LINE_HEIGHT = 15;
 
     private PrintService() {
     }
@@ -41,26 +54,40 @@ public final class PrintService {
                                 List<RecordData> records, PrintOptions options) {
         PrinterJob job = PrinterJob.createPrinterJob();
         if (job == null) {
-            UiUtil.warning(owner, "Printing Unavailable", "No printer service is available on this system.");
+            UiUtil.warning(owner, "Printing Unavailable",
+                    "PinDB could not find a configured printer. Add a printer in Linux system settings, "
+                            + "then restart PinDB.");
             return false;
         }
-        PageOrientation orientation = options.landscape() ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT;
-        Printer printer = job.getPrinter();
-        PageLayout pageLayout = printer.createPageLayout(Paper.A4, orientation, Printer.MarginType.DEFAULT);
-        job.getJobSettings().setPageLayout(pageLayout);
         if (!job.showPrintDialog(owner)) {
             return false;
         }
 
+        Printer printer = job.getPrinter();
+        PageLayout selectedLayout = job.getJobSettings().getPageLayout();
+        PageOrientation orientation = options.landscape() ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT;
+        PageLayout pageLayout = printer.createPageLayout(
+                selectedLayout.getPaper(), orientation, Printer.MarginType.DEFAULT);
+        job.getJobSettings().setPageLayout(pageLayout);
+
         List<FieldDefinition> fields = selectedFields(allFields, options.fieldIds());
-        List<Node> pages = options.arrangement() == PrintArrangement.COLUMNS
-                ? columnPages(info, fields, records, options, pageLayout)
-                : rowPages(info, fields, records, options, pageLayout);
+        List<Node> bodies = options.arrangement() == PrintArrangement.COLUMNS
+                ? columnBodies(fields, records, options, pageLayout)
+                : rowBodies(fields, records, options, pageLayout);
+        if (options.includeSummaries()) {
+            appendSummaryBody(bodies, fields, records, options, pageLayout);
+        }
+        if (bodies.isEmpty()) {
+            bodies.add(new Label("No entries in this database."));
+        }
+
         boolean success = true;
-        for (Node page : pages) {
-            page.applyCss();
-            page.autosize();
-            if (!job.printPage(pageLayout, page)) {
+        int pageCount = bodies.size();
+        for (int index = 0; index < pageCount; index++) {
+            Node printablePage = page(info, bodies.get(index), options, index + 1, pageCount, pageLayout);
+            printablePage.applyCss();
+            printablePage.autosize();
+            if (!job.printPage(pageLayout, printablePage)) {
                 success = false;
                 break;
             }
@@ -76,82 +103,226 @@ public final class PrintService {
     private static List<FieldDefinition> selectedFields(List<FieldDefinition> all, List<Long> selectedIds) {
         Map<Long, FieldDefinition> byId = new LinkedHashMap<>();
         all.forEach(field -> byId.put(field.id(), field));
-        return selectedIds.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
+        return selectedIds.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
-    private static List<Node> columnPages(DatabaseInfo info, List<FieldDefinition> fields,
-                                          List<RecordData> records, PrintOptions options, PageLayout layout) {
-        int rowsPerPage = options.landscape() ? 25 : 34;
-        int pageCount = Math.max(1, (records.size() + rowsPerPage - 1) / rowsPerPage);
+    private static List<Node> columnBodies(List<FieldDefinition> fields, List<RecordData> records,
+                                           PrintOptions options, PageLayout layout) {
         List<Node> pages = new ArrayList<>();
-        for (int page = 0; page < pageCount; page++) {
-            int from = page * rowsPerPage;
-            int to = Math.min(records.size(), from + rowsPerPage);
-            GridPane grid = new GridPane();
-            grid.setGridLinesVisible(true);
-            grid.setMaxWidth(Double.MAX_VALUE);
+        double bodyHeight = availableBodyHeight(options, layout);
+        double columnWidth = Math.max(70, layout.getPrintableWidth() / Math.max(1, fields.size()));
+        int index = 0;
+        boolean firstPage = true;
+        while (index < records.size() || (records.isEmpty() && firstPage)) {
+            GridPane grid = tableGrid(fields);
             int row = 0;
-            if (options.repeatHeadings() || page == 0) {
-                for (int col = 0; col < fields.size(); col++) {
-                    Label heading = cell(fields.get(col).name(), true);
-                    grid.add(heading, col, row);
-                }
-                row++;
+            double used = 0;
+            boolean headings = options.repeatHeadings() || firstPage;
+            if (headings) {
+                addHeadings(grid, fields, row++);
+                used += estimateHeadingHeight(fields, columnWidth);
             }
-            for (int index = from; index < to; index++) {
+            if (records.isEmpty()) {
+                grid.add(cell("No entries in this database.", false), 0, row, Math.max(1, fields.size()), 1);
+                pages.add(grid);
+                break;
+            }
+            while (index < records.size()) {
                 RecordData record = records.get(index);
+                double rowHeight = estimateRecordRowHeight(fields, record, columnWidth);
+                if (row > (headings ? 1 : 0) && used + rowHeight > bodyHeight) {
+                    break;
+                }
                 for (int col = 0; col < fields.size(); col++) {
                     FieldDefinition field = fields.get(col);
                     grid.add(cell(UiUtil.formatValue(field, record.value(field.id())), false), col, row);
                 }
                 row++;
+                used += Math.min(rowHeight, bodyHeight);
+                index++;
+                if (used >= bodyHeight) {
+                    break;
+                }
             }
-            double percent = fields.isEmpty() ? 100 : 100.0 / fields.size();
-            for (int i = 0; i < fields.size(); i++) {
-                ColumnConstraints constraints = new ColumnConstraints();
-                constraints.setPercentWidth(percent);
-                constraints.setHgrow(Priority.ALWAYS);
-                grid.getColumnConstraints().add(constraints);
-            }
-            pages.add(page(info, grid, options, page + 1, pageCount, layout));
+            pages.add(grid);
+            firstPage = false;
         }
         return pages;
     }
 
-    private static List<Node> rowPages(DatabaseInfo info, List<FieldDefinition> fields,
-                                       List<RecordData> records, PrintOptions options, PageLayout layout) {
-        int recordsPerPage = options.landscape() ? 5 : 4;
-        int pageCount = Math.max(1, (records.size() + recordsPerPage - 1) / recordsPerPage);
+    private static List<Node> rowBodies(List<FieldDefinition> fields, List<RecordData> records,
+                                        PrintOptions options, PageLayout layout) {
         List<Node> pages = new ArrayList<>();
-        for (int page = 0; page < pageCount; page++) {
+        double bodyHeight = availableBodyHeight(options, layout);
+        double valueWidth = Math.max(160, layout.getPrintableWidth() - 175);
+        int index = 0;
+        if (records.isEmpty()) {
+            pages.add(new Label("No entries in this database."));
+            return pages;
+        }
+        while (index < records.size()) {
             VBox body = new VBox(12);
-            int from = page * recordsPerPage;
-            int to = Math.min(records.size(), from + recordsPerPage);
-            if (records.isEmpty()) {
-                body.getChildren().add(new Label("No entries in this database."));
-            }
-            for (int index = from; index < to; index++) {
+            double used = 0;
+            while (index < records.size()) {
                 RecordData record = records.get(index);
-                GridPane grid = new GridPane();
-                grid.setGridLinesVisible(true);
-                grid.getColumnConstraints().add(new ColumnConstraints(150));
-                ColumnConstraints valueColumn = new ColumnConstraints();
-                valueColumn.setHgrow(Priority.ALWAYS);
-                grid.getColumnConstraints().add(valueColumn);
-                int row = 0;
-                Label recordTitle = new Label("Entry " + record.id());
-                recordTitle.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
-                body.getChildren().add(recordTitle);
-                for (FieldDefinition field : fields) {
-                    grid.add(cell(field.name(), true), 0, row);
-                    grid.add(cell(UiUtil.formatValue(field, record.value(field.id())), false), 1, row);
-                    row++;
+                double recordHeight = estimateRecordBlockHeight(fields, record, valueWidth);
+                if (!body.getChildren().isEmpty() && used + recordHeight + 12 > bodyHeight) {
+                    break;
                 }
-                body.getChildren().add(grid);
+                body.getChildren().add(recordBlock(fields, record));
+                used += Math.min(recordHeight + 12, bodyHeight);
+                index++;
+                if (used >= bodyHeight) {
+                    break;
+                }
             }
-            pages.add(page(info, body, options, page + 1, pageCount, layout));
+            pages.add(body);
         }
         return pages;
+    }
+
+    private static GridPane tableGrid(List<FieldDefinition> fields) {
+        GridPane grid = new GridPane();
+        grid.setGridLinesVisible(true);
+        grid.setMaxWidth(Double.MAX_VALUE);
+        double percent = fields.isEmpty() ? 100 : 100.0 / fields.size();
+        for (int i = 0; i < Math.max(1, fields.size()); i++) {
+            ColumnConstraints constraints = new ColumnConstraints();
+            constraints.setPercentWidth(percent);
+            constraints.setHgrow(Priority.ALWAYS);
+            grid.getColumnConstraints().add(constraints);
+        }
+        return grid;
+    }
+
+    private static void addHeadings(GridPane grid, List<FieldDefinition> fields, int row) {
+        for (int col = 0; col < fields.size(); col++) {
+            grid.add(cell(fields.get(col).name(), true), col, row);
+        }
+    }
+
+    private static VBox recordBlock(List<FieldDefinition> fields, RecordData record) {
+        Label recordTitle = new Label("Entry " + record.id());
+        recordTitle.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: black;");
+        GridPane grid = new GridPane();
+        grid.setGridLinesVisible(true);
+        grid.getColumnConstraints().add(new ColumnConstraints(150));
+        ColumnConstraints valueColumn = new ColumnConstraints();
+        valueColumn.setHgrow(Priority.ALWAYS);
+        grid.getColumnConstraints().add(valueColumn);
+        for (int row = 0; row < fields.size(); row++) {
+            FieldDefinition field = fields.get(row);
+            grid.add(cell(field.name(), true), 0, row);
+            grid.add(cell(UiUtil.formatValue(field, record.value(field.id())), false), 1, row);
+        }
+        return new VBox(5, recordTitle, grid);
+    }
+
+    private static void appendSummaryBody(List<Node> bodies, List<FieldDefinition> fields,
+                                          List<RecordData> records, PrintOptions options, PageLayout layout) {
+        Map<FieldDefinition, String> summaries = summaries(fields, records);
+        if (summaries.isEmpty()) {
+            return;
+        }
+        VBox summary = new VBox(6);
+        Label title = new Label("Field Summaries");
+        title.setFont(Font.font(15));
+        title.setStyle("-fx-font-weight: bold; -fx-text-fill: black;");
+        summary.getChildren().add(title);
+        for (Map.Entry<FieldDefinition, String> entry : summaries.entrySet()) {
+            Label line = new Label(entry.getKey().name() + " — "
+                    + entry.getKey().summaryType().displayName() + ": " + entry.getValue());
+            line.setWrapText(true);
+            line.setStyle("-fx-text-fill: black;");
+            summary.getChildren().add(line);
+        }
+        double estimated = 34 + summaries.size() * 24.0;
+        if (estimated > availableBodyHeight(options, layout)) {
+            summary.setScaleX(0.9);
+            summary.setScaleY(0.9);
+        }
+        bodies.add(summary);
+    }
+
+    static Map<FieldDefinition, String> summaries(List<FieldDefinition> fields, List<RecordData> records) {
+        LinkedHashMap<FieldDefinition, String> result = new LinkedHashMap<>();
+        NumberFormat currency = NumberFormat.getCurrencyInstance(Locale.US);
+        for (FieldDefinition field : fields) {
+            SummaryType type = field.summaryType();
+            if (type == SummaryType.NONE) {
+                continue;
+            }
+            List<String> values = records.stream()
+                    .map(record -> record.value(field.id()))
+                    .filter(value -> value != null && !value.isBlank())
+                    .toList();
+            if (type == SummaryType.COUNT) {
+                result.put(field, String.valueOf(values.size()));
+                continue;
+            }
+            if (!field.type().isNumeric()) {
+                result.put(field, "Not available");
+                continue;
+            }
+            List<BigDecimal> numbers = values.stream().map(value -> {
+                try {
+                    return new BigDecimal(value);
+                } catch (NumberFormatException ignored) {
+                    return null;
+                }
+            }).filter(Objects::nonNull).toList();
+            BigDecimal value = switch (type) {
+                case SUM -> numbers.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+                case AVERAGE -> numbers.isEmpty() ? BigDecimal.ZERO
+                        : numbers.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
+                        .divide(BigDecimal.valueOf(numbers.size()), 4, RoundingMode.HALF_UP);
+                case MINIMUM -> numbers.stream().min(Comparator.naturalOrder()).orElse(BigDecimal.ZERO);
+                case MAXIMUM -> numbers.stream().max(Comparator.naturalOrder()).orElse(BigDecimal.ZERO);
+                default -> BigDecimal.ZERO;
+            };
+            result.put(field, field.type() == FieldType.CURRENCY
+                    ? currency.format(value) : value.stripTrailingZeros().toPlainString());
+        }
+        return result;
+    }
+
+    private static double availableBodyHeight(PrintOptions options, PageLayout layout) {
+        double reserved = PAGE_PADDING * 2;
+        if (options.showDatabaseName() || options.showPrintDate()) {
+            reserved += HEADER_RESERVE;
+        }
+        if (options.showPageNumbers()) {
+            reserved += FOOTER_RESERVE;
+        }
+        return Math.max(100, layout.getPrintableHeight() - reserved);
+    }
+
+    private static double estimateHeadingHeight(List<FieldDefinition> fields, double width) {
+        return fields.stream().mapToDouble(field -> estimateTextHeight(field.name(), width))
+                .max().orElse(CELL_BASE_HEIGHT);
+    }
+
+    private static double estimateRecordRowHeight(List<FieldDefinition> fields, RecordData record, double width) {
+        return fields.stream().mapToDouble(field ->
+                        estimateTextHeight(UiUtil.formatValue(field, record.value(field.id())), width))
+                .max().orElse(CELL_BASE_HEIGHT);
+    }
+
+    private static double estimateRecordBlockHeight(List<FieldDefinition> fields, RecordData record, double width) {
+        double fieldsHeight = fields.stream().mapToDouble(field -> Math.max(
+                estimateTextHeight(field.name(), 150),
+                estimateTextHeight(UiUtil.formatValue(field, record.value(field.id())), width))).sum();
+        return 28 + fieldsHeight;
+    }
+
+    private static double estimateTextHeight(String text, double width) {
+        String safe = text == null ? "" : text;
+        int charactersPerLine = Math.max(8, (int) (width / 7.0));
+        int lines = 0;
+        for (String explicitLine : safe.split("\\R", -1)) {
+            lines += Math.max(1, (explicitLine.length() + charactersPerLine - 1) / charactersPerLine);
+        }
+        return Math.max(CELL_BASE_HEIGHT, 10 + lines * TEXT_LINE_HEIGHT);
     }
 
     private static BorderPane page(DatabaseInfo info, Node body, PrintOptions options,
@@ -172,7 +343,7 @@ public final class PrintService {
                 title.setStyle("-fx-font-weight: bold; -fx-text-fill: black;");
                 header.getChildren().add(title);
             }
-            javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
+            Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
             header.getChildren().add(spacer);
             if (options.showPrintDate()) {
