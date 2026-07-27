@@ -9,6 +9,7 @@ public record PrintOptions(
         boolean showPrintDate,
         boolean showPageNumbers,
         boolean repeatHeadings,
+        boolean includeSummaries,
         List<Long> fieldIds
 ) {
     public PrintOptions {
