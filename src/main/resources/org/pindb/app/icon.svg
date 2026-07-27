@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect x="24" y="24" width="464" height="464" rx="92" fill="#192436" stroke="#4ecdc4" stroke-width="12"/>
+  <ellipse cx="256" cy="155" rx="150" ry="49" fill="#5fe3d8" stroke="#e6fffc" stroke-width="7"/>
+  <path d="M106 155v188c0 27 67 49 150 49s150-22 150-49V155" fill="#2da6a4" stroke="#e6fffc" stroke-width="7"/>
+  <path d="M106 229c0 27 67 49 150 49s150-22 150-49M106 303c0 27 67 49 150 49s150-22 150-49" fill="none" stroke="#e6fffc" stroke-width="6"/>
+  <text x="256" y="335" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="150" font-weight="700" fill="white" stroke="#121926" stroke-width="3">P</text>
+</svg>
