@@ -124,7 +124,7 @@ tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
             '--input', inputDir.absolutePath,
             '--name', 'PinDB',
             '--app-version', linuxAppVersion,
-            '--linux-app-release', linuxAppRelease
+            '--linux-app-release', linuxAppRelease,
             '--vendor', 'PinDB Project',
             '--description', 'A flexible personal database application.',
             '--main-jar', mainJar,
