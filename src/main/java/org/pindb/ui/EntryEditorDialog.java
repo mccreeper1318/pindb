@@ -32,6 +32,7 @@ import java.util.Map;
 
 public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("H:mm");
+    private static final String BUTTON_ORDER = "CAO";
     private final List<FieldDefinition> fields;
     private final Map<Long, ValueEditor> editors = new LinkedHashMap<>();
     private final Label error = new Label();
@@ -47,9 +48,9 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
                 ? new ButtonType("Add & Add Another", ButtonBar.ButtonData.APPLY)
                 : null;
         if (addMoreType == null) {
-            getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+            getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveType);
         } else {
-            getDialogPane().getButtonTypes().addAll(addMoreType, saveType, ButtonType.CANCEL);
+            getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, addMoreType, saveType);
         }
 
         GridPane grid = new GridPane();
@@ -96,8 +97,17 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene != null) {
                 UiUtil.applyStyles(newScene, settings);
+                newScene.getRoot().applyCss();
+                applyButtonOrder();
             }
         });
+    }
+
+    private void applyButtonOrder() {
+        Node buttonBarNode = getDialogPane().lookup(".button-bar");
+        if (buttonBarNode instanceof ButtonBar buttonBar) {
+            buttonBar.setButtonOrder(BUTTON_ORDER);
+        }
     }
 
     private void addValidationFilter(Button button) {
