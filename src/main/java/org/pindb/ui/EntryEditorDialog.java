@@ -2,10 +2,9 @@ package org.pindb.ui;
 
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
@@ -17,6 +16,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import org.pindb.model.FieldDefinition;
 import org.pindb.model.RecordData;
@@ -32,7 +32,6 @@ import java.util.Map;
 
 public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("H:mm");
-    private static final String BUTTON_ORDER = "CAO";
     private final List<FieldDefinition> fields;
     private final Map<Long, ValueEditor> editors = new LinkedHashMap<>();
     private final Label error = new Label();
@@ -42,16 +41,6 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         initOwner(owner);
         setTitle(existing == null ? "New Entry" : "Edit Entry");
         setHeaderText(existing == null ? "Add an entry to the database" : "Edit entry " + existing.id());
-
-        ButtonType saveType = new ButtonType(existing == null ? "Add Entry" : "Save Changes", ButtonBar.ButtonData.OK_DONE);
-        ButtonType addMoreType = existing == null
-                ? new ButtonType("Add & Add Another", ButtonBar.ButtonData.APPLY)
-                : null;
-        if (addMoreType == null) {
-            getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveType);
-        } else {
-            getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, addMoreType, saveType);
-        }
 
         GridPane grid = new GridPane();
         grid.setHgap(12);
@@ -77,49 +66,51 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         ScrollPane scroll = new ScrollPane(grid);
         scroll.setFitToWidth(true);
         scroll.setPrefViewportHeight(Math.min(650, 90 + fields.size() * 58));
-        getDialogPane().setContent(scroll);
+
+        Button cancelButton = new Button("Cancel");
+        cancelButton.setCancelButton(true);
+        cancelButton.setOnAction(event -> {
+            setResult(null);
+            close();
+        });
+
+        Button saveButton = new Button(existing == null ? "Add Entry" : "Save Changes");
+        saveButton.setDefaultButton(true);
+        saveButton.getStyleClass().add("primary");
+        saveButton.setOnAction(event -> saveAndClose(false));
+
+        HBox actions;
+        if (existing == null) {
+            Button addMoreButton = new Button("Add & Add Another");
+            addMoreButton.setOnAction(event -> saveAndClose(true));
+            actions = new HBox(10, cancelButton, addMoreButton, saveButton);
+        } else {
+            actions = new HBox(10, cancelButton, saveButton);
+        }
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.setPadding(new Insets(0, 8, 8, 8));
+
+        VBox content = new VBox(12, scroll, actions);
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+        getDialogPane().setContent(content);
         getDialogPane().setPrefWidth(650);
 
-        addValidationFilter((Button) getDialogPane().lookupButton(saveType));
-        if (addMoreType != null) {
-            addValidationFilter((Button) getDialogPane().lookupButton(addMoreType));
-        }
-
-        setResultConverter(button -> {
-            if (button == saveType) {
-                return new Result(values(), false);
-            }
-            if (button == addMoreType) {
-                return new Result(values(), true);
-            }
-            return null;
-        });
         getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene != null) {
                 UiUtil.applyStyles(newScene, settings);
-                newScene.getRoot().applyCss();
-                applyButtonOrder();
             }
         });
     }
 
-    private void applyButtonOrder() {
-        Node buttonBarNode = getDialogPane().lookup(".button-bar");
-        if (buttonBarNode instanceof ButtonBar buttonBar) {
-            buttonBar.setButtonOrder(BUTTON_ORDER);
+    private void saveAndClose(boolean addAnother) {
+        String validation = validateEditors();
+        if (!validation.isBlank()) {
+            error.setText(validation);
+            return;
         }
-    }
-
-    private void addValidationFilter(Button button) {
-        button.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-            String validation = validateEditors();
-            if (!validation.isBlank()) {
-                error.setText(validation);
-                event.consume();
-            } else {
-                error.setText("");
-            }
-        });
+        error.setText("");
+        setResult(new Result(values(), addAnother));
+        close();
     }
 
     private ValueEditor createEditor(FieldDefinition field, String value) {
