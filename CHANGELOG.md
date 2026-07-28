@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1-beta.3
+
+- Reordered the new-entry dialog buttons to display as **Cancel**, **Add & Add Another**, and **Add Entry**.
+- Includes the automatic updater, printing, summary, and repeat-entry improvements introduced during the 0.1.1 beta cycle.
+
 ## 0.1.1
 
 - Added an **Add & Add Another** action for faster entry creation.
