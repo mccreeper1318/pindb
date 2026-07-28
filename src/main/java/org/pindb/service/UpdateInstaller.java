@@ -29,7 +29,9 @@ import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -239,20 +241,59 @@ public final class UpdateInstaller {
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IOException("Could not download the update checksum.");
         }
+        return parseExpectedChecksum(response.body(), packageName);
+    }
 
-        for (String line : response.body().lines().toList()) {
+    static Optional<String> parseExpectedChecksum(String checksumText, String packageName) throws IOException {
+        String expectedName = normalizeChecksumName(packageName);
+        List<String> validHashes = new ArrayList<>();
+
+        for (String line : (checksumText == null ? "" : checksumText).lines().toList()) {
             String trimmed = line.trim();
             if (trimmed.isBlank()) {
                 continue;
             }
+
             String[] pieces = trimmed.split("\\s+", 2);
-            if (pieces.length == 1 || pieces[1].replace("*", "").trim().equals(packageName)) {
-                if (pieces[0].matches("(?i)[0-9a-f]{64}")) {
-                    return Optional.of(pieces[0]);
-                }
+            String hash = pieces[0];
+            if (!hash.matches("(?i)[0-9a-f]{64}")) {
+                continue;
+            }
+
+            validHashes.add(hash);
+            if (pieces.length == 1) {
+                return Optional.of(hash);
+            }
+
+            String listedName = checksumBasename(pieces[1]);
+            if (normalizeChecksumName(listedName).equals(expectedName)) {
+                return Optional.of(hash);
             }
         }
+
+        // A release-specific checksum asset containing one valid digest is unambiguous,
+        // even when GitHub has normalized a character in the uploaded asset filename.
+        if (validHashes.size() == 1) {
+            return Optional.of(validHashes.getFirst());
+        }
+
         throw new IOException("The checksum file did not contain an entry for " + packageName + ".");
+    }
+
+    private static String checksumBasename(String value) {
+        String cleaned = value == null ? "" : value.trim();
+        if (cleaned.startsWith("*")) {
+            cleaned = cleaned.substring(1).trim();
+        }
+        cleaned = cleaned.replace('\\', '/');
+        int slash = cleaned.lastIndexOf('/');
+        return slash >= 0 ? cleaned.substring(slash + 1) : cleaned;
+    }
+
+    private static String normalizeChecksumName(String value) {
+        return checksumBasename(value)
+                .replace('~', '.')
+                .toLowerCase(Locale.ROOT);
     }
 
     private static String sha256(Path file) throws Exception {
@@ -341,13 +382,20 @@ public final class UpdateInstaller {
                 "--updated-notes=" + notesFile).start();
     }
 
+    static List<Path> installedLauncherCandidates() {
+        return List.of(
+                Path.of("/opt/pindb/pindb/bin/PinDB"),
+                Path.of("/opt/pindb/bin/PinDB"),
+                Path.of("/usr/local/bin/pindb"),
+                Path.of("/usr/bin/pindb")
+        );
+    }
+
     private static Path installedLauncher() {
-        Path packaged = Path.of("/opt/pindb/bin/PinDB");
-        if (Files.isExecutable(packaged)) {
-            return packaged;
-        }
-        Path system = Path.of("/usr/bin/pindb");
-        return Files.isExecutable(system) ? system : null;
+        return installedLauncherCandidates().stream()
+                .filter(Files::isExecutable)
+                .findFirst()
+                .orElse(null);
     }
 
     private void showFailureAlert(Window owner, Path downloadedPackage, Throwable failure, Path logFile) {
