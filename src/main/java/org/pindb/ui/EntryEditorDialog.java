@@ -5,6 +5,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
@@ -41,6 +43,12 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         initOwner(owner);
         setTitle(existing == null ? "New Entry" : "Edit Entry");
         setHeaderText(existing == null ? "Add an entry to the database" : "Edit entry " + existing.id());
+
+        // JavaFX only permits a dialog to close with a null result when it contains a
+        // cancel-capable ButtonType. Keep one hidden while using the explicit custom
+        // action row below so Linux cannot rearrange the visible buttons.
+        ButtonType hiddenCancelType = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        getDialogPane().getButtonTypes().add(hiddenCancelType);
 
         GridPane grid = new GridPane();
         grid.setHgap(12);
@@ -98,8 +106,23 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene != null) {
                 UiUtil.applyStyles(newScene, settings);
+                newScene.getRoot().applyCss();
+                hidePlatformButtonBar(hiddenCancelType);
             }
         });
+    }
+
+    private void hidePlatformButtonBar(ButtonType hiddenCancelType) {
+        Node hiddenCancelButton = getDialogPane().lookupButton(hiddenCancelType);
+        if (hiddenCancelButton != null) {
+            hiddenCancelButton.setVisible(false);
+            hiddenCancelButton.setManaged(false);
+        }
+        Node buttonBar = getDialogPane().lookup(".button-bar");
+        if (buttonBar != null) {
+            buttonBar.setVisible(false);
+            buttonBar.setManaged(false);
+        }
     }
 
     private void saveAndClose(boolean addAnother) {
