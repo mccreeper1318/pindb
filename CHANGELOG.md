@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1-beta.4
+
+- Replaced the platform-managed new-entry button bar with a fixed custom layout: **Cancel**, **Add & Add Another**, **Add Entry**.
+- Switched automatic Linux updates to use `apt-get` through `pkexec`.
+- Added persistent updater diagnostics at `~/.local/state/pindb/update-error.log`.
+- Delayed update failure alerts until the progress dialog has fully closed.
+- Replaced the blank custom failure dialog with a standard error alert containing the cause, package path, manual command, and log location.
+
 ## 0.1.1-beta.3
 
 - Reordered the new-entry dialog buttons to display as **Cancel**, **Add & Add Another**, and **Add Entry**.
