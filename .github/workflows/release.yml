@@ -106,7 +106,7 @@ jobs:
           ./gradlew --no-daemon clean test packageDeb \
             -PappVersion="${{ steps.version.outputs.version }}"
 
-      - name: Verify generated package
+      - name: Verify and normalize generated package
         id: package
         shell: bash
         run: |
@@ -136,7 +136,17 @@ jobs:
             exit 1
           fi
 
-          echo "deb=$DEB" >> "$GITHUB_OUTPUT"
+          DEB_DIR="$(dirname "$DEB")"
+          ORIGINAL_NAME="$(basename "$DEB")"
+          SAFE_NAME="${ORIGINAL_NAME//\~/.}"
+          SAFE_DEB="$DEB_DIR/$SAFE_NAME"
+
+          if [[ "$SAFE_DEB" != "$DEB" ]]; then
+            mv "$DEB" "$SAFE_DEB"
+          fi
+
+          echo "Release asset: $SAFE_NAME"
+          echo "deb=$SAFE_DEB" >> "$GITHUB_OUTPUT"
 
       - name: Generate SHA-256 checksum
         shell: bash
