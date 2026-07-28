@@ -2,11 +2,13 @@ package org.pindb.service;
 
 import javafx.application.Platform;
 import javafx.concurrent.Task;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import org.pindb.ui.UiUtil;
@@ -15,6 +17,8 @@ import org.pindb.util.AppPaths;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -67,8 +71,11 @@ public final class UpdateInstaller {
             }
         });
 
+        Button cancelButton = (Button) dialog.getDialogPane().lookupButton(cancelType);
         AtomicBoolean cancelled = new AtomicBoolean(false);
-        Task<DownloadedUpdate> task = new Task<>() {
+        AtomicBoolean installing = new AtomicBoolean(false);
+
+        Task<DownloadedUpdate> downloadTask = new Task<>() {
             @Override
             protected DownloadedUpdate call() throws Exception {
                 Path updateDir = AppPaths.ensure(AppPaths.cacheDirectory().resolve("updates"));
@@ -85,7 +92,8 @@ public final class UpdateInstaller {
                 }
                 Files.move(partial, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
-                Optional<String> expected = fetchExpectedChecksum(release.checksumAsset(), destination.getFileName().toString());
+                Optional<String> expected = fetchExpectedChecksum(
+                        release.checksumAsset(), destination.getFileName().toString());
                 if (expected.isPresent()) {
                     updateMessage("Verifying downloaded package…");
                     String actual = sha256(destination);
@@ -99,33 +107,79 @@ public final class UpdateInstaller {
                 return new DownloadedUpdate(destination, notes);
             }
         };
-        status.textProperty().bind(task.messageProperty());
-        progress.progressProperty().bind(task.progressProperty());
+
+        status.textProperty().bind(downloadTask.messageProperty());
+        progress.progressProperty().bind(downloadTask.progressProperty());
         dialog.setOnCloseRequest(event -> {
-            cancelled.set(true);
-            task.cancel(true);
-        });
-        task.setOnSucceeded(event -> {
-            dialog.close();
-            DownloadedUpdate update = task.getValue();
-            try {
-                startPrivilegedInstaller(update.packageFile(), update.notesFile(), release.tag());
-                Platform.exit();
-            } catch (Exception exception) {
-                handleFailure(owner, update.packageFile(), exception);
+            if (installing.get()) {
+                event.consume();
+                return;
             }
+            cancelled.set(true);
+            downloadTask.cancel(true);
         });
-        task.setOnCancelled(event -> dialog.close());
-        task.setOnFailed(event -> {
+
+        downloadTask.setOnSucceeded(event -> {
+            DownloadedUpdate update = downloadTask.getValue();
+            status.textProperty().unbind();
+            progress.progressProperty().unbind();
+            installing.set(true);
+            cancelButton.setDisable(true);
+            dialog.setTitle("Installing PinDB Update");
+            dialog.setHeaderText("Installing " + release.tag());
+            status.setText("Waiting for administrator approval…");
+            progress.setProgress(-1);
+
+            Task<Void> installTask = new Task<>() {
+                @Override
+                protected Void call() throws Exception {
+                    installPrivileged(update.packageFile(), this::updateMessage);
+                    return null;
+                }
+            };
+            status.textProperty().bind(installTask.messageProperty());
+
+            installTask.setOnSucceeded(installEvent -> {
+                status.textProperty().unbind();
+                installing.set(false);
+                dialog.close();
+                try {
+                    Files.deleteIfExists(update.packageFile());
+                } catch (IOException ignored) {
+                    // A successful installation is more important than removing the cached package.
+                }
+                try {
+                    restartAfterUpdate(update.notesFile(), release.tag());
+                    Platform.exit();
+                } catch (IOException exception) {
+                    UiUtil.error(owner, "Update Installed",
+                            "The update installed successfully, but PinDB could not restart automatically. "
+                                    + "Open PinDB from the application menu.", exception);
+                }
+            });
+            installTask.setOnFailed(installEvent -> {
+                status.textProperty().unbind();
+                installing.set(false);
+                dialog.close();
+                handleFailure(owner, update.packageFile(), installTask.getException());
+            });
+
+            Thread installThread = new Thread(installTask, "pindb-update-install");
+            installThread.setDaemon(true);
+            installThread.start();
+        });
+        downloadTask.setOnCancelled(event -> dialog.close());
+        downloadTask.setOnFailed(event -> {
             dialog.close();
-            Throwable failure = task.getException();
+            Throwable failure = downloadTask.getException();
             if (!(failure instanceof InterruptedException)) {
                 handleFailure(owner, null, failure);
             }
         });
-        Thread thread = new Thread(task, "pindb-update-download");
-        thread.setDaemon(true);
-        thread.start();
+
+        Thread downloadThread = new Thread(downloadTask, "pindb-update-download");
+        downloadThread.setDaemon(true);
+        downloadThread.start();
         dialog.showAndWait();
     }
 
@@ -138,7 +192,8 @@ public final class UpdateInstaller {
                 .GET().build();
         HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("GitHub returned HTTP " + response.statusCode() + " while downloading the update.");
+            throw new IOException("GitHub returned HTTP " + response.statusCode()
+                    + " while downloading the update.");
         }
         long total = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
         try (InputStream input = new BufferedInputStream(response.body());
@@ -200,73 +255,148 @@ public final class UpdateInstaller {
         return HexFormat.of().formatHex(digest.digest());
     }
 
-    private static void startPrivilegedInstaller(Path packageFile, Path notesFile, String tag) throws IOException {
-        if (!Files.isExecutable(Path.of("/opt/pindb/bin/PinDB")) && !Files.isExecutable(Path.of("/usr/bin/pindb"))) {
-            throw new IOException("Automatic installation is available after PinDB has been installed from its .deb package.");
+    private static void installPrivileged(Path packageFile, MessageReporter messageReporter) throws Exception {
+        Path launcher = installedLauncher();
+        if (launcher == null) {
+            throw new IOException("Automatic installation is available after PinDB has been installed "
+                    + "from its .deb package.");
         }
-        Path updateDir = packageFile.getParent();
-        Path rootScript = updateDir.resolve("install-pindb-update-root.sh");
-        Path helperScript = updateDir.resolve("install-pindb-update.sh");
-        long pid = ProcessHandle.current().pid();
+        Path pkexec = Path.of("/usr/bin/pkexec");
+        if (!Files.isExecutable(pkexec)) {
+            throw new IOException("The pkexec administrator tool is not installed at /usr/bin/pkexec.");
+        }
+        if (!Files.isExecutable(Path.of("/usr/bin/dpkg"))) {
+            throw new IOException("The dpkg package installer is not available at /usr/bin/dpkg.");
+        }
 
+        Path rootScript = packageFile.getParent().resolve("install-pindb-update-root.sh");
         String root = """
                 #!/bin/sh
                 set -u
                 DEB="$1"
                 BACKUP="/opt/pindb-update-backup-$$"
                 HAD_OLD=0
+
                 if [ -d /opt/pindb ]; then
                   cp -a /opt/pindb "$BACKUP" || exit 30
                   HAD_OLD=1
                 fi
-                if /usr/bin/dpkg -i "$DEB"; then
+
+                /usr/bin/dpkg -i "$DEB"
+                STATUS=$?
+                if [ "$STATUS" -eq 0 ]; then
                   [ "$HAD_OLD" -eq 1 ] && rm -rf "$BACKUP"
                   exit 0
                 fi
-                STATUS=$?
+
                 if [ "$HAD_OLD" -eq 1 ]; then
                   rm -rf /opt/pindb
                   mv "$BACKUP" /opt/pindb
                 fi
                 exit "$STATUS"
                 """;
-        String helper = """
-                #!/bin/sh
-                PID="$1"
-                ROOT_SCRIPT="$2"
-                DEB="$3"
-                NOTES="$4"
-                TAG="$5"
-                while kill -0 "$PID" 2>/dev/null; do sleep 1; done
-                /usr/bin/pkexec "$ROOT_SCRIPT" "$DEB"
-                STATUS=$?
-                LAUNCHER="/opt/pindb/bin/PinDB"
-                [ -x "$LAUNCHER" ] || LAUNCHER="/usr/bin/pindb"
-                if [ "$STATUS" -eq 0 ]; then
-                  rm -f "$DEB" "$ROOT_SCRIPT"
-                  nohup "$LAUNCHER" "--updated-tag=$TAG" "--updated-notes=$NOTES" >/dev/null 2>&1 &
-                else
-                  rm -f "$NOTES" "$ROOT_SCRIPT"
-                  nohup "$LAUNCHER" "--update-failed=$DEB" >/dev/null 2>&1 &
-                fi
-                rm -f "$0"
-                exit 0
-                """;
         Files.writeString(rootScript, root, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        Files.writeString(helperScript, helper, StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        rootScript.toFile().setExecutable(true, true);
-        helperScript.toFile().setExecutable(true, true);
-        new ProcessBuilder("/bin/sh", helperScript.toString(), String.valueOf(pid), rootScript.toString(),
-                packageFile.toString(), notesFile.toString(), tag).start();
+
+        try {
+            messageReporter.report("Approve the administrator prompt to install the update…");
+            ProcessBuilder builder = new ProcessBuilder(pkexec.toString(), "/bin/sh",
+                    rootScript.toString(), packageFile.toString());
+            builder.redirectErrorStream(true);
+            Process process = builder.start();
+            String output;
+            try (InputStream input = process.getInputStream()) {
+                output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
+            }
+            int status = process.waitFor();
+            if (status != 0) {
+                String details = output.isBlank() ? "No additional installer output was provided." : output;
+                throw new IOException("The administrator installer exited with status " + status
+                        + ".\n\n" + details);
+            }
+        } finally {
+            Files.deleteIfExists(rootScript);
+        }
     }
 
-    private static void handleFailure(Window owner, Path downloadedPackage, Throwable failure) {
-        String location = downloadedPackage == null ? "" : "\n\nDownloaded package: " + downloadedPackage;
-        UiUtil.error(owner, "Update Failed",
-                "PinDB could not install the update. The current installation has not been replaced." + location,
-                failure);
+    private static void restartAfterUpdate(Path notesFile, String tag) throws IOException {
+        Path launcher = installedLauncher();
+        if (launcher == null) {
+            throw new IOException("The installed PinDB launcher could not be found after the update.");
+        }
+        new ProcessBuilder(launcher.toString(), "--updated-tag=" + tag,
+                "--updated-notes=" + notesFile).start();
+    }
+
+    private static Path installedLauncher() {
+        Path packaged = Path.of("/opt/pindb/bin/PinDB");
+        if (Files.isExecutable(packaged)) {
+            return packaged;
+        }
+        Path system = Path.of("/usr/bin/pindb");
+        return Files.isExecutable(system) ? system : null;
+    }
+
+    private void handleFailure(Window owner, Path downloadedPackage, Throwable failure) {
+        Dialog<Void> errorDialog = new Dialog<>();
+        errorDialog.initOwner(owner);
+        errorDialog.setTitle("Update Failed");
+        errorDialog.setHeaderText("PinDB could not install the update");
+        errorDialog.getDialogPane().getButtonTypes().add(
+                new ButtonType("Close", ButtonBar.ButtonData.CANCEL_CLOSE));
+
+        StringBuilder message = new StringBuilder(
+                "The current PinDB installation was preserved.\n\nCause: ")
+                .append(failureSummary(failure));
+        if (downloadedPackage != null) {
+            message.append("\n\nThe downloaded package was kept for manual installation:\n")
+                    .append(downloadedPackage)
+                    .append("\n\nManual command:\nsudo dpkg -i \"")
+                    .append(downloadedPackage)
+                    .append("\"");
+        }
+        Label summary = new Label(message.toString());
+        summary.setWrapText(true);
+
+        TextArea details = new TextArea(stackTrace(failure));
+        details.setEditable(false);
+        details.setWrapText(false);
+        details.setPrefRowCount(9);
+        details.setPrefColumnCount(72);
+        details.setPromptText("No technical details were available.");
+
+        errorDialog.getDialogPane().setContent(new VBox(12, summary,
+                new Label("Technical details:"), details));
+        errorDialog.getDialogPane().setPrefWidth(680);
+        errorDialog.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                UiUtil.applyStyles(newScene, settings);
+            }
+        });
+        errorDialog.showAndWait();
+    }
+
+    private static String failureSummary(Throwable failure) {
+        if (failure == null) {
+            return "Unknown update error.";
+        }
+        Throwable root = failure;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String message = root.getMessage();
+        return message == null || message.isBlank()
+                ? root.getClass().getSimpleName()
+                : message;
+    }
+
+    private static String stackTrace(Throwable failure) {
+        if (failure == null) {
+            return "";
+        }
+        StringWriter writer = new StringWriter();
+        failure.printStackTrace(new PrintWriter(writer));
+        return writer.toString();
     }
 
     public static void showFailedInstallPrompt(Window owner, Path packageFile) {
@@ -277,8 +407,9 @@ public final class UpdateInstaller {
         ButtonType delete = new ButtonType("Delete Download", ButtonBar.ButtonData.OK_DONE);
         ButtonType keep = new ButtonType("Keep for Manual Install", ButtonBar.ButtonData.CANCEL_CLOSE);
         dialog.getDialogPane().getButtonTypes().addAll(delete, keep);
-        Label message = new Label("Your previous PinDB installation was preserved. The downloaded package is located at:\n"
-                + packageFile + "\n\nDelete it now or keep it for manual installation.");
+        Label message = new Label("Your previous PinDB installation was preserved. "
+                + "The downloaded package is located at:\n" + packageFile
+                + "\n\nDelete it now or keep it for manual installation.");
         message.setWrapText(true);
         dialog.getDialogPane().setContent(message);
         dialog.setResultConverter(button -> button == delete);
@@ -286,7 +417,8 @@ public final class UpdateInstaller {
             try {
                 Files.deleteIfExists(packageFile);
             } catch (IOException exception) {
-                UiUtil.error(owner, "Could Not Delete Download", "The update package could not be deleted.", exception);
+                UiUtil.error(owner, "Could Not Delete Download",
+                        "The update package could not be deleted.", exception);
             }
         }
     }
