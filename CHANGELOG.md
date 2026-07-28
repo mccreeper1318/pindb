@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1-beta.5
+
+- Fixed Issue #9: the new-entry dialog can now be closed with the visible **Cancel** button, the Escape key, or the title-bar **X**.
+- Preserved the fixed visible button order: **Cancel**, **Add & Add Another**, **Add Entry**.
+- Kept the platform dialog controls hidden so Linux cannot rearrange the custom action buttons.
+- Includes the Beta 4 updater diagnostics and privileged installation improvements for continued update testing.
+
 ## 0.1.1-beta.4
 
 - Replaced the platform-managed new-entry button bar with a fixed custom layout: **Cancel**, **Add & Add Another**, **Add Entry**.
