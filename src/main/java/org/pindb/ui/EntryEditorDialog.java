@@ -44,11 +44,10 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         setTitle(existing == null ? "New Entry" : "Edit Entry");
         setHeaderText(existing == null ? "Add an entry to the database" : "Edit entry " + existing.id());
 
-        // JavaFX only permits a dialog to close with a null result when it contains a
-        // cancel-capable ButtonType. Keep one hidden while using the explicit custom
-        // action row below so Linux cannot rearrange the visible buttons.
         ButtonType hiddenCancelType = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
         getDialogPane().getButtonTypes().add(hiddenCancelType);
+        getDialogPane().createButton(hiddenCancelType).setVisible(false);
+        getDialogPane().lookupButton(hiddenCancelType).setManaged(false);
 
         GridPane grid = new GridPane();
         grid.setHgap(12);
@@ -107,22 +106,13 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             if (newScene != null) {
                 UiUtil.applyStyles(newScene, settings);
                 newScene.getRoot().applyCss();
-                hidePlatformButtonBar(hiddenCancelType);
+                Node buttonBar = getDialogPane().lookup(".button-bar");
+                if (buttonBar != null) {
+                    buttonBar.setVisible(false);
+                    buttonBar.setManaged(false);
+                }
             }
         });
-    }
-
-    private void hidePlatformButtonBar(ButtonType hiddenCancelType) {
-        Node hiddenCancelButton = getDialogPane().lookupButton(hiddenCancelType);
-        if (hiddenCancelButton != null) {
-            hiddenCancelButton.setVisible(false);
-            hiddenCancelButton.setManaged(false);
-        }
-        Node buttonBar = getDialogPane().lookup(".button-bar");
-        if (buttonBar != null) {
-            buttonBar.setVisible(false);
-            buttonBar.setManaged(false);
-        }
     }
 
     private void saveAndClose(boolean addAnother) {
