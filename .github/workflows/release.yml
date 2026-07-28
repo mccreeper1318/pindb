@@ -142,7 +142,16 @@ jobs:
         shell: bash
         run: |
           DEB="${{ steps.package.outputs.deb }}"
-          sha256sum "$DEB" > "$DEB.sha256"
+          DEB_DIR="$(dirname "$DEB")"
+          DEB_NAME="$(basename "$DEB")"
+
+          (
+            cd "$DEB_DIR"
+            sha256sum "$DEB_NAME"
+          ) > "$DEB.sha256"
+
+          echo "Generated checksum:"
+          cat "$DEB.sha256"
 
       - name: Upload release files
         shell: bash
