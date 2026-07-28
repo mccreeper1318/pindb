@@ -46,8 +46,6 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
 
         ButtonType hiddenCancelType = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
         getDialogPane().getButtonTypes().add(hiddenCancelType);
-        getDialogPane().createButton(hiddenCancelType).setVisible(false);
-        getDialogPane().lookupButton(hiddenCancelType).setManaged(false);
 
         GridPane grid = new GridPane();
         grid.setHgap(12);
@@ -105,14 +103,23 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene != null) {
                 UiUtil.applyStyles(newScene, settings);
-                newScene.getRoot().applyCss();
-                Node buttonBar = getDialogPane().lookup(".button-bar");
-                if (buttonBar != null) {
-                    buttonBar.setVisible(false);
-                    buttonBar.setManaged(false);
-                }
             }
         });
+        setOnShown(event -> hidePlatformButtonBar(hiddenCancelType));
+    }
+
+    private void hidePlatformButtonBar(ButtonType hiddenCancelType) {
+        getDialogPane().applyCss();
+        Node hiddenCancelButton = getDialogPane().lookupButton(hiddenCancelType);
+        if (hiddenCancelButton != null) {
+            hiddenCancelButton.setVisible(false);
+            hiddenCancelButton.setManaged(false);
+        }
+        Node buttonBar = getDialogPane().lookup(".button-bar");
+        if (buttonBar != null) {
+            buttonBar.setVisible(false);
+            buttonBar.setManaged(false);
+        }
     }
 
     private void saveAndClose(boolean addAnother) {
