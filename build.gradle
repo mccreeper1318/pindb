@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'org.pindb'
-version = providers.gradleProperty('appVersion').orElse('0.1.1').get()
+version = providers.gradleProperty('appVersion').orElse('0.1.1-beta.1').get()
 
 def javafxVersion = '21.0.8'
 def sqliteVersion = '3.53.2.1'
