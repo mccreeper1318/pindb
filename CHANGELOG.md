@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.1-beta.6
+
+- Fixed the duplicate **Cancel** button in the new-entry dialog while preserving the exact visible order: **Cancel**, **Add & Add Another**, **Add Entry**.
+- Fixed the post-update release-notes window so notes display at a usable size and remain scrollable.
+- Added a plain-text fallback if Markdown release-note rendering fails.
+- Updated launcher detection to recognize the actual packaged location at `/opt/pindb/pindb/bin/PinDB` as well as alternate install paths.
+- Made checksum verification tolerant of GitHub normalizing `~` to `.` in uploaded asset filenames.
+- Made checksum verification accept directory-prefixed filenames and single unambiguous SHA-256 entries.
+- Added updater regression tests for launcher discovery and checksum filename normalization.
+- Updated release packaging so uploaded `.deb` filenames and generated checksum entries always match.
+
 ## 0.1.1-beta.5
 
 - Fixed Issue #9: the new-entry dialog can now be closed with the visible **Cancel** button, the Escape key, or the title-bar **X**.
