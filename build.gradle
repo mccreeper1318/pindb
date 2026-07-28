@@ -5,7 +5,16 @@ plugins {
 }
 
 group = 'org.pindb'
-version = providers.gradleProperty('appVersion').orElse('0.1').get()
+version = providers.gradleProperty('appVersion')
+        .orElse('0.0.0-dev')
+        .get()
+
+def semanticVersion = project.version.toString()
+def semanticParts = semanticVersion.split('-', 2)
+def linuxAppVersion = semanticParts[0]
+def linuxAppRelease = semanticParts.length == 2
+        ? "0~${semanticParts[1].replace('-', '.')}"
+        : '1'
 
 def javafxVersion = '21.0.8'
 def sqliteVersion = '3.53.2.1'
@@ -114,7 +123,8 @@ tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
             '--dest', packagesDir.absolutePath,
             '--input', inputDir.absolutePath,
             '--name', 'PinDB',
-            '--app-version', project.version.toString(),
+            '--app-version', linuxAppVersion,
+            '--linux-app-release', linuxAppRelease
             '--vendor', 'PinDB Project',
             '--description', 'A flexible personal database application.',
             '--main-jar', mainJar,
