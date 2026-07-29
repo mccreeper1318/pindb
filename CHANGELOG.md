@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2-dev
+## 0.2-beta.1
 
 ### Added
 
