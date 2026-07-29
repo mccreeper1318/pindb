@@ -6,6 +6,7 @@ on:
       - agent/0.2-dev
     paths:
       - tools/apply_0_2_integration.py
+      - tools/run_0_2_integration.txt
 
 permissions:
   contents: write
