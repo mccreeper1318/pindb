@@ -1,1 +1,1 @@
-Run the Help and bug reporter integration.
+Run the Help and bug reporter integration again.
