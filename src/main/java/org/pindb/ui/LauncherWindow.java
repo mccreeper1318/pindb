@@ -116,6 +116,7 @@ public final class LauncherWindow {
         Button checkUpdates = new Button("Check for Updates");
         Button settings = new Button("Settings");
         Button help = new Button("Help");
+        Button reportBug = new Button("Report Bug");
         Button about = new Button("About");
         Button close = new Button("Exit PinDB");
         checkUpdates.setOnAction(event -> context.checkForUpdates(stage, true));
@@ -125,13 +126,14 @@ public final class LauncherWindow {
             }
         }));
         help.setOnAction(event -> new HelpDialog(stage, context.settings()).showAndWait());
+        reportBug.setOnAction(event -> new BugReportDialog(stage, context.settings()).showAndWait());
         about.setOnAction(event -> new AboutDialog(stage, context.settings()).showAndWait());
         close.setOnAction(event -> context.closeAll());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         updateStatus.getStyleClass().add("muted-label");
-        HBox footer = new HBox(8, updateStatus, spacer, checkUpdates, settings, help, about, close);
+        HBox footer = new HBox(8, updateStatus, spacer, checkUpdates, settings, help, reportBug, about, close);
         footer.setAlignment(Pos.CENTER_LEFT);
 
         VBox center = new VBox(16, header, actionCard, recentCard);

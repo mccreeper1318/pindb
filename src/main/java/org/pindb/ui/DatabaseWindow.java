@@ -207,6 +207,8 @@ public final class DatabaseWindow {
         help.getItems().addAll(
                 item("PinDB Help", event -> new HelpDialog(stage, context.settings()).showAndWait()),
                 item("Check for Updates", event -> context.checkForUpdates(stage, true)),
+                new javafx.scene.control.SeparatorMenuItem(),
+                item("Report a Bug…", event -> new BugReportDialog(stage, context.settings()).showAndWait()),
                 item("About PinDB", event -> new AboutDialog(stage, context.settings()).showAndWait()));
         return new MenuBar(file, databaseMenu, viewMenu, help);
     }

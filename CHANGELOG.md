@@ -9,6 +9,10 @@
 - Added an in-app viewer for PDF, DOCX, text, and common image files.
 - Added printing, Save Copy, and system-application actions to the document viewer.
 - Added embedded-document support to logical database backup snapshots.
+- Added a clickable update-history browser under **Help → PinDB Help → Updates**, with online refresh, local caching, and bundled offline release notes.
+- Added an in-app bug reporter that creates labeled issues in the PinDB GitHub repository using GitHub device authorization.
+- Added privacy-conscious diagnostics that exclude database contents, embedded documents, filenames, and personal paths.
+- Added secure GitHub authorization storage through the Linux keyring when available, with an owner-only credential-file fallback.
 
 ### Fixed
 

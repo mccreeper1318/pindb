@@ -82,6 +82,9 @@ processResources {
     filesMatching('org/pindb/app/version.properties') {
         expand(version: project.version)
     }
+    from('CHANGELOG.md') {
+        into 'org/pindb/app'
+    }
 }
 
 test {
