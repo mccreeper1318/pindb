@@ -48,7 +48,6 @@ import org.pindb.model.DatabaseView;
 import org.pindb.model.FieldDefinition;
 import org.pindb.model.FieldType;
 import org.pindb.model.FilterSpec;
-import org.pindb.model.PrintOptions;
 import org.pindb.model.RecordData;
 import org.pindb.service.CsvService;
 import org.pindb.service.PrintService;
@@ -56,7 +55,6 @@ import org.pindb.service.PrintService;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -387,14 +385,22 @@ public final class DatabaseWindow {
     }
 
     private void addEntry() {
-        new EntryEditorDialog(stage, context.settings(), fields, null).showAndWait().ifPresent(values -> {
+        boolean addAnother;
+        do {
+            EntryEditorDialog.Result result = new EntryEditorDialog(
+                    stage, context.settings(), fields, null).showAndWait().orElse(null);
+            if (result == null) {
+                return;
+            }
             try {
-                database.addRecord(values);
+                database.addRecord(result.values());
                 reloadAll();
+                addAnother = result.addAnother();
             } catch (DatabaseException exception) {
                 UiUtil.warning(stage, "Entry Not Saved", exception.getMessage());
+                addAnother = false;
             }
-        });
+        } while (addAnother);
     }
 
     private void editSelected() {
@@ -402,9 +408,9 @@ public final class DatabaseWindow {
         if (selected == null) {
             return;
         }
-        new EntryEditorDialog(stage, context.settings(), fields, selected).showAndWait().ifPresent(values -> {
+        new EntryEditorDialog(stage, context.settings(), fields, selected).showAndWait().ifPresent(result -> {
             try {
-                database.updateRecord(selected.id(), values);
+                database.updateRecord(selected.id(), result.values());
                 reloadAll();
             } catch (DatabaseException exception) {
                 UiUtil.warning(stage, "Entry Not Saved", exception.getMessage());
@@ -478,7 +484,8 @@ public final class DatabaseWindow {
     private void printDatabase() {
         new PrintOptionsDialog(stage, context.settings(), database, fields).showAndWait().ifPresent(options -> {
             try {
-                boolean printed = PrintService.print(stage, database.info(), fields, new ArrayList<>(filtered), options);
+                boolean printed = PrintService.print(stage, database.info(), fields,
+                        new ArrayList<>(filtered), options);
                 if (!printed) {
                     statusLabel.setText("Printing cancelled or unsuccessful");
                 }
@@ -493,7 +500,8 @@ public final class DatabaseWindow {
             if (database.integrityCheck()) {
                 UiUtil.information(stage, "Database Integrity", "SQLite reports that this database is healthy.");
             } else {
-                UiUtil.warning(stage, "Database Integrity Warning", "SQLite found a problem in this database. Restore a recent backup before making further changes.");
+                UiUtil.warning(stage, "Database Integrity Warning",
+                        "SQLite found a problem in this database. Restore a recent backup before making further changes.");
             }
         } catch (RuntimeException exception) {
             UiUtil.error(stage, "Integrity Check Failed", "PinDB could not check this database.", exception);
@@ -530,7 +538,8 @@ public final class DatabaseWindow {
                 GridPane.setHgrow(value, Priority.ALWAYS);
                 row++;
             }
-            Label metadata = new Label("Entry " + record.id() + "  •  Updated " + MODIFIED_FORMAT.format(record.updatedAt()));
+            Label metadata = new Label("Entry " + record.id() + "  •  Updated "
+                    + MODIFIED_FORMAT.format(record.updatedAt()));
             metadata.getStyleClass().add("muted-label");
             VBox card = new VBox(10, grid, new Separator(), metadata);
             card.getStyleClass().add("record-card");

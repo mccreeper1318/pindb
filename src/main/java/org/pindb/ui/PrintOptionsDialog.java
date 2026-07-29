@@ -50,6 +50,8 @@ public final class PrintOptionsDialog extends Dialog<PrintOptions> {
         pageNumbers.setSelected(true);
         CheckBox repeatHeadings = new CheckBox("Repeat field headings on every page");
         repeatHeadings.setSelected(true);
+        CheckBox summaries = new CheckBox("Include field summaries for visible entries");
+        summaries.setSelected(Boolean.parseBoolean(database.getMeta("print_summaries", "true")));
 
         Map<Long, CheckBox> fieldChecks = new LinkedHashMap<>();
         VBox fieldBox = new VBox(7);
@@ -75,8 +77,9 @@ public final class PrintOptionsDialog extends Dialog<PrintOptions> {
         grid.add(printDate, 0, 3, 2, 1);
         grid.add(pageNumbers, 0, 4, 2, 1);
         grid.add(repeatHeadings, 0, 5, 2, 1);
-        grid.add(new Label("Fields to print:"), 0, 6, 2, 1);
-        grid.add(fieldScroll, 0, 7, 2, 1);
+        grid.add(summaries, 0, 6, 2, 1);
+        grid.add(new Label("Fields to print:"), 0, 7, 2, 1);
+        grid.add(fieldScroll, 0, 8, 2, 1);
         getDialogPane().setContent(grid);
         getDialogPane().setPrefWidth(560);
 
@@ -97,8 +100,9 @@ public final class PrintOptionsDialog extends Dialog<PrintOptions> {
             boolean landscape = "Landscape".equals(orientation.getValue());
             database.setMeta("print_layout", selected.name());
             database.setMeta("print_orientation", landscape ? "LANDSCAPE" : "PORTRAIT");
+            database.setMeta("print_summaries", Boolean.toString(summaries.isSelected()));
             return new PrintOptions(selected, landscape, databaseName.isSelected(), printDate.isSelected(),
-                    pageNumbers.isSelected(), repeatHeadings.isSelected(), chosen);
+                    pageNumbers.isSelected(), repeatHeadings.isSelected(), summaries.isSelected(), chosen);
         });
         getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene != null) {
