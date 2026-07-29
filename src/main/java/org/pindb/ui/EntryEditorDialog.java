@@ -24,6 +24,7 @@ import org.pindb.model.FieldDefinition;
 import org.pindb.model.RecordData;
 import org.pindb.service.SettingsService;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -161,8 +162,25 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         DatePicker picker = new DatePicker(UiUtil.parseDate(value));
         picker.setMaxWidth(Double.MAX_VALUE);
         return new ValueEditor(picker,
-                () -> picker.getValue() == null ? "" : picker.getValue().toString(),
-                () -> "");
+                () -> committedDate(picker).toString(),
+                () -> {
+                    try {
+                        committedDate(picker);
+                        return "";
+                    } catch (RuntimeException exception) {
+                        return "Enter a valid date.";
+                    }
+                });
+    }
+
+    private LocalDate committedDate(DatePicker picker) {
+        String typed = picker.getEditor().getText() == null ? "" : picker.getEditor().getText().trim();
+        if (typed.isBlank()) {
+            return picker.getValue();
+        }
+        LocalDate parsed = picker.getConverter().fromString(typed);
+        picker.setValue(parsed);
+        return parsed;
     }
 
     private ValueEditor dateTimeEditor(String value) {
@@ -181,20 +199,24 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         HBox box = new HBox(8, date, time);
         HBox.setHgrow(date, Priority.ALWAYS);
         return new ValueEditor(box, () -> {
-            if (date.getValue() == null || time.getText().isBlank()) {
+            LocalDate committed = committedDate(date);
+            if (committed == null || time.getText().isBlank()) {
                 return "";
             }
-            return LocalDateTime.of(date.getValue(),
+            return LocalDateTime.of(committed,
                     LocalTime.parse(time.getText().trim(), TIME_FORMAT)).toString();
         }, () -> {
             if (time.getText().isBlank()) {
                 return "";
             }
             try {
+                committedDate(date);
                 LocalTime.parse(time.getText().trim(), TIME_FORMAT);
                 return "";
             } catch (DateTimeParseException exception) {
-                return "Enter time as hours and minutes, such as 14:30.";
+                return "Enter a valid date and time, such as 14:30.";
+            } catch (RuntimeException exception) {
+                return "Enter a valid date and time.";
             }
         });
     }
@@ -233,7 +255,7 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             } catch (RuntimeException exception) {
                 return field.name() + " contains an invalid value.";
             }
-            if (field.required() && value.isBlank()) {
+            if (field.required() && (value == null || value.isBlank())) {
                 return field.name() + " is required.";
             }
         }
@@ -243,7 +265,8 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
     private Map<Long, String> values() {
         LinkedHashMap<Long, String> values = new LinkedHashMap<>();
         for (FieldDefinition field : fields) {
-            values.put(field.id(), editors.get(field.id()).value().get());
+            String value = editors.get(field.id()).value().get();
+            values.put(field.id(), value == null ? "" : value);
         }
         return values;
     }
