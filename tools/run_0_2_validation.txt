@@ -1,0 +1,1 @@
+Run the complete PinDB 0.2 test suite.
