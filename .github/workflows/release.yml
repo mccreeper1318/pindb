@@ -1,0 +1,182 @@
+name: Build Release Package
+
+run-name: Build PinDB ${{ github.event.release.tag_name || inputs.tag }}
+
+on:
+  release:
+    types:
+      - published
+
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub release tag to build
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-24.04
+
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Read and validate version
+        id: version
+        shell: bash
+        run: |
+          RAW_TAG="$RELEASE_TAG"
+          VERSION="$RAW_TAG"
+
+          # Accept 0.1.1, v0.1.1, and v.0.1.1.
+          if [[ "$VERSION" == v.* ]]; then
+            VERSION="${VERSION#v.}"
+          elif [[ "$VERSION" == v* ]]; then
+            VERSION="${VERSION#v}"
+          fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid PinDB release tag: $RAW_TAG"
+            exit 1
+          fi
+
+          BASE_VERSION="${VERSION%%-*}"
+
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE_PART="${VERSION#*-}"
+            LINUX_RELEASE="0~${PRERELEASE_PART//-/.}"
+            TAG_IS_PRERELEASE=true
+          else
+            LINUX_RELEASE="1"
+            TAG_IS_PRERELEASE=false
+          fi
+
+          RELEASE_IS_PRERELEASE="$(
+            gh release view "$RAW_TAG" \
+              --json isPrerelease \
+              --jq '.isPrerelease'
+          )"
+
+          if [[ "$TAG_IS_PRERELEASE" != "$RELEASE_IS_PRERELEASE" ]]; then
+            echo "The tag and GitHub release type do not match."
+            echo "Tag: $RAW_TAG"
+            echo "Tag indicates prerelease: $TAG_IS_PRERELEASE"
+            echo "GitHub release is prerelease: $RELEASE_IS_PRERELEASE"
+            exit 1
+          fi
+
+          PACKAGE_VERSION="${BASE_VERSION}-${LINUX_RELEASE}"
+
+          echo "tag=$RAW_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "linux_release=$LINUX_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+
+          echo "PinDB version: $VERSION"
+          echo "Debian version: $PACKAGE_VERSION"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Install Debian packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Run tests and build package
+        run: |
+          ./gradlew --no-daemon clean test packageDeb \
+            -PappVersion="${{ steps.version.outputs.version }}"
+
+      - name: Verify and normalize generated package
+        id: package
+        shell: bash
+        run: |
+          mapfile -t PACKAGES < <(
+            find build/packages \
+              -maxdepth 1 \
+              -type f \
+              -name '*.deb'
+          )
+
+          if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one Debian package."
+            echo "Found: ${#PACKAGES[@]}"
+            printf '%s\n' "${PACKAGES[@]}"
+            exit 1
+          fi
+
+          DEB="${PACKAGES[0]}"
+          ACTUAL_VERSION="$(dpkg-deb -f "$DEB" Version)"
+          EXPECTED_VERSION="${{ steps.version.outputs.package_version }}"
+
+          echo "Expected Debian version: $EXPECTED_VERSION"
+          echo "Actual Debian version:   $ACTUAL_VERSION"
+
+          if [[ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "The package version does not match the release tag."
+            exit 1
+          fi
+
+          DEB_DIR="$(dirname "$DEB")"
+          ORIGINAL_NAME="$(basename "$DEB")"
+          SAFE_NAME="${ORIGINAL_NAME//\~/.}"
+          SAFE_DEB="$DEB_DIR/$SAFE_NAME"
+
+          if [[ "$SAFE_DEB" != "$DEB" ]]; then
+            mv "$DEB" "$SAFE_DEB"
+          fi
+
+          echo "Release asset: $SAFE_NAME"
+          echo "deb=$SAFE_DEB" >> "$GITHUB_OUTPUT"
+
+      - name: Generate SHA-256 checksum
+        shell: bash
+        run: |
+          DEB="${{ steps.package.outputs.deb }}"
+          DEB_DIR="$(dirname "$DEB")"
+          DEB_NAME="$(basename "$DEB")"
+
+          (
+            cd "$DEB_DIR"
+            sha256sum "$DEB_NAME"
+          ) > "$DEB.sha256"
+
+          echo "Generated checksum:"
+          cat "$DEB.sha256"
+
+      - name: Upload release files
+        shell: bash
+        run: |
+          DEB="${{ steps.package.outputs.deb }}"
+
+          gh release upload \
+            "$RELEASE_TAG" \
+            "$DEB" \
+            "$DEB.sha256" \
+            --clobber
+
+      - name: Save workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pindb-${{ steps.version.outputs.version }}
+          path: build/packages/*
+          if-no-files-found: error
