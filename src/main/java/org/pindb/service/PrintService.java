@@ -110,11 +110,11 @@ public final class PrintService {
                                            PrintOptions options, PageLayout layout) {
         List<Node> pages = new ArrayList<>();
         double bodyHeight = availableBodyHeight(options, layout);
-        double columnWidth = Math.max(70, layout.getPrintableWidth() / Math.max(1, fields.size()));
+        double columnWidth = printableColumnWidth(layout, fields.size());
         int index = 0;
         boolean firstPage = true;
         while (index < records.size() || (records.isEmpty() && firstPage)) {
-            GridPane grid = tableGrid(fields);
+            GridPane grid = tableGrid(fields, columnWidth);
             int row = 0;
             double used = 0;
             boolean headings = options.repeatHeadings() || firstPage;
@@ -181,15 +181,16 @@ public final class PrintService {
         return pages;
     }
 
-    private static GridPane tableGrid(List<FieldDefinition> fields) {
+    private static GridPane tableGrid(List<FieldDefinition> fields, double columnWidth) {
         GridPane grid = new GridPane();
         grid.setGridLinesVisible(true);
-        grid.setMaxWidth(Double.MAX_VALUE);
-        double percent = fields.isEmpty() ? 100 : 100.0 / fields.size();
-        for (int i = 0; i < Math.max(1, fields.size()); i++) {
-            ColumnConstraints constraints = new ColumnConstraints();
-            constraints.setPercentWidth(percent);
-            constraints.setHgrow(Priority.ALWAYS);
+        int count = Math.max(1, fields.size());
+        grid.setMinWidth(columnWidth * count);
+        grid.setPrefWidth(columnWidth * count);
+        grid.setMaxWidth(columnWidth * count);
+        for (int i = 0; i < count; i++) {
+            ColumnConstraints constraints = new ColumnConstraints(columnWidth, columnWidth, columnWidth);
+            constraints.setHgrow(Priority.NEVER);
             grid.getColumnConstraints().add(constraints);
         }
         return grid;
@@ -220,28 +221,43 @@ public final class PrintService {
 
     private static void appendSummaryBody(List<Node> bodies, List<FieldDefinition> fields,
                                           List<RecordData> records, PrintOptions options, PageLayout layout) {
-        Map<FieldDefinition, String> summaries = summaries(fields, records);
-        if (summaries.isEmpty()) {
+        List<Map.Entry<FieldDefinition, String>> entries = new ArrayList<>(summaries(fields, records).entrySet());
+        if (entries.isEmpty()) {
             return;
         }
-        VBox summary = new VBox(6);
-        Label title = new Label("Field Summaries");
-        title.setFont(Font.font(15));
-        title.setStyle("-fx-font-weight: bold; -fx-text-fill: black;");
-        summary.getChildren().add(title);
-        for (Map.Entry<FieldDefinition, String> entry : summaries.entrySet()) {
-            Label line = new Label(entry.getKey().name() + " — "
-                    + entry.getKey().summaryType().displayName() + ": " + entry.getValue());
-            line.setWrapText(true);
-            line.setStyle("-fx-text-fill: black;");
-            summary.getChildren().add(line);
+        double bodyHeight = availableBodyHeight(options, layout);
+        double lineWidth = Math.max(80, layout.getPrintableWidth() - 16);
+        int index = 0;
+        int summaryPage = 1;
+        while (index < entries.size()) {
+            VBox summary = new VBox(6);
+            Label title = new Label(summaryPage == 1 ? "Field Summaries" : "Field Summaries (continued)");
+            title.setFont(Font.font(15));
+            title.setStyle("-fx-font-weight: bold; -fx-text-fill: black;");
+            summary.getChildren().add(title);
+            double used = 34;
+            while (index < entries.size()) {
+                Map.Entry<FieldDefinition, String> entry = entries.get(index);
+                String text = entry.getKey().name() + " — "
+                        + entry.getKey().summaryType().displayName() + ": " + entry.getValue();
+                double lineHeight = estimateTextHeight(text, lineWidth) + 6;
+                if (summary.getChildren().size() > 1 && used + lineHeight > bodyHeight) {
+                    break;
+                }
+                Label line = new Label(text);
+                line.setWrapText(true);
+                line.setMaxWidth(lineWidth);
+                line.setStyle("-fx-text-fill: black;");
+                summary.getChildren().add(line);
+                used += Math.min(lineHeight, bodyHeight);
+                index++;
+                if (used >= bodyHeight) {
+                    break;
+                }
+            }
+            bodies.add(summary);
+            summaryPage++;
         }
-        double estimated = 34 + summaries.size() * 24.0;
-        if (estimated > availableBodyHeight(options, layout)) {
-            summary.setScaleX(0.9);
-            summary.setScaleY(0.9);
-        }
-        bodies.add(summary);
     }
 
     static Map<FieldDefinition, String> summaries(List<FieldDefinition> fields, List<RecordData> records) {
@@ -284,6 +300,10 @@ public final class PrintService {
                     ? currency.format(value) : value.stripTrailingZeros().toPlainString());
         }
         return result;
+    }
+
+    static double printableColumnWidth(PageLayout layout, int fieldCount) {
+        return Math.max(1, (layout.getPrintableWidth() - 8) / Math.max(1, fieldCount));
     }
 
     private static double availableBodyHeight(PrintOptions options, PageLayout layout) {

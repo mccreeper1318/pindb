@@ -14,6 +14,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
@@ -43,8 +44,10 @@ import javafx.stage.Stage;
 import org.pindb.AppContext;
 import org.pindb.db.DatabaseException;
 import org.pindb.db.DatabaseService;
+import org.pindb.db.DocumentStore;
 import org.pindb.model.DatabaseInfo;
 import org.pindb.model.DatabaseView;
+import org.pindb.model.DocumentData;
 import org.pindb.model.FieldDefinition;
 import org.pindb.model.FieldType;
 import org.pindb.model.FilterSpec;
@@ -68,6 +71,7 @@ public final class DatabaseWindow {
 
     private final AppContext context;
     private final DatabaseService database;
+    private final DocumentStore documentStore;
     private final Runnable onClosed;
     private final Stage stage = new Stage();
     private final ObservableList<RecordData> records = FXCollections.observableArrayList();
@@ -93,6 +97,7 @@ public final class DatabaseWindow {
     public DatabaseWindow(AppContext context, DatabaseService database, Runnable onClosed) {
         this.context = context;
         this.database = database;
+        this.documentStore = new DocumentStore(database.path());
         this.onClosed = onClosed;
         DatabaseInfo info = database.info();
         view = info.defaultView();
@@ -155,6 +160,7 @@ public final class DatabaseWindow {
             return;
         }
         closed = true;
+        documentStore.close();
         database.close();
         stage.hide();
         onClosed.run();
@@ -287,8 +293,24 @@ public final class DatabaseWindow {
                 @Override
                 protected void updateItem(String value, boolean empty) {
                     super.updateItem(value, empty);
-                    setText(empty ? null : UiUtil.formatValue(field, value));
-                    setWrapText(field.type() == FieldType.MULTILINE_TEXT);
+                    setGraphic(null);
+                    setText(null);
+                    if (empty) {
+                        return;
+                    }
+                    if (field.type() == FieldType.DOCUMENT && value != null && !value.isBlank()) {
+                        Hyperlink link = new Hyperlink(value);
+                        link.setOnAction(event -> {
+                            RecordData record = getTableRow() == null ? null : getTableRow().getItem();
+                            if (record != null) {
+                                openDocument(record.id(), field.id());
+                            }
+                        });
+                        setGraphic(link);
+                    } else {
+                        setText(UiUtil.formatValue(field, value));
+                        setWrapText(field.type() == FieldType.MULTILINE_TEXT);
+                    }
                 }
             });
             column.setComparator(comparatorFor(field));
@@ -388,12 +410,13 @@ public final class DatabaseWindow {
         boolean addAnother;
         do {
             EntryEditorDialog.Result result = new EntryEditorDialog(
-                    stage, context.settings(), fields, null).showAndWait().orElse(null);
+                    stage, context.settings(), fields, null, Map.of()).showAndWait().orElse(null);
             if (result == null) {
                 return;
             }
             try {
-                database.addRecord(result.values());
+                long recordId = database.addRecord(result.values());
+                documentStore.replaceDocuments(recordId, result.documents());
                 reloadAll();
                 addAnother = result.addAnother();
             } catch (DatabaseException exception) {
@@ -408,9 +431,12 @@ public final class DatabaseWindow {
         if (selected == null) {
             return;
         }
-        new EntryEditorDialog(stage, context.settings(), fields, selected).showAndWait().ifPresent(result -> {
+        Map<Long, DocumentData> existingDocuments = documentStore.documentsForRecord(selected.id());
+        new EntryEditorDialog(stage, context.settings(), fields, selected, existingDocuments)
+                .showAndWait().ifPresent(result -> {
             try {
                 database.updateRecord(selected.id(), result.values());
+                documentStore.replaceDocuments(selected.id(), result.documents());
                 reloadAll();
             } catch (DatabaseException exception) {
                 UiUtil.warning(stage, "Entry Not Saved", exception.getMessage());
@@ -459,6 +485,13 @@ public final class DatabaseWindow {
             }
         });
         return dialog.showAndWait().orElse(false);
+    }
+
+    private void openDocument(long recordId, long fieldId) {
+        documentStore.document(recordId, fieldId).ifPresentOrElse(
+                document -> new DocumentViewer(stage, context.settings(), document).show(),
+                () -> UiUtil.warning(stage, "Document Unavailable",
+                        "The selected document is no longer stored in this entry."));
     }
 
     private void exportCsv() {
@@ -530,9 +563,17 @@ public final class DatabaseWindow {
             for (FieldDefinition field : fields) {
                 Label name = new Label(field.name() + ":");
                 name.setStyle("-fx-font-weight: bold;");
-                Label value = new Label(UiUtil.formatValue(field, record.value(field.id())));
-                value.setWrapText(true);
-                value.setMaxWidth(Double.MAX_VALUE);
+                javafx.scene.Node value;
+                if (field.type() == FieldType.DOCUMENT && !record.value(field.id()).isBlank()) {
+                    Hyperlink link = new Hyperlink(record.value(field.id()));
+                    link.setOnAction(event -> openDocument(record.id(), field.id()));
+                    value = link;
+                } else {
+                    Label label = new Label(UiUtil.formatValue(field, record.value(field.id())));
+                    label.setWrapText(true);
+                    label.setMaxWidth(Double.MAX_VALUE);
+                    value = label;
+                }
                 grid.add(name, 0, row);
                 grid.add(value, 1, row);
                 GridPane.setHgrow(value, Priority.ALWAYS);

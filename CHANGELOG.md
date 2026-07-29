@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2-dev
+
+### Added
+
+- Added a **Document** field type that stores the original file inside the `.pindb` SQLite database.
+- Added clickable document filenames in table and record views.
+- Added an in-app viewer for PDF, DOCX, text, and common image files.
+- Added printing, Save Copy, and system-application actions to the document viewer.
+- Added embedded-document support to logical database backup snapshots.
+
+### Fixed
+
+- Fixed CSV imports keeping display-formatted dates instead of normalizing them to PinDB's internal date format (Issue #12).
+- Fixed typed DatePicker values being replaced by the previous or current date when Enter saved an entry (Issue #13).
+- Fixed large groups of printed summaries being clipped instead of continuing onto additional pages (Issue #16).
+- Fixed table-print pagination estimating wrapping with a different column width than the rendered table (Issue #17).
+
 ## 0.1.1-beta.6
 
 - Fixed the duplicate **Cancel** button in the new-entry dialog while preserving the exact visible order: **Cancel**, **Add & Add Another**, **Add Entry**.

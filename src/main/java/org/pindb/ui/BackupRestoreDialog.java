@@ -15,6 +15,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.pindb.db.DatabaseService;
+import org.pindb.db.DocumentStore;
 import org.pindb.model.BackupSnapshot;
 import org.pindb.service.SettingsService;
 
@@ -55,6 +56,9 @@ public final class BackupRestoreDialog {
             if (selected != null && UiUtil.confirm(stage, "Restore Backup",
                     "Restore the database to " + selected.createdAt() + "? PinDB will first back up the current state.")) {
                 database.restoreSnapshot(selected.id());
+                try (DocumentStore documents = new DocumentStore(database.path())) {
+                    documents.restoreSnapshot(selected.id());
+                }
                 reload();
                 onRestored.run();
                 UiUtil.information(stage, "Backup Restored", "The database was restored successfully.");
