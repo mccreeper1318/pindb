@@ -50,7 +50,12 @@ public final class CsvService {
         List<FieldDefinition> fields = new ArrayList<>();
         for (int index = 0; index < headers.size(); index++) {
             String header = headers.get(index).isBlank() ? "Field " + (index + 1) : headers.get(index).trim();
-            fields.add(new FieldDefinition(0, header, FieldType.TEXT, index, false,
+            int column = index;
+            List<String> columnValues = rows.stream().skip(1)
+                    .map(row -> column < row.size() ? row.get(column) : "")
+                    .toList();
+            FieldType inferredType = DateValueParser.inferType(columnValues);
+            fields.add(new FieldDefinition(0, header, inferredType, index, false,
                     "", "", "", false, null, List.of(), SummaryType.NONE));
         }
         DatabaseService service = DatabaseService.create(destination, databaseName,
@@ -60,7 +65,9 @@ public final class CsvService {
             List<String> row = rows.get(rowIndex);
             Map<Long, String> values = new LinkedHashMap<>();
             for (int column = 0; column < createdFields.size(); column++) {
-                values.put(createdFields.get(column).id(), column < row.size() ? row.get(column) : "");
+                FieldDefinition field = createdFields.get(column);
+                String raw = column < row.size() ? row.get(column) : "";
+                values.put(field.id(), DateValueParser.normalize(field.type(), raw));
             }
             service.addRecord(values);
         }
