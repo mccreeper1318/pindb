@@ -1,1 +1,0 @@
-Run the PinDB 0.2 integration patch.
