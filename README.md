@@ -210,13 +210,13 @@ A development run uses the version supplied with `-PappVersion`. Without that pr
 Example:
 
 ```bash
-./gradlew run -PappVersion=0.2-beta.1
+./gradlew run -PappVersion=0.2-beta.2
 ```
 
 ## Build the Linux installer
 
 ```bash
-./gradlew clean test packageDeb -PappVersion=0.2-beta.1
+./gradlew clean test packageDeb -PappVersion=0.2-beta.2
 ```
 
 The self-contained Debian package is written to:
@@ -267,7 +267,7 @@ Supported tag formats include:
 0.2.1
 v0.2.1
 v.0.2.1
-0.2-beta.1
+0.2-beta.2
 ```
 
 A tag containing a pre-release suffix must be published as a GitHub pre-release. A stable tag must be published as a normal release.
