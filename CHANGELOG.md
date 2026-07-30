@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2-beta.2
+
+### Fixed
+
+- Fixed the GitHub authorization button freezing PinDB while opening the browser during in-app bug reporting (Issue #18).
+- Moved GitHub authorization and submitted-issue link opening off the JavaFX application thread.
+- Added a visible device code, authorization address, and **Copy Code** fallback when the browser cannot open automatically.
+
 ## 0.2-beta.1
 
 ### Added
@@ -20,8 +28,6 @@
 - Fixed typed DatePicker values being replaced by the previous or current date when Enter saved an entry (Issue #13).
 - Fixed large groups of printed summaries being clipped instead of continuing onto additional pages (Issue #16).
 - Fixed table-print pagination estimating wrapping with a different column width than the rendered table (Issue #17).
-- Fixed the GitHub authorization button freezing PinDB while opening the browser during in-app bug reporting (Issue #18).
-- Added a visible device code, authorization address, and copy-code fallback when the browser cannot open automatically.
 
 ## 0.1.1-beta.6
 
