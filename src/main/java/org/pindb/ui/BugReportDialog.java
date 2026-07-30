@@ -12,15 +12,18 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import org.pindb.service.BugReportService;
+import org.pindb.service.ExternalLinkService;
 import org.pindb.service.GitHubAppConfig;
 import org.pindb.service.GitHubAuthService;
 import org.pindb.service.SettingsService;
 
-import java.awt.Desktop;
 import java.net.URI;
 
 public final class BugReportDialog extends Dialog<Void> {
@@ -113,7 +116,7 @@ public final class BugReportDialog extends Dialog<Void> {
             ButtonType open = new ButtonType("Open Issue", ButtonBar.ButtonData.OTHER);
             alert.getButtonTypes().setAll(open, ButtonType.CLOSE);
             if (alert.showAndWait().orElse(ButtonType.CLOSE) == open) {
-                openBrowser(issue.url());
+                openExternalLink(issue.url(), "Opening the GitHub issue…");
             }
         });
         task.setOnFailed(event -> {
@@ -129,27 +132,46 @@ public final class BugReportDialog extends Dialog<Void> {
     }
 
     private void showAuthorization(GitHubAuthService.DeviceAuthorization authorization) {
+        Label instructions = new Label("Open the GitHub authorization page, enter the code, and approve PinDB. "
+                + "This is required only when connecting or reconnecting your GitHub account.");
+        instructions.setWrapText(true);
+        TextField code = new TextField(authorization.userCode());
+        code.setEditable(false);
+        TextField address = new TextField(authorization.verificationUri().toString());
+        address.setEditable(false);
+        VBox content = new VBox(10, instructions, new Label("Device code:"), code,
+                new Label("Authorization page:"), address);
+
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.initOwner(getOwner());
         alert.setTitle("Authorize PinDB on GitHub");
-        alert.setHeaderText("Enter this GitHub device code: " + authorization.userCode());
-        alert.setContentText("Open the GitHub authorization page, enter the code, and approve PinDB. "
-                + "This is required only when connecting or reconnecting your GitHub account.");
+        alert.setHeaderText("Authorize PinDB using this GitHub device code");
+        alert.getDialogPane().setContent(content);
         ButtonType open = new ButtonType("Open GitHub", ButtonBar.ButtonData.OK_DONE);
-        alert.getButtonTypes().setAll(open, ButtonType.CLOSE);
-        if (alert.showAndWait().orElse(ButtonType.CLOSE) == open) {
-            openBrowser(authorization.verificationUri());
+        ButtonType copy = new ButtonType("Copy Code", ButtonBar.ButtonData.OTHER);
+        alert.getButtonTypes().setAll(open, copy, ButtonType.CLOSE);
+
+        ButtonType selected = alert.showAndWait().orElse(ButtonType.CLOSE);
+        if (selected == copy) {
+            ClipboardContent clipboard = new ClipboardContent();
+            clipboard.putString(authorization.userCode());
+            Clipboard.getSystemClipboard().setContent(clipboard);
+            status.setText("GitHub device code copied. Complete authorization in your browser.");
+        } else if (selected == open) {
+            openExternalLink(authorization.verificationUri(),
+                    "Opening GitHub… Complete authorization with code " + authorization.userCode() + ".");
         }
     }
 
-    private static void openBrowser(URI uri) {
-        try {
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(uri);
+    private void openExternalLink(URI uri, String progressMessage) {
+        status.setText(progressMessage);
+        ExternalLinkService.openAsync(uri).thenAccept(opened -> Platform.runLater(() -> {
+            if (opened) {
+                status.setText("Waiting for GitHub authorization…");
+            } else {
+                status.setText("Could not open the browser automatically. Use this address manually: " + uri);
             }
-        } catch (Exception ignored) {
-            // The code and URL remain visible for manual navigation.
-        }
+        }));
     }
 
     private static TextArea area(String prompt) {
