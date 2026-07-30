@@ -1,0 +1,37 @@
+name: Validate Issue 18 Fix
+
+on:
+  push:
+    branches:
+      - agent/0.2-dev
+    paths:
+      - tools/run_issue_18_validation.txt
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/0.2-dev
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+      - name: Run complete test suite
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test
+      - name: Record successful validation
+        run: |
+          git config user.name "PinDB Development Automation"
+          git config user.email "actions@users.noreply.github.com"
+          printf 'Issue 18 validation passed for %s\n' "$GITHUB_SHA" > tools/issue-18-tests-passed.txt
+          git add tools/issue-18-tests-passed.txt
+          git commit -m "Record Issue 18 validation"
+          git push origin HEAD:agent/0.2-dev
