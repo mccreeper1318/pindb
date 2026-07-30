@@ -1,1 +1,1 @@
-Run the complete Issue 18 regression test suite.
+Run the complete Issue 18 regression test suite again.
