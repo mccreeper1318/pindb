@@ -1,1 +1,0 @@
-Beta 3 bug reporter validation passed for 21f68db3972880e938591b4ffc65550ffccc04cd
