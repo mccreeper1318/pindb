@@ -2,8 +2,8 @@ package org.pindb.ui;
 
 import javafx.application.Platform;
 import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -27,6 +27,7 @@ import org.pindb.service.SettingsService;
 import java.net.URI;
 
 public final class BugReportDialog extends Dialog<Void> {
+    private final Window owner;
     private final SettingsService settings;
     private final TextField title = new TextField();
     private final TextArea description = area("Describe the problem.");
@@ -37,7 +38,12 @@ public final class BugReportDialog extends Dialog<Void> {
     private final CheckBox diagnostics = new CheckBox("Include PinDB version and system diagnostics");
     private final Label status = new Label();
 
+    private Task<BugReportService.SubmittedIssue> activeSubmission;
+    private Dialog<Void> authorizationDialog;
+    private boolean closingAuthorizationProgrammatically;
+
     public BugReportDialog(Window owner, SettingsService settings) {
+        this.owner = owner;
         this.settings = settings;
         initOwner(owner);
         setTitle("Report a PinDB Bug");
@@ -66,7 +72,7 @@ public final class BugReportDialog extends Dialog<Void> {
         getDialogPane().setPrefSize(760, 720);
 
         Button submit = (Button) getDialogPane().lookupButton(submitType);
-        submit.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+        submit.addEventFilter(ActionEvent.ACTION, event -> {
             event.consume();
             if (title.getText().isBlank() || description.getText().isBlank()) {
                 status.setText("Enter a title and description before submitting.");
@@ -79,20 +85,26 @@ public final class BugReportDialog extends Dialog<Void> {
                 UiUtil.applyStyles(newScene, settings);
             }
         });
+        setOnHidden(event -> cancelActiveSubmission());
     }
 
     private void submitReport(Button submitButton) {
         if (!GitHubAppConfig.configured()) {
-            UiUtil.warning(getOwner(), "Bug Reporter Not Configured",
+            UiUtil.warning(owner, "Bug Reporter Not Configured",
                     "The PinDB GitHub App client ID has not been configured yet. "
                             + "The application owner must finish the GitHub App setup before reports can be submitted.");
             return;
         }
+        if (activeSubmission != null && activeSubmission.isRunning()) {
+            return;
+        }
+
         submitButton.setDisable(true);
         status.setText("Connecting to GitHub…");
         BugReportService.BugReport report = new BugReportService.BugReport(
                 title.getText().trim(), description.getText(), steps.getText(), expected.getText(),
                 actual.getText(), additional.getText(), diagnostics.isSelected());
+
         Task<BugReportService.SubmittedIssue> task = new Task<>() {
             @Override
             protected BugReportService.SubmittedIssue call() throws Exception {
@@ -103,37 +115,48 @@ public final class BugReportDialog extends Dialog<Void> {
                 return new BugReportService().submit(token, report);
             }
         };
-        status.textProperty().bind(task.messageProperty());
-        task.setOnSucceeded(event -> {
-            status.textProperty().unbind();
-            BugReportService.SubmittedIssue issue = task.getValue();
-            close();
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.initOwner(getOwner());
-            alert.setTitle("Bug Report Submitted");
-            alert.setHeaderText("GitHub issue #" + issue.number() + " was created");
-            alert.setContentText("Your bug report was submitted successfully.");
-            ButtonType open = new ButtonType("Open Issue", ButtonBar.ButtonData.OTHER);
-            alert.getButtonTypes().setAll(open, ButtonType.CLOSE);
-            if (alert.showAndWait().orElse(ButtonType.CLOSE) == open) {
-                openExternalLink(issue.url(), "Opening the GitHub issue…");
+        activeSubmission = task;
+        task.messageProperty().addListener((observable, oldMessage, newMessage) -> {
+            if (newMessage != null && !newMessage.isBlank()) {
+                status.setText(newMessage);
             }
         });
+
+        task.setOnSucceeded(event -> {
+            closeAuthorizationDialog();
+            activeSubmission = null;
+            submitButton.setDisable(false);
+            BugReportService.SubmittedIssue issue = task.getValue();
+            close();
+            showSubmissionSuccess(issue);
+        });
         task.setOnFailed(event -> {
-            status.textProperty().unbind();
+            closeAuthorizationDialog();
+            activeSubmission = null;
             submitButton.setDisable(false);
             status.setText("The report could not be submitted.");
-            UiUtil.error(getOwner(), "Bug Report Failed",
+            UiUtil.error(owner, "Bug Report Failed",
                     "PinDB could not submit the bug report to GitHub.", task.getException());
         });
+        task.setOnCancelled(event -> {
+            closeAuthorizationDialog();
+            activeSubmission = null;
+            submitButton.setDisable(false);
+            if (isShowing()) {
+                status.setText("GitHub authorization was cancelled. You can submit the report again.");
+            }
+        });
+
         Thread thread = new Thread(task, "pindb-bug-report");
         thread.setDaemon(true);
         thread.start();
     }
 
     private void showAuthorization(GitHubAuthService.DeviceAuthorization authorization) {
+        closeAuthorizationDialog();
+
         Label instructions = new Label("Open the GitHub authorization page, enter the code, and approve PinDB. "
-                + "This is required only when connecting or reconnecting your GitHub account.");
+                + "This window will close automatically after authorization succeeds.");
         instructions.setWrapText(true);
         TextField code = new TextField(authorization.userCode());
         code.setEditable(false);
@@ -142,36 +165,124 @@ public final class BugReportDialog extends Dialog<Void> {
         VBox content = new VBox(10, instructions, new Label("Device code:"), code,
                 new Label("Authorization page:"), address);
 
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.initOwner(getOwner());
-        alert.setTitle("Authorize PinDB on GitHub");
-        alert.setHeaderText("Authorize PinDB using this GitHub device code");
-        alert.getDialogPane().setContent(content);
-        ButtonType open = new ButtonType("Open GitHub", ButtonBar.ButtonData.OK_DONE);
-        ButtonType copy = new ButtonType("Copy Code", ButtonBar.ButtonData.OTHER);
-        alert.getButtonTypes().setAll(open, copy, ButtonType.CLOSE);
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.initOwner(owner);
+        dialog.setTitle("Authorize PinDB on GitHub");
+        dialog.setHeaderText("Authorize PinDB using this GitHub device code");
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setPrefWidth(620);
 
-        ButtonType selected = alert.showAndWait().orElse(ButtonType.CLOSE);
-        if (selected == copy) {
+        ButtonType openType = new ButtonType("Open GitHub", ButtonBar.ButtonData.OTHER);
+        ButtonType copyType = new ButtonType("Copy Code", ButtonBar.ButtonData.OTHER);
+        ButtonType cancelType = new ButtonType("Cancel Authorization", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().setAll(openType, copyType, cancelType);
+
+        Button openButton = (Button) dialog.getDialogPane().lookupButton(openType);
+        openButton.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
+            openExternalLink(authorization.verificationUri(),
+                    "Opening GitHub… Complete authorization with code " + authorization.userCode() + ".");
+        });
+
+        Button copyButton = (Button) dialog.getDialogPane().lookupButton(copyType);
+        copyButton.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
             ClipboardContent clipboard = new ClipboardContent();
             clipboard.putString(authorization.userCode());
             Clipboard.getSystemClipboard().setContent(clipboard);
             status.setText("GitHub device code copied. Complete authorization in your browser.");
-        } else if (selected == open) {
-            openExternalLink(authorization.verificationUri(),
-                    "Opening GitHub… Complete authorization with code " + authorization.userCode() + ".");
+            code.requestFocus();
+            code.selectAll();
+        });
+
+        dialog.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                UiUtil.applyStyles(newScene, settings);
+            }
+        });
+        dialog.setOnHidden(event -> {
+            boolean closedByUser = !closingAuthorizationProgrammatically;
+            authorizationDialog = null;
+            closingAuthorizationProgrammatically = false;
+            if (closedByUser) {
+                cancelActiveSubmission();
+            }
+        });
+
+        authorizationDialog = dialog;
+        dialog.show();
+        code.requestFocus();
+        code.selectAll();
+    }
+
+    private void showSubmissionSuccess(BugReportService.SubmittedIssue issue) {
+        Label message = new Label("Your bug report was submitted successfully.");
+        message.setWrapText(true);
+        Label number = new Label("GitHub issue #" + issue.number() + " was created.");
+        number.setStyle("-fx-font-weight: bold;");
+        TextField address = new TextField(issue.url().toString());
+        address.setEditable(false);
+        VBox content = new VBox(10, message, number, new Label("Issue address:"), address);
+        content.setPadding(new Insets(8));
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.initOwner(owner);
+        dialog.setTitle("Bug Report Submitted");
+        dialog.setHeaderText("GitHub issue #" + issue.number() + " was created");
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setPrefWidth(620);
+        ButtonType openType = new ButtonType("Open Issue", ButtonBar.ButtonData.OTHER);
+        dialog.getDialogPane().getButtonTypes().setAll(openType, ButtonType.CLOSE);
+        dialog.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                UiUtil.applyStyles(newScene, settings);
+            }
+        });
+
+        ButtonType selected = dialog.showAndWait().orElse(ButtonType.CLOSE);
+        if (selected == openType) {
+            ExternalLinkService.openAsync(issue.url()).thenAccept(opened -> {
+                if (!opened) {
+                    Platform.runLater(() -> UiUtil.warning(owner, "Could Not Open Issue",
+                            "PinDB could not open the web browser automatically.\n\n" + issue.url()));
+                }
+            });
         }
     }
 
     private void openExternalLink(URI uri, String progressMessage) {
         status.setText(progressMessage);
         ExternalLinkService.openAsync(uri).thenAccept(opened -> Platform.runLater(() -> {
+            if (!isShowing()) {
+                return;
+            }
             if (opened) {
                 status.setText("Waiting for GitHub authorization…");
             } else {
                 status.setText("Could not open the browser automatically. Use this address manually: " + uri);
             }
         }));
+    }
+
+    private void closeAuthorizationDialog() {
+        Dialog<Void> dialog = authorizationDialog;
+        if (dialog == null) {
+            return;
+        }
+        if (dialog.isShowing()) {
+            closingAuthorizationProgrammatically = true;
+            dialog.close();
+        } else {
+            authorizationDialog = null;
+            closingAuthorizationProgrammatically = false;
+        }
+    }
+
+    private void cancelActiveSubmission() {
+        Task<BugReportService.SubmittedIssue> task = activeSubmission;
+        if (task != null && task.isRunning()) {
+            task.cancel(true);
+        }
     }
 
     private static TextArea area(String prompt) {
