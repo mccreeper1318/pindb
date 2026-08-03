@@ -128,7 +128,7 @@ public final class BugReportDialog extends Dialog<Void> {
             submitButton.setDisable(false);
             BugReportService.SubmittedIssue issue = task.getValue();
             close();
-            showSubmissionSuccess(issue);
+            Platform.runLater(() -> showSubmissionSuccess(issue));
         });
         task.setOnFailed(event -> {
             closeAuthorizationDialog();
@@ -170,7 +170,7 @@ public final class BugReportDialog extends Dialog<Void> {
         dialog.setTitle("Authorize PinDB on GitHub");
         dialog.setHeaderText("Authorize PinDB using this GitHub device code");
         dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().setPrefWidth(620);
+        dialog.getDialogPane().setPrefSize(620, 300);
 
         ButtonType openType = new ButtonType("Open GitHub", ButtonBar.ButtonData.OTHER);
         ButtonType copyType = new ButtonType("Copy Code", ButtonBar.ButtonData.OTHER);
@@ -230,7 +230,7 @@ public final class BugReportDialog extends Dialog<Void> {
         dialog.setTitle("Bug Report Submitted");
         dialog.setHeaderText("GitHub issue #" + issue.number() + " was created");
         dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().setPrefWidth(620);
+        dialog.getDialogPane().setPrefSize(620, 260);
         ButtonType openType = new ButtonType("Open Issue", ButtonBar.ButtonData.OTHER);
         dialog.getDialogPane().getButtonTypes().setAll(openType, ButtonType.CLOSE);
         dialog.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
