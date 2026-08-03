@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PinDB - a flexible personal database application.">
+  <title>Download - PinDB</title>
+  <link rel="icon" href="assets/icon.png" type="image/png">
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="masthead">
+      <div class="brand">
+        <img class="brand-icon" src="assets/icon.png" alt="PinDB logo">
+        <div class="logo">PinDB<span class="blink">_</span></div>
+      </div>
+      <p class="tagline">A FLEXIBLE PERSONAL DATABASE FOR YOUR COMPUTER</p>
+    </header>
+    <nav class="navbar" aria-label="Main navigation">
+      <a href="index.html">HOME</a>
+      <a href="download.html" class="current">DOWNLOAD</a>
+      <a href="features.html">FEATURES</a>
+      <a href="gallery.html">GALLERY</a>
+      <a href="manual.html">USER GUIDE</a>
+      <a href="build.html">BUILD FROM SOURCE</a>
+      <a href="about.html">ABOUT</a>
+    </nav>
+    <main class="content">
+<div data-release-page></div>
+<h1>Download PinDB</h1>
+
+<p class="note"><b>Linux only at this time:</b> the official installer is a self-contained Debian package for 64-bit Debian-based Linux systems.</p>
+
+<h2>Latest stable release: <span id="stable-version">checking GitHub...</span></h2>
+<p><a id="stable-deb" class="download-button primary" href="https://github.com/mccreeper1318/pindb/releases/latest">Download latest stable .deb</a></p>
+<p><a id="stable-checksum" href="https://github.com/mccreeper1318/pindb/releases/latest">Stable release checksum</a></p>
+
+<h2>Latest beta release: <span id="beta-version">checking GitHub...</span></h2>
+<p><a id="beta-deb" class="download-button" href="https://github.com/mccreeper1318/pindb/releases">Download latest beta .deb</a></p>
+<p><a id="beta-checksum" href="https://github.com/mccreeper1318/pindb/releases">Beta release checksum</a></p>
+
+<p id="release-status" class="small">Looking up current release assets...</p>
+
+<h2>Installation</h2>
+<ol>
+  <li>Download the <code>.deb</code> file.</li>
+  <li>Double-click it and open it with Software Manager or Package Installer.</li>
+  <li>Select <b>Install</b> and enter your administrator password.</li>
+  <li>Launch <b>PinDB</b> from the application menu.</li>
+</ol>
+<p>Terminal installation:</p>
+<pre>sudo apt install ./pindb_*.deb</pre>
+
+<h2>Source archives</h2>
+<p>
+  <a class="download-button" href="https://github.com/mccreeper1318/pindb/archive/refs/heads/main.zip">Main branch ZIP</a>
+  <a class="download-button" href="https://github.com/mccreeper1318/pindb/archive/refs/heads/main.tar.gz">Main branch TAR.GZ</a>
+</p>
+
+<h2>Verify a download</h2>
+<pre>sha256sum -c downloaded-package.deb.sha256</pre>
+<p>The calculated SHA-256 value should match the checksum published with the release.</p>
+
+<h2>Other platforms</h2>
+<table class="status-table">
+  <tr><th>Platform</th><th>Status</th></tr>
+  <tr><td>Linux Mint / Ubuntu / Debian x64</td><td>Official <code>.deb</code> package</td></tr>
+  <tr><td>Windows</td><td>Not currently released</td></tr>
+  <tr><td>macOS</td><td>Not currently released</td></tr>
+</table>
+    </main>
+    <footer class="footer">
+      <div>PinDB Project &mdash; Hosted with simple HTML suitable for GitHub Pages.</div>
+      <div>Best viewed at 800&times;600 or better. JavaScript is optional except for live release links.</div>
+      <div>You are visitor <span class="counter" id="visitor-counter">000001</span></div>
+      <div>&copy; <span id="year">2026</span> PinDB Project &nbsp;|&nbsp; <a href="https://github.com/mccreeper1318/pindb">View Source on GitHub</a></div>
+    </footer>
+  </div>
+</body>
+</html>
