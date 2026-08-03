@@ -1,1 +1,0 @@
-Rerun the beta 3 bug reporter validation after the compile fix.
