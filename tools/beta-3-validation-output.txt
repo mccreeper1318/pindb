@@ -11,32 +11,22 @@ For more details see https://docs.gradle.org/9.6.1/release-notes.html
 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
 Daemon will be stopped at the end of the build 
 > Task :clean UP-TO-DATE
-
 > Task :compileJava
-/home/runner/work/pindb/pindb/src/main/java/org/pindb/ui/BugReportDialog.java:242: error: incompatible types: ButtonType cannot be converted to Void
-        ButtonType selected = dialog.showAndWait().orElse(ButtonType.CLOSE);
-                                                                    ^
-Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
-1 error
-
-> Task :compileJava FAILED
+> Task :processResources
+> Task :classes
+> Task :compileTestJava
+> Task :processTestResources NO-SOURCE
+> Task :testClasses
+> Task :test
+> Task :jacocoTestReport
 
 [Incubating] Problems report is available at: file:///home/runner/work/pindb/pindb/build/reports/problems/problems-report.html
 
-FAILURE: Build failed with an exception.
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
 
-* What went wrong:
-Execution failed for task ':compileJava' (registered by plugin class 'org.gradle.api.plugins.JavaBasePlugin').
-> Compilation failed; see the compiler output below.
-  /home/runner/work/pindb/pindb/src/main/java/org/pindb/ui/BugReportDialog.java:242: error: incompatible types: ButtonType cannot be converted to Void
-          ButtonType selected = dialog.showAndWait().orElse(ButtonType.CLOSE);
-                                                                      ^
-  Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
-  1 error
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
 
-* Try:
-> Check your code and dependencies to fix the compilation error(s)
-> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 9s
-2 actionable tasks: 1 executed, 1 up-to-date
+BUILD SUCCESSFUL in 16s
+6 actionable tasks: 5 executed, 1 up-to-date
