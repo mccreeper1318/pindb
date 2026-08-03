@@ -7,6 +7,12 @@
 - Fixed the About PinDB dialog referring specifically to Version 0.1 in its database-encryption notice (Issue #19).
 - Changed the notice to **Current version does not encrypt database contents** so it remains accurate in future releases.
 
+### Planned fixes
+
+- Keep the GitHub authorization dialog open after **Copy Code** is selected and prevent the bug-report form from remaining disabled (Issue #20).
+- Close the GitHub authorization dialog automatically after authorization succeeds and the bug report is submitted (Issue #21).
+- Ensure every successful bug submission displays a populated confirmation dialog with the issue actions (Issue #22).
+
 ## 0.2-beta.2
 
 ### Fixed
