@@ -40,13 +40,12 @@ jobs:
           git config user.name "PinDB Development Automation"
           git config user.email "actions@users.noreply.github.com"
           if [ "${{ steps.tests.outputs.status }}" = "0" ]; then
-            printf 'Beta 3 bug reporter validation passed for %s\n' "$GITHUB_SHA" > tools/beta-3-bug-reporter-tests-passed.txt
-            rm -f tools/beta-3-bug-reporter-tests-failed.txt
+            RESULT="passed"
           else
-            printf 'Beta 3 bug reporter validation failed for %s\n' "$GITHUB_SHA" > tools/beta-3-bug-reporter-tests-failed.txt
-            rm -f tools/beta-3-bug-reporter-tests-passed.txt
+            RESULT="failed"
           fi
-          git add tools/beta-3-validation-output.txt tools/beta-3-bug-reporter-tests-passed.txt tools/beta-3-bug-reporter-tests-failed.txt 2>/dev/null || true
+          printf 'Beta 3 bug reporter validation %s for %s\n' "$RESULT" "$GITHUB_SHA" > tools/beta-3-validation-result.txt
+          git add tools/beta-3-validation-output.txt tools/beta-3-validation-result.txt
           git commit -m "Record beta 3 bug reporter validation result"
           git push origin HEAD:agent/0.2-dev
       - name: Fail workflow when tests fail
