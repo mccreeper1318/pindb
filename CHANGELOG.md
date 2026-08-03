@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2-beta.3
+
+### Fixed
+
+- Fixed the About PinDB dialog referring specifically to Version 0.1 in its database-encryption notice (Issue #19).
+- Changed the notice to **Current version does not encrypt database contents** so it remains accurate in future releases.
+
 ## 0.2-beta.2
 
 ### Fixed
