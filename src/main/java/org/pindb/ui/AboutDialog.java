@@ -29,7 +29,7 @@ public final class AboutDialog extends Dialog<Void> {
         Label text = new Label("A flexible personal database application built with JavaFX and SQLite.\n\n"
                 + "Update repository: " + UpdateService.REPOSITORY + "\n"
                 + "Database files use the .pindb extension and remain standard SQLite databases.\n\n"
-                + "Version 0.1 does not encrypt database contents.");
+                + "Current version does not encrypt database contents.");
         text.setWrapText(true);
         text.setMaxWidth(520);
         VBox content = new VBox(12, icon, title, text);
