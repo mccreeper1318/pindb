@@ -1,0 +1,1 @@
+Beta 3 bug reporter validation failed for 47ad8e06f0cefaf53e36ec671fb1a6bdbe4a51d5
