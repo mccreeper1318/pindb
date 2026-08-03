@@ -24,14 +24,31 @@ jobs:
           java-version: "21"
           cache: gradle
       - name: Run complete test suite
+        id: tests
+        shell: bash
         run: |
+          set +e
           chmod +x gradlew
-          ./gradlew --no-daemon clean test
-      - name: Record successful validation
+          ./gradlew --no-daemon clean test > tools/beta-3-validation-output.txt 2>&1
+          STATUS=$?
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          tail -n 500 tools/beta-3-validation-output.txt
+          exit 0
+      - name: Record validation result
+        shell: bash
         run: |
           git config user.name "PinDB Development Automation"
           git config user.email "actions@users.noreply.github.com"
-          printf 'Beta 3 bug reporter validation passed for %s\n' "$GITHUB_SHA" > tools/beta-3-bug-reporter-tests-passed.txt
-          git add tools/beta-3-bug-reporter-tests-passed.txt
-          git commit -m "Record beta 3 bug reporter validation"
+          if [ "${{ steps.tests.outputs.status }}" = "0" ]; then
+            printf 'Beta 3 bug reporter validation passed for %s\n' "$GITHUB_SHA" > tools/beta-3-bug-reporter-tests-passed.txt
+            rm -f tools/beta-3-bug-reporter-tests-failed.txt
+          else
+            printf 'Beta 3 bug reporter validation failed for %s\n' "$GITHUB_SHA" > tools/beta-3-bug-reporter-tests-failed.txt
+            rm -f tools/beta-3-bug-reporter-tests-passed.txt
+          fi
+          git add tools/beta-3-validation-output.txt tools/beta-3-bug-reporter-tests-passed.txt tools/beta-3-bug-reporter-tests-failed.txt 2>/dev/null || true
+          git commit -m "Record beta 3 bug reporter validation result"
           git push origin HEAD:agent/0.2-dev
+      - name: Fail workflow when tests fail
+        if: steps.tests.outputs.status != '0'
+        run: exit 1
