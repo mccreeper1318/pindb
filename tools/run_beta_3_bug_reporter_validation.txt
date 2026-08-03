@@ -1,1 +1,1 @@
-Run the complete beta 3 bug reporter validation with captured output.
+Run the final complete beta 3 bug reporter validation.
