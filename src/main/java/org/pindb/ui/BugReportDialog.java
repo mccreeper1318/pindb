@@ -239,15 +239,18 @@ public final class BugReportDialog extends Dialog<Void> {
             }
         });
 
-        ButtonType selected = dialog.showAndWait().orElse(ButtonType.CLOSE);
-        if (selected == openType) {
+        Button openButton = (Button) dialog.getDialogPane().lookupButton(openType);
+        openButton.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
+            dialog.close();
             ExternalLinkService.openAsync(issue.url()).thenAccept(opened -> {
                 if (!opened) {
                     Platform.runLater(() -> UiUtil.warning(owner, "Could Not Open Issue",
                             "PinDB could not open the web browser automatically.\n\n" + issue.url()));
                 }
             });
-        }
+        });
+        dialog.showAndWait();
     }
 
     private void openExternalLink(URI uri, String progressMessage) {
