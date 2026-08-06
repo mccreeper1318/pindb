@@ -4,31 +4,46 @@ PinDB is a desktop personal database application for organizing structured infor
 
 Each database is stored as a portable SQLite file with the `.pindb` extension. A single file contains its field definitions, entries, display preferences, deleted records, internal backups, and embedded documents.
 
-PinDB is designed primarily for Linux Mint, Ubuntu, Debian, and other Debian-based Linux distributions.
+PinDB provides self-contained packages for Debian-family and Fedora-family Linux distributions.
 
 ## Download and install
 
-Download the newest `.deb` installer from the [PinDB Releases](https://github.com/mccreeper1318/pindb/releases) page.
+Download the newest package for your distribution from the [PinDB Releases](https://github.com/mccreeper1318/pindb/releases) page:
 
-The installer includes a private Java runtime, so Java does not need to be installed separately for normal use.
+- Use the `.deb` package on Linux Mint, Ubuntu, Debian, and related distributions.
+- Use the `.rpm` package on Fedora Workstation, Fedora KDE, and other traditional Fedora spins.
 
-### Install with a graphical package manager
+Both packages include a private Java runtime, so Java does not need to be installed separately for normal use.
 
-1. Download the PinDB `.deb` file.
-2. Double-click the downloaded file.
-3. Open it with Software Manager, Package Installer, or another Debian package installer.
-4. Select **Install** and enter the administrator password when requested.
-5. Launch **PinDB** from the application menu.
+### Debian, Ubuntu, and Linux Mint
 
-### Install from a terminal
+To install graphically, double-click the downloaded `.deb` and open it with the distribution's package installer.
 
-Open a terminal in the folder containing the downloaded package and run:
+To install from a terminal, open the folder containing the package and run:
 
 ```bash
 sudo apt install ./pindb_*_amd64.deb
 ```
 
-Installing a newer package upgrades the existing PinDB installation while preserving databases stored in your own folders.
+### Fedora Workstation and Fedora spins
+
+To install graphically, double-click the downloaded `.rpm` and open it with Software or Discover.
+
+To install from a terminal, open the folder containing the package and run:
+
+```bash
+sudo dnf install ./pindb-*.x86_64.rpm
+```
+
+Fedora Atomic desktops such as Silverblue and Kinoite use `rpm-ostree` rather than normal DNF package installation. PinDB's in-application installer does not currently update those immutable systems automatically. An RPM can be layered manually with:
+
+```bash
+sudo rpm-ostree install ./pindb-*.x86_64.rpm
+```
+
+Reboot into the new deployment after an `rpm-ostree` installation or update.
+
+Installing a newer native package upgrades the existing PinDB installation while preserving databases stored in your own folders.
 
 ## Getting started
 
@@ -120,14 +135,15 @@ Keep separate copies of important `.pindb` files as part of a normal backup rout
 
 PinDB can check GitHub Releases for new versions from inside the application.
 
-When an update is accepted, PinDB:
+When an update is accepted on a supported traditional Linux installation, PinDB:
 
-1. Downloads the matching Debian package.
-2. Verifies its SHA-256 checksum when supplied.
-3. Requests administrator approval through the normal Linux privilege prompt.
-4. Installs the package.
-5. Restarts PinDB.
-6. Displays the release notes.
+1. Detects whether the system uses Debian or RPM packages.
+2. Downloads the matching `.deb` or `.rpm` package for the current architecture.
+3. Verifies its SHA-256 checksum when supplied.
+4. Requests administrator approval through the normal Linux privilege prompt.
+5. Installs the package with `apt-get`, `dnf5`, or `dnf` as appropriate.
+6. Restarts PinDB.
+7. Displays the release notes.
 
 Stable updates are checked by default. Pre-release updates can be enabled in Settings.
 
@@ -153,7 +169,8 @@ The copy is placed beside the original database. Older PinDB versions may not be
 
 ## Current limitations
 
-- The official installer and automatic updater target Debian-based Linux systems.
+- Official release packages currently target 64-bit x86 Debian-family and Fedora-family systems.
+- Automatic installation is not supported on Fedora Atomic desktops such as Silverblue and Kinoite.
 - Database encryption is not currently included.
 - Embedded document previews are not intended to reproduce every detail of a full office suite.
 - A GitHub account and internet connection are required to submit a bug report from inside PinDB.
@@ -164,10 +181,22 @@ PinDB is still an early-stage application. Keep external backups of important da
 
 ## Requirements
 
+All builds require:
+
 - Git
 - JDK 21, including `jpackage`
-- A 64-bit Linux system for building the official Debian package
-- `dpkg`, `dpkg-deb`, and `fakeroot` for Debian packaging
+- A 64-bit Linux system for building the official Linux packages
+
+Debian packaging additionally requires:
+
+- `dpkg`
+- `dpkg-deb`
+- `fakeroot`
+
+RPM packaging additionally requires:
+
+- `rpm-build`
+- `rpmbuild`
 
 PinDB uses the included Gradle wrapper. A system-wide Gradle installation is not required.
 
@@ -181,7 +210,7 @@ cd pindb
 chmod +x gradlew
 ```
 
-To work with an active development branch, check it out after cloning. For example:
+To work with the active 0.2 development branch:
 
 ```bash
 git switch agent/0.2-dev
@@ -210,24 +239,34 @@ A development run uses the version supplied with `-PappVersion`. Without that pr
 Example:
 
 ```bash
-./gradlew run -PappVersion=0.2-beta.2
+./gradlew run -PappVersion=0.2-beta.3
 ```
 
-## Build the Linux installer
+## Build the Debian package
+
+On a Debian-family build system:
 
 ```bash
-./gradlew clean test packageDeb -PappVersion=0.2-beta.2
+./gradlew clean test packageDeb -PappVersion=0.2-beta.3
 ```
 
-The self-contained Debian package is written to:
+## Build the Fedora RPM
+
+On Fedora or another RPM build system with `rpm-build` installed:
+
+```bash
+./gradlew clean test packageRpm -PappVersion=0.2-beta.3
+```
+
+Both tasks write their self-contained package to:
 
 ```text
 build/packages/
 ```
 
-The package includes a private runtime generated by `jpackage` and installs PinDB under `/opt/pindb` with an application-menu shortcut and `.pindb` file association.
+The packages include a private runtime generated by `jpackage` and install PinDB under `/opt/pindb` with an application-menu shortcut and `.pindb` file association.
 
-The `packageDeb` task runs only on Linux.
+Native `jpackage` packages should be built on a distribution from the corresponding package family. The CI and release workflows build the `.deb` on Ubuntu and the `.rpm` inside Fedora.
 
 ## Open the project in IntelliJ IDEA
 
@@ -243,22 +282,22 @@ The `packageDeb` task runs only on Linux.
 src/main/java/          Application source
 src/main/resources/     Styles, icons, configuration, and packaged resources
 src/test/java/          JUnit tests
-packaging/              Debian package and file-association resources
+packaging/              Native package and file-association resources
 docs/                   Release and updater documentation
-.github/workflows/      Build, test, and release automation
+.github/workflows/      Debian and Fedora build, test, and release automation
 ```
 
 ## Release builds
 
 The release workflow runs when a GitHub Release is published. It:
 
-1. Checks out the release tag.
-2. Validates the version format.
-3. Runs the complete test suite.
-4. Builds the self-contained `.deb` package.
-5. Verifies the Debian package version.
-6. Generates a SHA-256 checksum.
-7. Uploads both files to the GitHub Release.
+1. Validates the release tag and pre-release status.
+2. Runs the complete test suite in the Debian and Fedora build jobs.
+3. Builds a self-contained `.deb` package on Ubuntu.
+4. Builds a self-contained `.rpm` package in Fedora.
+5. Verifies the native package versions and metadata.
+6. Generates a SHA-256 checksum for each package.
+7. Uploads both packages and both checksum files to the GitHub Release.
 
 Supported tag formats include:
 
@@ -267,7 +306,7 @@ Supported tag formats include:
 0.2.1
 v0.2.1
 v.0.2.1
-0.2-beta.2
+0.2-beta.3
 ```
 
 A tag containing a pre-release suffix must be published as a GitHub pre-release. A stable tag must be published as a normal release.
@@ -286,6 +325,7 @@ A useful bug report should include:
 
 - The PinDB version
 - Linux distribution and version
+- Package type used (`.deb` or `.rpm`)
 - Steps that reproduce the problem
 - Expected behavior
 - Actual behavior

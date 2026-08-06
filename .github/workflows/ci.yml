@@ -12,7 +12,8 @@ permissions:
   contents: read
 
 jobs:
-  test-and-package:
+  test-and-package-deb:
+    name: Test and build Debian package
     runs-on: ubuntu-24.04
 
     steps:
@@ -34,14 +35,8 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Run tests
-        run: ./gradlew --no-daemon clean test
-
-      - name: Build application distribution
-        run: ./gradlew --no-daemon installDist
-
-      - name: Build Debian package
-        run: ./gradlew --no-daemon packageDeb
+      - name: Run tests and build Debian package
+        run: ./gradlew --no-daemon clean test packageDeb
 
       - name: Upload test report
         if: always()
@@ -56,4 +51,50 @@ jobs:
         with:
           name: pindb-deb
           path: build/packages/*.deb
+          if-no-files-found: error
+
+  test-and-package-rpm:
+    name: Test and build Fedora RPM
+    runs-on: ubuntu-24.04
+    container:
+      image: fedora:latest
+
+    steps:
+      - name: Install Fedora build tools
+        run: |
+          dnf install -y \
+            git \
+            java-21-openjdk-devel \
+            rpm-build \
+            findutils \
+            gzip \
+            tar \
+            which
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Run tests and build RPM package
+        run: ./gradlew --no-daemon clean test packageRpm
+
+      - name: Verify RPM metadata
+        shell: bash
+        run: |
+          mapfile -t PACKAGES < <(find build/packages -maxdepth 1 -type f -name '*.rpm')
+          if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one RPM package; found ${#PACKAGES[@]}."
+            printf '%s\n' "${PACKAGES[@]}"
+            exit 1
+          fi
+          rpm -qpi "${PACKAGES[0]}"
+          rpm -qpl "${PACKAGES[0]}"
+
+      - name: Upload Fedora RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: pindb-rpm
+          path: build/packages/*.rpm
           if-no-files-found: error

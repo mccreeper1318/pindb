@@ -12,9 +12,13 @@ version = providers.gradleProperty('appVersion')
 def semanticVersion = project.version.toString()
 def semanticParts = semanticVersion.split('-', 2)
 def linuxAppVersion = semanticParts[0]
-def linuxAppRelease = semanticParts.length == 2
-        ? "0~${semanticParts[1].replace('-', '.')}"
-        : '1'
+def prereleasePart = semanticParts.length == 2 ? semanticParts[1] : null
+def debAppRelease = prereleasePart == null
+        ? '1'
+        : "0~${prereleasePart.replace('-', '.')}"
+def rpmAppRelease = prereleasePart == null
+        ? '1'
+        : "0.${prereleasePart.replaceAll(/[^0-9A-Za-z.]+/, '.')}"
 
 def javafxVersion = '21.0.8'
 def sqliteVersion = '3.53.2.1'
@@ -99,6 +103,19 @@ jacocoTestReport {
     }
 }
 
+def preparePackageDirectory = { File packagesDir, String extension ->
+    if (!packagesDir.mkdirs() && !packagesDir.isDirectory()) {
+        throw new GradleException("Unable to create package directory: ${packagesDir}")
+    }
+    packagesDir.listFiles()?.findAll { file ->
+        file.isFile() && (file.name.endsWith(extension) || file.name.endsWith(extension + '.sha256'))
+    }?.each { file ->
+        if (!file.delete()) {
+            throw new GradleException("Unable to remove old package: ${file}")
+        }
+    }
+}
+
 tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
     group = 'distribution'
     description = 'Builds a self-contained Debian package with jpackage.'
@@ -115,15 +132,7 @@ tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
     def associations = file('packaging/pindb-file-associations.properties')
 
     doFirst {
-        if (packagesDir.exists()) {
-            packagesDir.deleteDir()
-        }
-
-        if (!packagesDir.mkdirs() && !packagesDir.isDirectory()) {
-            throw new GradleException(
-                    "Unable to create package directory: ${packagesDir}"
-            )
-        }
+        preparePackageDirectory(packagesDir, '.deb')
     }
 
     commandLine 'jpackage',
@@ -132,7 +141,7 @@ tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
             '--input', inputDir.absolutePath,
             '--name', 'PinDB',
             '--app-version', linuxAppVersion,
-            '--linux-app-release', linuxAppRelease,
+            '--linux-app-release', debAppRelease,
             '--vendor', 'PinDB Project',
             '--description', 'A flexible personal database application.',
             '--main-jar', mainJar,
@@ -141,6 +150,47 @@ tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
             '--install-dir', '/opt/pindb',
             '--linux-package-name', 'pindb',
             '--linux-menu-group', 'Office',
+            '--linux-shortcut',
+            '--file-associations', associations.absolutePath,
+            '--java-options', '-Dfile.encoding=UTF-8',
+            '--java-options', '-Dprism.order=es2,sw'
+}
+
+tasks.register('packageRpm', org.gradle.api.tasks.Exec) {
+    group = 'distribution'
+    description = 'Builds a self-contained RPM package for Fedora-family Linux distributions with jpackage.'
+    dependsOn tasks.installDist
+
+    onlyIf {
+        osName.contains('linux')
+    }
+
+    def packagesDir = layout.buildDirectory.dir('packages').get().asFile
+    def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
+    def mainJar = "pindb-${project.version}.jar"
+    def iconFile = file('src/main/resources/org/pindb/app/icon.png')
+    def associations = file('packaging/pindb-file-associations.properties')
+
+    doFirst {
+        preparePackageDirectory(packagesDir, '.rpm')
+    }
+
+    commandLine 'jpackage',
+            '--type', 'rpm',
+            '--dest', packagesDir.absolutePath,
+            '--input', inputDir.absolutePath,
+            '--name', 'PinDB',
+            '--app-version', linuxAppVersion,
+            '--linux-app-release', rpmAppRelease,
+            '--vendor', 'PinDB Project',
+            '--description', 'A flexible personal database application.',
+            '--main-jar', mainJar,
+            '--main-class', application.mainClass.get(),
+            '--icon', iconFile.absolutePath,
+            '--install-dir', '/opt/pindb',
+            '--linux-package-name', 'pindb',
+            '--linux-menu-group', 'Office',
+            '--linux-app-category', 'Office',
             '--linux-shortcut',
             '--file-associations', associations.absolutePath,
             '--java-options', '-Dfile.encoding=UTF-8',
