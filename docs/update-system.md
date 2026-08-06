@@ -13,6 +13,8 @@ PinDB reads `/etc/os-release`, with `/usr/lib/os-release` as a fallback, to clas
 - Package assets must include `pindb` in the filename and match the current CPU architecture.
 - A matching `<package>.sha256`, `checksums.sha256`, or `checksums-linux.sha256` asset is used when available.
 
+The initial official Debian and Fedora packages target 64-bit x86 systems. The selection model also recognizes ARM64 package names so that architecture can be added later without another updater redesign.
+
 A release without a matching package for the detected distribution and architecture is not offered as an installable update.
 
 ## Installation
