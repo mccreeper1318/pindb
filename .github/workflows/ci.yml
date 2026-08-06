@@ -66,6 +66,8 @@ jobs:
             git \
             java-21-openjdk-devel \
             rpm-build \
+            desktop-file-utils \
+            cpio \
             findutils \
             gzip \
             tar \
@@ -80,17 +82,40 @@ jobs:
       - name: Run tests and build RPM package
         run: ./gradlew --no-daemon clean test packageRpm
 
-      - name: Verify RPM metadata
+      - name: Verify RPM metadata and desktop integration
         shell: bash
         run: |
+          set -euo pipefail
           mapfile -t PACKAGES < <(find build/packages -maxdepth 1 -type f -name '*.rpm')
           if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
             echo "Expected exactly one RPM package; found ${#PACKAGES[@]}."
             printf '%s\n' "${PACKAGES[@]}"
             exit 1
           fi
-          rpm -qpi "${PACKAGES[0]}"
-          rpm -qpl "${PACKAGES[0]}"
+
+          RPM="${PACKAGES[0]}"
+          rpm -qpi "$RPM"
+          rpm -qpl "$RPM"
+
+          EXTRACT_DIR="$(mktemp -d)"
+          trap 'rm -rf "$EXTRACT_DIR"' EXIT
+          (
+            cd "$EXTRACT_DIR"
+            rpm2cpio "$GITHUB_WORKSPACE/$RPM" | cpio -idmu
+          )
+
+          mapfile -t DESKTOP_FILES < <(find "$EXTRACT_DIR" -type f -path '*/applications/*.desktop')
+          if [[ "${#DESKTOP_FILES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one desktop entry; found ${#DESKTOP_FILES[@]}."
+            printf '%s\n' "${DESKTOP_FILES[@]}"
+            exit 1
+          fi
+          desktop-file-validate "${DESKTOP_FILES[0]}"
+
+          if ! find "$EXTRACT_DIR" -type f -iname '*pindb*.png' -print -quit | grep -q .; then
+            echo "The RPM does not contain a PinDB PNG icon."
+            exit 1
+          fi
 
       - name: Upload Fedora RPM
         uses: actions/upload-artifact@v4
