@@ -2,6 +2,16 @@
 
 ## 0.2-beta.3
 
+### Added
+
+- Added self-contained RPM packaging for Fedora Workstation, Fedora KDE, and other traditional Fedora-family Linux systems.
+- Added Fedora-aware distribution detection using the standard `os-release` files.
+- Added architecture-aware GitHub Release selection for Debian and RPM packages.
+- Added automatic Fedora updates through `dnf5` or `dnf` with `pkexec`, SHA-256 verification, rollback protection, restart, and release-note display.
+- Added Fedora Atomic detection with a safe manual `rpm-ostree` installation path instead of attempting an unsupported DNF update.
+- Added Fedora CI and release jobs that build and verify an RPM alongside the existing Debian package.
+- Added regression tests for Fedora detection, architecture matching, RPM release selection, RPM checksums, package-manager selection, and manual installation commands.
+
 ### Fixed
 
 - Fixed the About PinDB dialog referring specifically to Version 0.1 in its database-encryption notice (Issue #19).

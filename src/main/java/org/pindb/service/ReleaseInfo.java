@@ -1,6 +1,5 @@
 package org.pindb.service;
 
-import java.net.URI;
 import java.time.Instant;
 
 public record ReleaseInfo(
@@ -8,8 +7,7 @@ public record ReleaseInfo(
         Version version,
         String name,
         String markdownNotes,
-        URI debAsset,
-        URI checksumAsset,
+        ReleasePackage packageAsset,
         boolean prerelease,
         Instant publishedAt
 ) {

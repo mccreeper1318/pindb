@@ -1,4 +1,4 @@
-name: Build Release Package
+name: Build Release Packages
 
 run-name: Build PinDB ${{ github.event.release.tag_name || inputs.tag }}
 
@@ -17,20 +17,24 @@ on:
 permissions:
   contents: write
 
-jobs:
-  build-release:
-    runs-on: ubuntu-24.04
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  GH_TOKEN: ${{ github.token }}
 
-    env:
-      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-      GH_TOKEN: ${{ github.token }}
+jobs:
+  prepare:
+    name: Validate release
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      base_version: ${{ steps.version.outputs.base_version }}
+      deb_release: ${{ steps.version.outputs.deb_release }}
+      rpm_release: ${{ steps.version.outputs.rpm_release }}
+      deb_package_version: ${{ steps.version.outputs.deb_package_version }}
+      rpm_package_version: ${{ steps.version.outputs.rpm_package_version }}
 
     steps:
-      - name: Check out release tag
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-
       - name: Read and validate version
         id: version
         shell: bash
@@ -38,7 +42,6 @@ jobs:
           RAW_TAG="$RELEASE_TAG"
           VERSION="$RAW_TAG"
 
-          # Accept 0.1.1, v0.1.1, and v.0.1.1.
           if [[ "$VERSION" == v.* ]]; then
             VERSION="${VERSION#v.}"
           elif [[ "$VERSION" == v* ]]; then
@@ -51,18 +54,20 @@ jobs:
           fi
 
           BASE_VERSION="${VERSION%%-*}"
-
           if [[ "$VERSION" == *-* ]]; then
             PRERELEASE_PART="${VERSION#*-}"
-            LINUX_RELEASE="0~${PRERELEASE_PART//-/.}"
+            DEB_RELEASE="0~${PRERELEASE_PART//-/.}"
+            RPM_RELEASE="0.${PRERELEASE_PART//-/.}"
             TAG_IS_PRERELEASE=true
           else
-            LINUX_RELEASE="1"
+            DEB_RELEASE="1"
+            RPM_RELEASE="1"
             TAG_IS_PRERELEASE=false
           fi
 
           RELEASE_IS_PRERELEASE="$(
             gh release view "$RAW_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
               --json isPrerelease \
               --jq '.isPrerelease'
           )"
@@ -75,16 +80,28 @@ jobs:
             exit 1
           fi
 
-          PACKAGE_VERSION="${BASE_VERSION}-${LINUX_RELEASE}"
-
           echo "tag=$RAW_TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
-          echo "linux_release=$LINUX_RELEASE" >> "$GITHUB_OUTPUT"
-          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "deb_release=$DEB_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "rpm_release=$RPM_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "deb_package_version=${BASE_VERSION}-${DEB_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "rpm_package_version=${BASE_VERSION}-${RPM_RELEASE}" >> "$GITHUB_OUTPUT"
 
           echo "PinDB version: $VERSION"
-          echo "Debian version: $PACKAGE_VERSION"
+          echo "Debian version: ${BASE_VERSION}-${DEB_RELEASE}"
+          echo "RPM version: ${BASE_VERSION}-${RPM_RELEASE}"
+
+  build-deb:
+    name: Build Debian package
+    needs: prepare
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -98,41 +115,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fakeroot
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
-      - name: Run tests and build package
+      - name: Build Debian package
         run: |
+          chmod +x gradlew
           ./gradlew --no-daemon clean test packageDeb \
-            -PappVersion="${{ steps.version.outputs.version }}"
+            -PappVersion="${{ needs.prepare.outputs.version }}"
 
-      - name: Verify and normalize generated package
+      - name: Verify and normalize Debian package
         id: package
         shell: bash
         run: |
-          mapfile -t PACKAGES < <(
-            find build/packages \
-              -maxdepth 1 \
-              -type f \
-              -name '*.deb'
-          )
-
+          mapfile -t PACKAGES < <(find build/packages -maxdepth 1 -type f -name '*.deb')
           if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
-            echo "Expected exactly one Debian package."
-            echo "Found: ${#PACKAGES[@]}"
+            echo "Expected exactly one Debian package; found ${#PACKAGES[@]}."
             printf '%s\n' "${PACKAGES[@]}"
             exit 1
           fi
 
           DEB="${PACKAGES[0]}"
           ACTUAL_VERSION="$(dpkg-deb -f "$DEB" Version)"
-          EXPECTED_VERSION="${{ steps.version.outputs.package_version }}"
-
-          echo "Expected Debian version: $EXPECTED_VERSION"
-          echo "Actual Debian version:   $ACTUAL_VERSION"
-
+          EXPECTED_VERSION="${{ needs.prepare.outputs.deb_package_version }}"
           if [[ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ]]; then
-            echo "The package version does not match the release tag."
+            echo "Expected Debian version: $EXPECTED_VERSION"
+            echo "Actual Debian version:   $ACTUAL_VERSION"
             exit 1
           fi
 
@@ -140,43 +145,130 @@ jobs:
           ORIGINAL_NAME="$(basename "$DEB")"
           SAFE_NAME="${ORIGINAL_NAME//\~/.}"
           SAFE_DEB="$DEB_DIR/$SAFE_NAME"
-
           if [[ "$SAFE_DEB" != "$DEB" ]]; then
             mv "$DEB" "$SAFE_DEB"
           fi
+          echo "package=$SAFE_DEB" >> "$GITHUB_OUTPUT"
 
-          echo "Release asset: $SAFE_NAME"
-          echo "deb=$SAFE_DEB" >> "$GITHUB_OUTPUT"
-
-      - name: Generate SHA-256 checksum
+      - name: Generate Debian checksum
         shell: bash
         run: |
-          DEB="${{ steps.package.outputs.deb }}"
-          DEB_DIR="$(dirname "$DEB")"
-          DEB_NAME="$(basename "$DEB")"
+          PACKAGE="${{ steps.package.outputs.package }}"
+          PACKAGE_DIR="$(dirname "$PACKAGE")"
+          PACKAGE_NAME="$(basename "$PACKAGE")"
+          (cd "$PACKAGE_DIR" && sha256sum "$PACKAGE_NAME") > "$PACKAGE.sha256"
+          cat "$PACKAGE.sha256"
 
-          (
-            cd "$DEB_DIR"
-            sha256sum "$DEB_NAME"
-          ) > "$DEB.sha256"
+      - name: Upload Debian release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pindb-deb-${{ needs.prepare.outputs.version }}
+          path: |
+            ${{ steps.package.outputs.package }}
+            ${{ steps.package.outputs.package }}.sha256
+          if-no-files-found: error
 
-          echo "Generated checksum:"
-          cat "$DEB.sha256"
+  build-rpm:
+    name: Build Fedora RPM
+    needs: prepare
+    runs-on: ubuntu-24.04
+    container:
+      image: fedora:latest
+
+    steps:
+      - name: Install Fedora build tools
+        run: |
+          dnf install -y \
+            git \
+            java-21-openjdk-devel \
+            rpm-build \
+            findutils \
+            gzip \
+            tar \
+            which
+
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Build RPM package
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test packageRpm \
+            -PappVersion="${{ needs.prepare.outputs.version }}"
+
+      - name: Verify RPM package
+        id: package
+        shell: bash
+        run: |
+          mapfile -t PACKAGES < <(find build/packages -maxdepth 1 -type f -name '*.rpm')
+          if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one RPM package; found ${#PACKAGES[@]}."
+            printf '%s\n' "${PACKAGES[@]}"
+            exit 1
+          fi
+
+          RPM="${PACKAGES[0]}"
+          ACTUAL_VERSION="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$RPM")"
+          EXPECTED_VERSION="${{ needs.prepare.outputs.rpm_package_version }}"
+          if [[ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "Expected RPM version: $EXPECTED_VERSION"
+            echo "Actual RPM version:   $ACTUAL_VERSION"
+            exit 1
+          fi
+
+          rpm -qpi "$RPM"
+          rpm -qpl "$RPM"
+          echo "package=$RPM" >> "$GITHUB_OUTPUT"
+
+      - name: Generate RPM checksum
+        shell: bash
+        run: |
+          PACKAGE="${{ steps.package.outputs.package }}"
+          PACKAGE_DIR="$(dirname "$PACKAGE")"
+          PACKAGE_NAME="$(basename "$PACKAGE")"
+          (cd "$PACKAGE_DIR" && sha256sum "$PACKAGE_NAME") > "$PACKAGE.sha256"
+          cat "$PACKAGE.sha256"
+
+      - name: Upload RPM release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pindb-rpm-${{ needs.prepare.outputs.version }}
+          path: |
+            ${{ steps.package.outputs.package }}
+            ${{ steps.package.outputs.package }}.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Attach Linux packages to release
+    needs:
+      - prepare
+      - build-deb
+      - build-rpm
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: List release files
+        run: find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
 
       - name: Upload release files
         shell: bash
         run: |
-          DEB="${{ steps.package.outputs.deb }}"
-
+          mapfile -t FILES < <(find release-assets -maxdepth 1 -type f | sort)
+          if [[ "${#FILES[@]}" -ne 4 ]]; then
+            echo "Expected two packages and two checksum files; found ${#FILES[@]}."
+            printf '%s\n' "${FILES[@]}"
+            exit 1
+          fi
           gh release upload \
-            "$RELEASE_TAG" \
-            "$DEB" \
-            "$DEB.sha256" \
+            "${{ needs.prepare.outputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            "${FILES[@]}" \
             --clobber
-
-      - name: Save workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: pindb-${{ steps.version.outputs.version }}
-          path: build/packages/*
-          if-no-files-found: error
