@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PinDB - a flexible personal database application.">
+  <meta name="description" content="Download PinDB for Debian and Fedora Linux.">
   <title>Download - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -21,6 +21,7 @@
     <nav class="navbar" aria-label="Main navigation">
       <a href="index.html">HOME</a>
       <a href="download.html" class="current">DOWNLOAD</a>
+      <a href="fedora.html">FEDORA</a>
       <a href="features.html">FEATURES</a>
       <a href="gallery.html">GALLERY</a>
       <a href="manual.html">USER GUIDE</a>
@@ -31,27 +32,93 @@
 <div data-release-page></div>
 <h1>Download PinDB</h1>
 
-<p class="note"><b>Linux only at this time:</b> the official installer is a self-contained Debian package for 64-bit Debian-based Linux systems.</p>
+<p class="note"><b>Linux packages:</b> PinDB provides self-contained installers for 64-bit Debian-family and Fedora-family systems. Both include a private Java runtime.</p>
 
-<h2>Latest stable release: <span id="stable-version">checking GitHub...</span></h2>
-<p><a id="stable-deb" class="download-button primary" href="https://github.com/mccreeper1318/pindb/releases/latest">Download latest stable .deb</a></p>
-<p><a id="stable-checksum" href="https://github.com/mccreeper1318/pindb/releases/latest">Stable release checksum</a></p>
+<div class="release-panel">
+  <h2>Latest stable release: <span id="stable-version">checking GitHub...</span></h2>
+  <div class="package-grid">
+    <div class="package-card debian">
+      <h3>Debian / Ubuntu / Linux Mint</h3>
+      <span class="platform-badge">DEB</span>
+      <div class="download-links">
+        <a id="stable-deb" class="download-button primary" href="https://github.com/mccreeper1318/pindb/releases/latest">Download stable .deb</a>
+        <a id="stable-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/latest">View Debian checksum</a>
+      </div>
+    </div>
+    <div class="package-card fedora">
+      <h3>Fedora Workstation and Spins</h3>
+      <span class="platform-badge fedora">RPM</span>
+      <div class="download-links">
+        <a id="stable-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases/latest">Download stable .rpm</a>
+        <a id="stable-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/latest">View RPM checksum</a>
+      </div>
+    </div>
+  </div>
+</div>
 
-<h2>Latest beta release: <span id="beta-version">checking GitHub...</span></h2>
-<p><a id="beta-deb" class="download-button" href="https://github.com/mccreeper1318/pindb/releases">Download latest beta .deb</a></p>
-<p><a id="beta-checksum" href="https://github.com/mccreeper1318/pindb/releases">Beta release checksum</a></p>
+<div class="release-panel">
+  <h2>Latest beta release: <span id="beta-version">checking GitHub...</span></h2>
+  <div class="package-grid">
+    <div class="package-card debian">
+      <h3>Debian / Ubuntu / Linux Mint</h3>
+      <span class="platform-badge">DEB</span>
+      <div class="download-links">
+        <a id="beta-deb" class="download-button" href="https://github.com/mccreeper1318/pindb/releases">Download beta .deb</a>
+        <a id="beta-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View Debian checksum</a>
+      </div>
+    </div>
+    <div class="package-card fedora">
+      <h3>Fedora Workstation and Spins</h3>
+      <span class="platform-badge fedora">RPM</span>
+      <div class="download-links">
+        <a id="beta-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases">Download beta .rpm</a>
+        <a id="beta-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View RPM checksum</a>
+      </div>
+    </div>
+  </div>
+</div>
 
 <p id="release-status" class="small">Looking up current release assets...</p>
 
-<h2>Installation</h2>
+<h2 id="debian-downloads">Install on Debian, Ubuntu, or Linux Mint</h2>
 <ol>
-  <li>Download the <code>.deb</code> file.</li>
+  <li>Download the matching <code>.deb</code> file.</li>
   <li>Double-click it and open it with Software Manager or Package Installer.</li>
   <li>Select <b>Install</b> and enter your administrator password.</li>
   <li>Launch <b>PinDB</b> from the application menu.</li>
 </ol>
 <p>Terminal installation:</p>
-<pre>sudo apt install ./pindb_*.deb</pre>
+<pre>sudo apt install ./pindb_*_amd64.deb</pre>
+
+<h2 id="fedora-downloads">Install on Fedora Workstation or a traditional Fedora spin</h2>
+<ol>
+  <li>Download the matching <code>.rpm</code> file.</li>
+  <li>Double-click it and open it with Software or Discover.</li>
+  <li>Select <b>Install</b> and approve the administrator prompt.</li>
+  <li>Launch <b>PinDB</b> from the application menu.</li>
+</ol>
+<p>Terminal installation:</p>
+<pre>sudo dnf install ./pindb-*.x86_64.rpm</pre>
+<p><a class="download-button fedora" href="fedora.html">READ THE COMPLETE FEDORA GUIDE</a></p>
+
+<h2>Fedora Silverblue, Kinoite, and other Atomic desktops</h2>
+<p class="note"><b>PinDB does not perform automatic DNF updates on Fedora Atomic desktops.</b> Install or update the RPM manually with <code>rpm-ostree</code>, then reboot into the new deployment.</p>
+<pre>sudo rpm-ostree install ./pindb-*.x86_64.rpm</pre>
+
+<h2>Automatic application updates</h2>
+<p>On supported traditional Linux installations, PinDB can select the correct package type for the current system, download the package, verify its SHA-256 checksum when supplied, request administrator approval, install it, restart, and display the release notes.</p>
+<table class="status-table">
+  <tr><th>System</th><th>Automatic installer</th></tr>
+  <tr><td>Debian / Ubuntu / Linux Mint</td><td><code>apt-get</code> through <code>pkexec</code></td></tr>
+  <tr><td>Fedora Workstation and traditional spins</td><td><code>dnf5</code> or <code>dnf</code> through <code>pkexec</code></td></tr>
+  <tr><td>Fedora Atomic desktops</td><td>Manual <code>rpm-ostree</code> installation required</td></tr>
+</table>
+
+<h2>Verify a download</h2>
+<p>Download the checksum file that matches the package. Run the command from the folder containing both files:</p>
+<pre>sha256sum -c downloaded-package.deb.sha256
+sha256sum -c downloaded-package.rpm.sha256</pre>
+<p>The check should report <code>OK</code> before installation.</p>
 
 <h2>Source archives</h2>
 <p>
@@ -59,14 +126,12 @@
   <a class="download-button" href="https://github.com/mccreeper1318/pindb/archive/refs/heads/main.tar.gz">Main branch TAR.GZ</a>
 </p>
 
-<h2>Verify a download</h2>
-<pre>sha256sum -c downloaded-package.deb.sha256</pre>
-<p>The calculated SHA-256 value should match the checksum published with the release.</p>
-
-<h2>Other platforms</h2>
+<h2>Platform status</h2>
 <table class="status-table">
   <tr><th>Platform</th><th>Status</th></tr>
-  <tr><td>Linux Mint / Ubuntu / Debian x64</td><td>Official <code>.deb</code> package</td></tr>
+  <tr><td>Linux Mint / Ubuntu / Debian x86-64</td><td>Official <code>.deb</code> package</td></tr>
+  <tr><td>Fedora Workstation / Fedora KDE / traditional Fedora spins x86-64</td><td>Official <code>.rpm</code> package beginning with 0.2 Beta 4</td></tr>
+  <tr><td>Fedora Silverblue / Kinoite / Atomic desktops</td><td>RPM can be layered manually with <code>rpm-ostree</code></td></tr>
   <tr><td>Windows</td><td>Not currently released</td></tr>
   <tr><td>macOS</td><td>Not currently released</td></tr>
 </table>
