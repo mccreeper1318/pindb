@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PinDB - a flexible personal database application.">
+  <meta name="description" content="PinDB - a flexible personal database application for Debian and Fedora Linux.">
   <title>Home - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -21,6 +21,7 @@
     <nav class="navbar" aria-label="Main navigation">
       <a href="index.html" class="current">HOME</a>
       <a href="download.html">DOWNLOAD</a>
+      <a href="fedora.html">FEDORA</a>
       <a href="features.html">FEATURES</a>
       <a href="gallery.html">GALLERY</a>
       <a href="manual.html">USER GUIDE</a>
@@ -28,7 +29,7 @@
       <a href="about.html">ABOUT</a>
     </nav>
     <main class="content">
-<div class="marquee"><span>*** WELCOME TO THE OFFICIAL PinDB WEB SITE *** NEW RELEASES ARE AVAILABLE FROM GITHUB ***</span></div>
+<div class="marquee"><span>*** PinDB 0.2 BETA 4 ADDS FEDORA RPM SUPPORT *** DEBIAN AND FEDORA DOWNLOADS AVAILABLE FROM GITHUB RELEASES ***</span></div>
 
 <p class="welcome">Organize your information without writing SQL or running a database server.</p>
 
@@ -40,9 +41,27 @@
 
     <div class="box">
       <h2>Quick Download</h2>
-      <p>The official package currently targets Debian-based Linux systems such as Linux Mint, Ubuntu, and Debian.</p>
-      <p><a class="download-button primary" href="download.html">GO TO DOWNLOAD PAGE</a></p>
-      <p class="small">The installer contains a private Java runtime. Normal users do not need to install Java separately.</p>
+      <p>Self-contained packages are provided for 64-bit Debian-family and Fedora-family Linux systems.</p>
+      <p>
+        <a class="download-button primary" href="download.html#debian-downloads">DOWNLOAD .DEB</a>
+        <a class="download-button fedora" href="download.html#fedora-downloads">DOWNLOAD .RPM</a>
+      </p>
+      <p class="small">Both packages include a private Java runtime. Normal users do not need to install Java separately.</p>
+    </div>
+
+    <h2>Linux packages</h2>
+    <div class="package-grid">
+      <div class="package-card debian">
+        <h3>Debian Package</h3>
+        <p>For Linux Mint, Ubuntu, Debian, and related distributions.</p>
+        <p><code>.deb</code> &mdash; x86-64</p>
+      </div>
+      <div class="package-card fedora">
+        <h3>Fedora RPM</h3>
+        <p>For Fedora Workstation, Fedora KDE, and traditional Fedora spins.</p>
+        <p><code>.rpm</code> &mdash; x86-64</p>
+        <p class="small"><a href="fedora.html">Read the Fedora installation guide.</a></p>
+      </div>
     </div>
 
     <h2>Why PinDB?</h2>
@@ -53,6 +72,7 @@
       <li>Embedded PDF, DOCX, image, and text documents.</li>
       <li>Search, sorting, filters, summaries, printing, and CSV tools.</li>
       <li>Automatic update checks through GitHub Releases.</li>
+      <li>Automatic package installation on supported Debian and traditional Fedora systems.</li>
     </ul>
   </section>
 
@@ -61,7 +81,8 @@
       <h2>Project Status</h2>
       <img src="assets/icon.png" alt="PinDB logo" width="160" height="160">
       <p><b>Platform:</b> Linux</p>
-      <p><b>Package:</b> .deb</p>
+      <p><b>Packages:</b> .deb / .rpm</p>
+      <p><b>Fedora support:</b> 0.2 Beta 4+</p>
       <p><b>Source:</b> Java 21 / JavaFX</p>
       <p><b>Database:</b> SQLite</p>
       <p><b>Newest listed release:</b> <span id="latest-version">checking...</span></p>
@@ -71,6 +92,7 @@
       <h2>Useful Links</h2>
       <ul>
         <li><a href="https://github.com/mccreeper1318/pindb/releases">All releases</a></li>
+        <li><a href="fedora.html">Fedora guide</a></li>
         <li><a href="https://github.com/mccreeper1318/pindb/issues">Report a problem</a></li>
         <li><a href="https://github.com/mccreeper1318/pindb">Source repository</a></li>
       </ul>
