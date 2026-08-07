@@ -64,7 +64,6 @@ jobs:
         run: |
           dnf install -y \
             git \
-            java-21-openjdk-devel \
             rpm-build \
             desktop-file-utils \
             cpio \
@@ -75,6 +74,13 @@ jobs:
 
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
