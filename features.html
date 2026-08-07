@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PinDB - a flexible personal database application.">
+  <meta name="description" content="PinDB features, including Debian and Fedora Linux support.">
   <title>Features - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -21,6 +21,7 @@
     <nav class="navbar" aria-label="Main navigation">
       <a href="index.html">HOME</a>
       <a href="download.html">DOWNLOAD</a>
+      <a href="fedora.html">FEDORA</a>
       <a href="features.html" class="current">FEATURES</a>
       <a href="gallery.html">GALLERY</a>
       <a href="manual.html">USER GUIDE</a>
@@ -66,6 +67,32 @@
   <li>Keep timestamped internal backup snapshots.</li>
   <li>Create an untouched safety copy before database migrations.</li>
 </ul>
+
+<h2>Debian and Fedora packages</h2>
+<div class="package-grid">
+  <div class="package-card debian">
+    <h3>Debian-family Linux</h3>
+    <p>Self-contained <code>.deb</code> package for Linux Mint, Ubuntu, Debian, and related systems.</p>
+    <p>Automatic installation uses <code>apt-get</code> through <code>pkexec</code>.</p>
+  </div>
+  <div class="package-card fedora">
+    <h3>Fedora-family Linux</h3>
+    <p>Self-contained <code>.rpm</code> package for Fedora Workstation, Fedora KDE, and traditional Fedora spins beginning with 0.2 Beta 4.</p>
+    <p>Automatic installation uses <code>dnf5</code> or <code>dnf</code> through <code>pkexec</code>.</p>
+  </div>
+</div>
+<p>Both packages include a private Java runtime, an application-menu shortcut, the PinDB icon, and a <code>.pindb</code> file association.</p>
+
+<h2>Update safety</h2>
+<ul>
+  <li>Selects the package type that matches the current Linux distribution.</li>
+  <li>Selects a release asset matching the current system architecture.</li>
+  <li>Verifies the downloaded package with SHA-256 when a checksum is published.</li>
+  <li>Preserves the existing application files while the package manager runs.</li>
+  <li>Restores the previous application files if installation fails.</li>
+  <li>Restarts PinDB and displays release notes after a successful update.</li>
+</ul>
+<p class="note">Fedora Atomic desktops such as Silverblue and Kinoite use a manual <code>rpm-ostree</code> installation path instead of PinDB's automatic DNF installer.</p>
 
     </main>
     <footer class="footer">
