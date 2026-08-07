@@ -2,6 +2,7 @@
   "use strict";
 
   const repo = "mccreeper1318/pindb";
+  const releasesUrl = `https://github.com/${repo}/releases`;
   const api = `https://api.github.com/repos/${repo}/releases`;
 
   function setText(id, value) {
@@ -9,47 +10,76 @@
     if (node) node.textContent = value;
   }
 
-  function setAssetLink(id, release, asset, fallback) {
+  function choosePackage(release, extension) {
+    if (!release) return null;
+    const packages = release.assets.filter(asset => asset.name.toLowerCase().endsWith(extension));
+    return packages.find(asset => /(?:x86_64|amd64|x64)/i.test(asset.name)) || packages[0] || null;
+  }
+
+  function chooseChecksum(release, packageAsset) {
+    if (!release || !packageAsset) return null;
+    const exactName = `${packageAsset.name}.sha256`.toLowerCase();
+    return release.assets.find(asset => asset.name.toLowerCase() === exactName) ||
+      release.assets.find(asset => {
+        const name = asset.name.toLowerCase();
+        return name === "checksums.sha256" || name === "checksums-linux.sha256";
+      }) || null;
+  }
+
+  function setPackageLink(id, release, asset, fallback, packageLabel) {
     const link = document.getElementById(id);
     if (!link) return;
-    if (asset) {
-      link.href = asset.browser_download_url;
-      link.textContent = `Download ${asset.name}`;
-      link.title = `Download ${release.tag_name}`;
-    } else {
-      link.href = fallback;
+    link.href = asset ? asset.browser_download_url : fallback;
+    link.textContent = asset ? `Download ${asset.name}` : `View release for ${packageLabel}`;
+    link.title = release ? `${packageLabel} for ${release.tag_name}` : packageLabel;
+  }
+
+  function setChecksumLink(id, release, packageAsset, fallback, packageLabel) {
+    const link = document.getElementById(id);
+    if (!link) return;
+    const checksum = chooseChecksum(release, packageAsset);
+    link.href = checksum ? checksum.browser_download_url : fallback;
+    link.textContent = checksum ? `Checksum: ${checksum.name}` : `View ${packageLabel} checksum`;
+  }
+
+  function fillRelease(prefix, release, fallback) {
+    if (!release) {
+      setText(`${prefix}-version`, "not published");
+      return;
     }
+
+    const deb = choosePackage(release, ".deb");
+    const rpm = choosePackage(release, ".rpm");
+    setText(`${prefix}-version`, release.tag_name);
+    setPackageLink(`${prefix}-deb`, release, deb, fallback, "Debian package");
+    setChecksumLink(`${prefix}-deb-checksum`, release, deb, fallback, "Debian package");
+    setPackageLink(`${prefix}-rpm`, release, rpm, fallback, "Fedora RPM");
+    setChecksumLink(`${prefix}-rpm-checksum`, release, rpm, fallback, "Fedora RPM");
   }
 
   async function loadReleases() {
     try {
-      const response = await fetch(api, { headers: { "Accept": "application/vnd.github+json" } });
+      const response = await fetch(api, {
+        headers: {
+          "Accept": "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28"
+        }
+      });
       if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
-      const releases = await response.json();
-      const published = releases.filter(r => !r.draft);
-      const stable = published.find(r => !r.prerelease);
-      const beta = published.find(r => r.prerelease);
-      const chooseDeb = release => release && release.assets.find(a => a.name.toLowerCase().endsWith(".deb"));
-      const chooseChecksum = (release, deb) => release && release.assets.find(a =>
-        a.name === `${deb?.name}.sha256` || a.name.toLowerCase() === "checksums.sha256");
 
-      if (stable) {
-        setText("stable-version", stable.tag_name);
-        setAssetLink("stable-deb", stable, chooseDeb(stable), `https://github.com/${repo}/releases/latest`);
-        const checksum = chooseChecksum(stable, chooseDeb(stable));
-        if (checksum) setAssetLink("stable-checksum", stable, checksum, `https://github.com/${repo}/releases/latest`);
-      }
-      if (beta) {
-        setText("beta-version", beta.tag_name);
-        setAssetLink("beta-deb", beta, chooseDeb(beta), `https://github.com/${repo}/releases`);
-        const checksum = chooseChecksum(beta, chooseDeb(beta));
-        if (checksum) setAssetLink("beta-checksum", beta, checksum, `https://github.com/${repo}/releases`);
-      }
+      const releases = await response.json();
+      const published = releases.filter(release => !release.draft);
+      const stable = published.find(release => !release.prerelease);
+      const beta = published.find(release => release.prerelease);
+
+      fillRelease("stable", stable, stable?.html_url || `${releasesUrl}/latest`);
+      fillRelease("beta", beta, beta?.html_url || releasesUrl);
+
       const newest = published[0];
       if (newest) setText("latest-version", newest.tag_name);
-      setText("release-status", "GitHub release information loaded successfully.");
+      setText("release-status", "GitHub release information loaded. Download buttons now point to available package assets.");
     } catch (error) {
-      setText("release-status", "Live release lookup unavailable. The Releases links still work.");
+      setText("release-status", "Live release lookup is unavailable. The buttons still open the GitHub Releases page.");
     }
   }
 
@@ -62,7 +92,9 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     localCounter();
-    if (document.querySelector("[data-release-page]") || document.getElementById("latest-version")) loadReleases();
+    if (document.querySelector("[data-release-page]") || document.getElementById("latest-version")) {
+      loadReleases();
+    }
     const year = document.getElementById("year");
     if (year) year.textContent = new Date().getFullYear();
   });
