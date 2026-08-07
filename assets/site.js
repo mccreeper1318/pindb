@@ -26,35 +26,62 @@
       }) || null;
   }
 
-  function setPackageLink(id, release, asset, fallback, packageLabel) {
-    const link = document.getElementById(id);
-    if (!link) return;
-    link.href = asset ? asset.browser_download_url : fallback;
-    link.textContent = asset ? `Download ${asset.name}` : `View release for ${packageLabel}`;
-    link.title = release ? `${packageLabel} for ${release.tag_name}` : packageLabel;
+  function makeUnavailable(link, text) {
+    link.removeAttribute("href");
+    link.textContent = text;
+    link.classList.add("unavailable");
+    link.setAttribute("aria-disabled", "true");
+    link.removeAttribute("title");
   }
 
-  function setChecksumLink(id, release, packageAsset, fallback, packageLabel) {
+  function setPackageLink(id, release, asset, packageLabel, channelLabel) {
     const link = document.getElementById(id);
     if (!link) return;
+
+    if (!asset) {
+      makeUnavailable(link, `No ${channelLabel} ${packageLabel} published yet`);
+      return;
+    }
+
+    link.href = asset.browser_download_url;
+    link.textContent = `Download ${asset.name}`;
+    link.title = `${packageLabel} for ${release.tag_name}`;
+    link.classList.remove("unavailable");
+    link.removeAttribute("aria-disabled");
+  }
+
+  function setChecksumLink(id, release, packageAsset, packageLabel) {
+    const link = document.getElementById(id);
+    if (!link) return;
+
     const checksum = chooseChecksum(release, packageAsset);
-    link.href = checksum ? checksum.browser_download_url : fallback;
-    link.textContent = checksum ? `Checksum: ${checksum.name}` : `View ${packageLabel} checksum`;
+    if (!checksum) {
+      makeUnavailable(link, packageAsset ? `No ${packageLabel} checksum published` : "Checksum unavailable");
+      return;
+    }
+
+    link.href = checksum.browser_download_url;
+    link.textContent = `Checksum: ${checksum.name}`;
+    link.classList.remove("unavailable");
+    link.removeAttribute("aria-disabled");
   }
 
-  function fillRelease(prefix, release, fallback) {
+  function fillRelease(prefix, release, channelLabel) {
     if (!release) {
       setText(`${prefix}-version`, "not published");
+      setPackageLink(`${prefix}-deb`, null, null, "Debian package", channelLabel);
+      setPackageLink(`${prefix}-rpm`, null, null, "Fedora RPM", channelLabel);
       return;
     }
 
     const deb = choosePackage(release, ".deb");
     const rpm = choosePackage(release, ".rpm");
+
     setText(`${prefix}-version`, release.tag_name);
-    setPackageLink(`${prefix}-deb`, release, deb, fallback, "Debian package");
-    setChecksumLink(`${prefix}-deb-checksum`, release, deb, fallback, "Debian package");
-    setPackageLink(`${prefix}-rpm`, release, rpm, fallback, "Fedora RPM");
-    setChecksumLink(`${prefix}-rpm-checksum`, release, rpm, fallback, "Fedora RPM");
+    setPackageLink(`${prefix}-deb`, release, deb, "Debian package", channelLabel);
+    setChecksumLink(`${prefix}-deb-checksum`, release, deb, "Debian package");
+    setPackageLink(`${prefix}-rpm`, release, rpm, "Fedora RPM", channelLabel);
+    setChecksumLink(`${prefix}-rpm-checksum`, release, rpm, "Fedora RPM");
   }
 
   async function loadReleases() {
@@ -72,14 +99,14 @@
       const stable = published.find(release => !release.prerelease);
       const beta = published.find(release => release.prerelease);
 
-      fillRelease("stable", stable, stable?.html_url || `${releasesUrl}/latest`);
-      fillRelease("beta", beta, beta?.html_url || releasesUrl);
+      fillRelease("stable", stable, "stable");
+      fillRelease("beta", beta, "beta");
 
       const newest = published[0];
       if (newest) setText("latest-version", newest.tag_name);
-      setText("release-status", "GitHub release information loaded. Download buttons now point to available package assets.");
+      setText("release-status", "GitHub release information loaded. Available package buttons download the files directly.");
     } catch (error) {
-      setText("release-status", "Live release lookup is unavailable. The buttons still open the GitHub Releases page.");
+      setText("release-status", `Live release lookup is unavailable. Visit ${releasesUrl} for all packages.`);
     }
   }
 
