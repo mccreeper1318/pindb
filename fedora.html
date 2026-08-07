@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install and update PinDB on Fedora Linux.">
+  <title>Fedora Guide - PinDB</title>
+  <link rel="icon" href="assets/icon.png" type="image/png">
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="masthead">
+      <div class="brand">
+        <img class="brand-icon" src="assets/icon.png" alt="PinDB logo">
+        <div class="logo">PinDB<span class="blink">_</span></div>
+      </div>
+      <p class="tagline">A FLEXIBLE PERSONAL DATABASE FOR YOUR COMPUTER</p>
+    </header>
+    <nav class="navbar" aria-label="Main navigation">
+      <a href="index.html">HOME</a>
+      <a href="download.html">DOWNLOAD</a>
+      <a href="fedora.html" class="current">FEDORA</a>
+      <a href="features.html">FEATURES</a>
+      <a href="gallery.html">GALLERY</a>
+      <a href="manual.html">USER GUIDE</a>
+      <a href="build.html">BUILD FROM SOURCE</a>
+      <a href="about.html">ABOUT</a>
+    </nav>
+    <main class="content">
+      <h1>PinDB on Fedora</h1>
+
+      <p class="welcome">RPM support begins with PinDB 0.2 Beta 4.</p>
+
+      <p>PinDB provides a self-contained <code>.rpm</code> package for 64-bit Fedora Workstation, Fedora KDE, and other traditional Fedora spins. The package includes a private Java runtime, so Java does not need to be installed separately for normal use.</p>
+
+      <p><a class="download-button primary" href="download.html#fedora-downloads">GO TO FEDORA DOWNLOADS</a></p>
+
+      <h2>Install on Fedora Workstation or a traditional spin</h2>
+      <ol>
+        <li>Download the PinDB <code>.rpm</code> from the <a href="download.html">Download page</a>.</li>
+        <li>Double-click the RPM and open it with Software, Discover, or your package installer.</li>
+        <li>Select <b>Install</b> and approve the administrator prompt.</li>
+        <li>Launch <b>PinDB</b> from the application menu.</li>
+      </ol>
+
+      <p>Terminal installation:</p>
+      <pre>sudo dnf install ./pindb-*.x86_64.rpm</pre>
+
+      <h2>Automatic updates</h2>
+      <p>On supported traditional Fedora installations, PinDB can download the matching RPM, verify its SHA-256 checksum when one is supplied, request administrator approval through <code>pkexec</code>, and install it with <code>dnf5</code> or <code>dnf</code>.</p>
+      <p>Stable updates are checked by default. Beta updates can be enabled in PinDB Settings.</p>
+
+      <h2>Fedora Silverblue, Kinoite, and other Atomic desktops</h2>
+      <p class="note"><b>Automatic installation is not supported on Fedora Atomic desktops.</b> These systems use <code>rpm-ostree</code> instead of the normal DNF installation path.</p>
+      <p>To layer the downloaded RPM manually:</p>
+      <pre>sudo rpm-ostree install ./pindb-*.x86_64.rpm</pre>
+      <p>Reboot into the new deployment after installing or updating PinDB with <code>rpm-ostree</code>.</p>
+
+      <h2>Verify the downloaded RPM</h2>
+      <p>Download the matching <code>.sha256</code> file from the release and run:</p>
+      <pre>sha256sum -c pindb-*.rpm.sha256</pre>
+      <p>The check should report <code>OK</code> before you install the package.</p>
+
+      <h2>What the RPM installs</h2>
+      <ul>
+        <li>The PinDB application and private Java runtime under <code>/opt/pindb</code>.</li>
+        <li>An application-menu shortcut.</li>
+        <li>The PinDB application icon.</li>
+        <li>A file association for <code>.pindb</code> databases.</li>
+      </ul>
+
+      <h2>Uninstall PinDB</h2>
+      <pre>sudo dnf remove pindb</pre>
+      <p>Removing the application does not remove databases saved in your personal folders.</p>
+
+      <h2>Troubleshooting</h2>
+      <dl>
+        <dt><b>The RPM will not install.</b></dt>
+        <dd>Confirm that you downloaded the x86-64 RPM and try the terminal command above so DNF can display the full error.</dd>
+        <dt><b>The automatic updater is unavailable.</b></dt>
+        <dd>Automatic installation requires a traditional Fedora installation, <code>pkexec</code>, and either <code>dnf5</code> or <code>dnf</code>.</dd>
+        <dt><b>I use Silverblue or Kinoite.</b></dt>
+        <dd>Use the manual <code>rpm-ostree</code> command and reboot. PinDB intentionally does not run DNF on Atomic desktops.</dd>
+      </dl>
+    </main>
+    <footer class="footer">
+      <div>PinDB Project &mdash; Hosted with simple HTML suitable for GitHub Pages.</div>
+      <div>Best viewed at 800&times;600 or better. JavaScript is optional except for live release links.</div>
+      <div>You are visitor <span class="counter" id="visitor-counter">000001</span></div>
+      <div>&copy; <span id="year">2026</span> PinDB Project &nbsp;|&nbsp; <a href="https://github.com/mccreeper1318/pindb">View Source on GitHub</a></div>
+    </footer>
+  </div>
+</body>
+</html>
