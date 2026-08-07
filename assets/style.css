@@ -87,6 +87,7 @@ a:hover { background: #ffff00; color: #000; }
   font-family: Arial, Helvetica, sans-serif;
   font-size: 13px;
   text-align: center;
+  white-space: nowrap;
 }
 
 .navbar a {
@@ -101,6 +102,10 @@ a:hover { background: #ffff00; color: #000; }
   border-bottom: 2px solid #444;
   text-decoration: none;
 }
+
+/* Distribution guides are linked from Download instead of crowding the main bar. */
+.navbar a[href="fedora.html"] { display: none; }
+
 .navbar a:active,
 .navbar a.current {
   border-top-color: #444;
@@ -239,6 +244,19 @@ h3 { font-size: 16px; }
 .download-button.primary { background: #80ff80; }
 .download-button.fedora { background: #a9c7ff; }
 
+.download-button.unavailable,
+a.unavailable {
+  color: #666 !important;
+  background: #ddd;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+.download-button.unavailable:hover,
+a.unavailable:hover {
+  color: #666 !important;
+  background: #ddd;
+}
+
 .small { font-size: 13px; }
 .note {
   padding: 8px;
@@ -360,6 +378,7 @@ hr { border: 0; border-top: 1px solid #555; border-bottom: 1px solid #fff; }
   .content { padding: 12px; }
   .columns,
   .package-grid { grid-template-columns: 1fr; }
+  .navbar { white-space: normal; }
   .navbar a { padding: 5px 6px; }
   .brand { gap: 8px; }
   .brand-icon { width: 52px; height: 52px; }
