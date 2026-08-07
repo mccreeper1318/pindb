@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PinDB - a flexible personal database application.">
+  <meta name="description" content="Build PinDB Debian and Fedora packages from source.">
   <title>Build From Source - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -21,6 +21,7 @@
     <nav class="navbar" aria-label="Main navigation">
       <a href="index.html">HOME</a>
       <a href="download.html">DOWNLOAD</a>
+      <a href="fedora.html">FEDORA</a>
       <a href="features.html">FEATURES</a>
       <a href="gallery.html">GALLERY</a>
       <a href="manual.html">USER GUIDE</a>
@@ -32,27 +33,56 @@
 
 <p>PinDB is a Java 21 application built with Gradle and JavaFX.</p>
 
-<h2>Requirements</h2>
+<h2>General requirements</h2>
 <ul>
   <li>Git</li>
-  <li>JDK 21</li>
+  <li>JDK 21 with <code>jpackage</code></li>
   <li>Internet access for Gradle dependency downloads</li>
-  <li>Linux, <code>jpackage</code>, <code>dpkg</code>, and <code>fakeroot</code> to build the official Debian package</li>
+  <li>A 64-bit Linux build system</li>
 </ul>
+
+<h2>Package-specific requirements</h2>
+<table class="status-table">
+  <tr><th>Package</th><th>Build system and tools</th></tr>
+  <tr><td>Debian <code>.deb</code></td><td>Debian-family Linux with <code>dpkg</code>, <code>dpkg-deb</code>, and <code>fakeroot</code></td></tr>
+  <tr><td>Fedora <code>.rpm</code></td><td>Fedora or another RPM-based build system with <code>rpm-build</code> and <code>rpmbuild</code></td></tr>
+</table>
+<p>Native <code>jpackage</code> installers should be built on a system from the corresponding package family.</p>
 
 <h2>Clone and test</h2>
 <pre>git clone https://github.com/mccreeper1318/pindb.git
 cd pindb
 chmod +x gradlew
+git switch agent/0.2-dev
 ./gradlew clean test</pre>
 
 <h2>Run from source</h2>
-<pre>./gradlew run</pre>
+<pre>./gradlew run -PappVersion=0.2-beta.4</pre>
 
 <h2>Build the Debian package</h2>
-<pre>./gradlew clean test packageDeb -PappVersion=0.2-beta.3</pre>
-<p>The package is written to:</p>
+<pre>./gradlew clean test packageDeb -PappVersion=0.2-beta.4</pre>
+
+<h2>Build the Fedora RPM</h2>
+<p>On Fedora, install the native RPM packaging tools and use a JDK 21 distribution that includes <code>jpackage</code>.</p>
+<pre>sudo dnf install rpm-build desktop-file-utils cpio
+./gradlew clean test packageRpm -PappVersion=0.2-beta.4</pre>
+
+<p>Both package tasks write their output to:</p>
 <pre>build/packages/</pre>
+
+<h2>Inspect the RPM</h2>
+<pre>rpm -qpi build/packages/*.rpm
+rpm -qpl build/packages/*.rpm</pre>
+<p>The package should include the PinDB launcher, private Java runtime, desktop entry, icon, and <code>.pindb</code> file association.</p>
+
+<h2>Automated builds</h2>
+<p>The GitHub Actions build workflow tests and packages both formats independently:</p>
+<ul>
+  <li>The Debian package is built on Ubuntu.</li>
+  <li>The RPM is built inside a Fedora container using Temurin Java 21.</li>
+  <li>The RPM metadata, desktop entry, launcher reference, and icon are checked before the artifact is accepted.</li>
+</ul>
+<p>The release workflow creates a checksum for each package and attaches both packages and both checksum files to the GitHub Release.</p>
 
 <h2>Open in IntelliJ IDEA</h2>
 <ol>
