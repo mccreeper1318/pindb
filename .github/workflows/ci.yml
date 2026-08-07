@@ -110,13 +110,27 @@ jobs:
             rpm2cpio "$GITHUB_WORKSPACE/$RPM" | cpio -idmu
           )
 
-          mapfile -t DESKTOP_FILES < <(find "$EXTRACT_DIR" -type f -path '*/applications/*.desktop')
+          mapfile -t DESKTOP_FILES < <(find "$EXTRACT_DIR" -type f -iname '*pindb*.desktop')
           if [[ "${#DESKTOP_FILES[@]}" -ne 1 ]]; then
-            echo "Expected exactly one desktop entry; found ${#DESKTOP_FILES[@]}."
+            echo "Expected exactly one PinDB desktop entry; found ${#DESKTOP_FILES[@]}."
             printf '%s\n' "${DESKTOP_FILES[@]}"
             exit 1
           fi
-          desktop-file-validate "${DESKTOP_FILES[0]}"
+
+          DESKTOP_FILE="${DESKTOP_FILES[0]}"
+          desktop-file-validate "$DESKTOP_FILE"
+
+          if ! grep -Eq '^Exec=.*/PinDB([[:space:]]|$)' "$DESKTOP_FILE"; then
+            echo "The desktop entry does not reference the packaged PinDB launcher."
+            cat "$DESKTOP_FILE"
+            exit 1
+          fi
+
+          if ! grep -Eq '^Icon=.+' "$DESKTOP_FILE"; then
+            echo "The desktop entry does not define an icon."
+            cat "$DESKTOP_FILE"
+            exit 1
+          fi
 
           if ! find "$EXTRACT_DIR" -type f -iname '*pindb*.png' -print -quit | grep -q .; then
             echo "The RPM does not contain a PinDB PNG icon."
