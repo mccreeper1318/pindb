@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PinDB - a flexible personal database application.">
+  <meta name="description" content="PinDB user guide for Debian and Fedora Linux.">
   <title>User Guide - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -21,6 +21,7 @@
     <nav class="navbar" aria-label="Main navigation">
       <a href="index.html">HOME</a>
       <a href="download.html">DOWNLOAD</a>
+      <a href="fedora.html">FEDORA</a>
       <a href="features.html">FEATURES</a>
       <a href="gallery.html">GALLERY</a>
       <a href="manual.html" class="current">USER GUIDE</a>
@@ -30,7 +31,15 @@
     <main class="content">
 <h1>User Guide</h1>
 
-<h2>1. Create a database</h2>
+<h2>1. Install PinDB</h2>
+<p>Choose the package that matches your Linux system:</p>
+<ul>
+  <li><code>.deb</code> for Linux Mint, Ubuntu, Debian, and related systems.</li>
+  <li><code>.rpm</code> for Fedora Workstation, Fedora KDE, and traditional Fedora spins.</li>
+</ul>
+<p>Both packages include their own Java runtime. See the <a href="download.html">Download page</a> for package links and installation commands. Fedora users can also read the <a href="fedora.html">complete Fedora guide</a>.</p>
+
+<h2>2. Create a database</h2>
 <ol>
   <li>Launch PinDB.</li>
   <li>Select <b>Create New Database</b>.</li>
@@ -39,26 +48,35 @@
   <li>Select <b>Create Database</b>.</li>
 </ol>
 
-<h2>2. Add entries</h2>
+<h2>3. Add entries</h2>
 <p>Use the <b>+</b> button to add a record. Complete the fields and select <b>Add Entry</b>. Use <b>Add &amp; Add Another</b> when entering several records in a row.</p>
 
-<h2>3. Find information</h2>
+<h2>4. Find information</h2>
 <p>Use the search box for a broad search. Select a column heading to sort. Use field filters to display records matching specific values.</p>
 
-<h2>4. Store documents</h2>
-<p>Add a Document field, edit a record, and choose the file. The original file is copied into the <code>.pindb</code> database. Click its filename later to preview or save it.</p>
+<h2>5. Store documents</h2>
+<p>Add a Document field, edit a record, and choose the file. The original file is copied into the <code>.pindb</code> database. Click its filename later to preview, print, save a copy, or open it in another application.</p>
 
-<h2>5. Back up your database</h2>
+<h2>6. Back up your database</h2>
 <p>PinDB keeps internal snapshots, but those snapshots are part of the same database file. Copy important <code>.pindb</code> files to another drive or backup service.</p>
 
-<h2>6. Update PinDB</h2>
+<h2>7. Update PinDB</h2>
 <p>PinDB checks GitHub Releases for newer versions. Stable releases are selected by default. Beta updates can be enabled in Settings.</p>
+<p>On supported systems, PinDB selects the correct package, verifies the checksum when supplied, requests administrator approval, installs the update, restarts, and displays the release notes.</p>
+<table class="status-table">
+  <tr><th>System</th><th>Update method</th></tr>
+  <tr><td>Debian / Ubuntu / Linux Mint</td><td>Automatic <code>.deb</code> installation with <code>apt-get</code></td></tr>
+  <tr><td>Traditional Fedora systems</td><td>Automatic <code>.rpm</code> installation with <code>dnf5</code> or <code>dnf</code></td></tr>
+  <tr><td>Fedora Silverblue / Kinoite / Atomic</td><td>Manual <code>rpm-ostree</code> installation and reboot</td></tr>
+</table>
 
 <h2>Frequently asked questions</h2>
 <dl>
   <dt><b>Do I need a database server?</b></dt><dd>No. Each database is a local SQLite file.</dd>
-  <dt><b>Do I need Java?</b></dt><dd>Not when installing the official <code>.deb</code>. It includes a private runtime.</dd>
+  <dt><b>Do I need Java?</b></dt><dd>Not when installing the official <code>.deb</code> or <code>.rpm</code>. Both include a private runtime.</dd>
+  <dt><b>Which Fedora editions are supported?</b></dt><dd>The normal RPM is intended for Fedora Workstation, Fedora KDE, and traditional Fedora spins. Atomic desktops require manual <code>rpm-ostree</code> installation.</dd>
   <dt><b>Are database contents encrypted?</b></dt><dd>No. The current version does not encrypt database contents.</dd>
+  <dt><b>Can I move a database between Debian and Fedora?</b></dt><dd>Yes. The <code>.pindb</code> format is portable. Close the database, then copy the complete file.</dd>
   <dt><b>Can I move a database?</b></dt><dd>Yes. Close it in PinDB, then copy the entire <code>.pindb</code> file.</dd>
 </dl>
     </main>
