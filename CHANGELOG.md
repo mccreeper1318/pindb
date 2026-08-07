@@ -15,6 +15,7 @@
 ### Fixed
 
 - Fixed Fedora 44 RPM builds failing because `java-21-openjdk-devel` is no longer available in Fedora 44 repositories; Fedora jobs now install Temurin Java 21 through `actions/setup-java` and use DNF only for native RPM build tools.
+- Fixed RPM verification incorrectly requiring the generated PinDB desktop entry to be stored under an `applications` directory; validation now finds the actual `jpackage` desktop file inside the application bundle and verifies its launcher and icon entries.
 - Fixed the About PinDB dialog referring specifically to Version 0.1 in its database-encryption notice (Issue #19).
 - Changed the notice to **Current version does not encrypt database contents** so it remains accurate in future releases.
 - Fixed **Copy Code** closing the GitHub authorization dialog and leaving the bug-report form disabled (Issue #20).
