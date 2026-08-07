@@ -49,36 +49,50 @@
       <h3>Fedora Workstation and Spins</h3>
       <span class="platform-badge fedora">RPM</span>
       <div class="download-links">
-        <a id="stable-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases/latest">Download stable .rpm</a>
-        <a id="stable-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/latest">View RPM checksum</a>
+        <a id="stable-rpm" class="download-button fedora unavailable" aria-disabled="true">No stable Fedora RPM published yet</a>
+        <a id="stable-rpm-checksum" class="small unavailable" aria-disabled="true">Checksum unavailable</a>
       </div>
     </div>
   </div>
 </div>
 
 <div class="release-panel">
-  <h2>Latest beta release: <span id="beta-version">checking GitHub...</span></h2>
+  <h2>Latest beta release: <span id="beta-version">0.2-beta.4</span></h2>
   <div class="package-grid">
     <div class="package-card debian">
       <h3>Debian / Ubuntu / Linux Mint</h3>
       <span class="platform-badge">DEB</span>
       <div class="download-links">
-        <a id="beta-deb" class="download-button" href="https://github.com/mccreeper1318/pindb/releases">Download beta .deb</a>
-        <a id="beta-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View Debian checksum</a>
+        <a id="beta-deb" class="download-button" href="https://github.com/mccreeper1318/pindb/releases/download/0.2-beta.4/pindb_0.2-0.beta.4_amd64.deb">Download pindb_0.2-0.beta.4_amd64.deb</a>
+        <a id="beta-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.2-beta.4/pindb_0.2-0.beta.4_amd64.deb.sha256">Checksum: pindb_0.2-0.beta.4_amd64.deb.sha256</a>
       </div>
     </div>
     <div class="package-card fedora">
       <h3>Fedora Workstation and Spins</h3>
       <span class="platform-badge fedora">RPM</span>
       <div class="download-links">
-        <a id="beta-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases">Download beta .rpm</a>
-        <a id="beta-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View RPM checksum</a>
+        <a id="beta-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases/download/0.2-beta.4/pindb-0.2-0.beta.4.x86_64.rpm">Download pindb-0.2-0.beta.4.x86_64.rpm</a>
+        <a id="beta-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.2-beta.4/pindb-0.2-0.beta.4.x86_64.rpm.sha256">Checksum: pindb-0.2-0.beta.4.x86_64.rpm.sha256</a>
       </div>
     </div>
   </div>
 </div>
 
 <p id="release-status" class="small">Looking up current release assets...</p>
+
+<h2 id="install-guides">Complete installation guides</h2>
+<div class="package-grid">
+  <div class="package-card debian">
+    <h3>Debian-family guide</h3>
+    <p>Installation, APT updates, checksum verification, uninstalling, and troubleshooting for Debian, Ubuntu, Linux Mint, and related distributions.</p>
+    <p><a class="download-button primary" href="debian.html">READ THE DEBIAN GUIDE</a></p>
+  </div>
+  <div class="package-card fedora">
+    <h3>Fedora guide</h3>
+    <p>Installation, DNF updates, Fedora Atomic instructions, checksum verification, uninstalling, and troubleshooting.</p>
+    <p><a class="download-button fedora" href="fedora.html">READ THE FEDORA GUIDE</a></p>
+  </div>
+</div>
 
 <h2 id="debian-downloads">Install on Debian, Ubuntu, or Linux Mint</h2>
 <ol>
@@ -89,6 +103,7 @@
 </ol>
 <p>Terminal installation:</p>
 <pre>sudo apt install ./pindb_*_amd64.deb</pre>
+<p><a class="download-button primary" href="debian.html">READ THE COMPLETE DEBIAN GUIDE</a></p>
 
 <h2 id="fedora-downloads">Install on Fedora Workstation or a traditional Fedora spin</h2>
 <ol>
