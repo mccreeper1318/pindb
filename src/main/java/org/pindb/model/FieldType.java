@@ -8,7 +8,8 @@ public enum FieldType {
     DATE("Date"),
     DATE_TIME("Date and Time"),
     BOOLEAN("Yes / No"),
-    DROPDOWN("Dropdown List");
+    DROPDOWN("Dropdown List"),
+    DOCUMENT("Document");
 
     private final String displayName;
 

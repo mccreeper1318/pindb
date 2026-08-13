@@ -132,11 +132,13 @@ public final class FieldEditorDialog extends Dialog<FieldDefinition> {
         boolean date = selected == FieldType.DATE || selected == FieldType.DATE_TIME;
         boolean text = selected == FieldType.TEXT || selected == FieldType.MULTILINE_TEXT;
         boolean dropdown = selected == FieldType.DROPDOWN;
+        boolean document = selected == FieldType.DOCUMENT;
 
         minimum.setDisable(!numeric);
         maximum.setDisable(!numeric);
         useCurrentDate.setDisable(!date);
-        defaultValue.setDisable(date && useCurrentDate.isSelected());
+        defaultValue.setDisable(document || (date && useCurrentDate.isSelected()));
+        unique.setDisable(document);
         characterLimit.setDisable(!text);
         dropdownOptions.setDisable(!dropdown);
 
@@ -182,7 +184,8 @@ public final class FieldEditorDialog extends Dialog<FieldDefinition> {
         result.setName(name.getText());
         result.setType(type.getValue());
         result.setRequired(required.isSelected());
-        result.setDefaultValue(useCurrentDate.isSelected()
+        result.setDefaultValue(type.getValue() == FieldType.DOCUMENT ? ""
+                : useCurrentDate.isSelected()
                 ? (type.getValue() == FieldType.DATE ? "${TODAY}" : "${NOW}")
                 : defaultValue.getText().trim());
         result.setMinValue(minimum.getText().trim());

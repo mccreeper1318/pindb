@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.2-beta.4
+
+### Added
+
+- Added self-contained RPM packaging for Fedora Workstation, Fedora KDE, and other traditional Fedora-family Linux systems.
+- Added Fedora-aware distribution detection using the standard `os-release` files.
+- Added architecture-aware GitHub Release selection for Debian and RPM packages.
+- Added automatic Fedora updates through `dnf5` or `dnf` with `pkexec`, SHA-256 verification, rollback protection, restart, and release-note display.
+- Added Fedora Atomic detection with a safe manual `rpm-ostree` installation path instead of attempting an unsupported DNF update.
+- Added Fedora CI and release jobs that build and verify an RPM alongside the existing Debian package.
+- Added regression tests for Fedora detection, architecture matching, RPM release selection, RPM checksums, package-manager selection, and manual installation commands.
+
+### Fixed
+
+- Fixed Fedora 44 RPM builds failing because `java-21-openjdk-devel` is no longer available in Fedora 44 repositories; Fedora jobs now install Temurin Java 21 through `actions/setup-java` and use DNF only for native RPM build tools.
+- Fixed RPM verification incorrectly requiring the generated PinDB desktop entry to be stored under an `applications` directory; validation now finds the actual `jpackage` desktop file inside the application bundle and verifies its launcher and icon entries.
+
+## 0.2-beta.3
+
+### Fixed
+
+- Fixed the About PinDB dialog referring specifically to Version 0.1 in its database-encryption notice (Issue #19).
+- Changed the notice to **Current version does not encrypt database contents** so it remains accurate in future releases.
+- Fixed **Copy Code** closing the GitHub authorization dialog and leaving the bug-report form disabled (Issue #20).
+- Kept the authorization dialog open while copying the device code or opening GitHub, with an explicit cancellation option.
+- Fixed the GitHub authorization dialog remaining open after authorization and bug submission succeeded (Issue #21).
+- Fixed later successful bug submissions displaying an empty confirmation dialog (Issue #22).
+- Replaced the transient success alert with a consistently populated confirmation containing the issue number, address, **Open Issue**, and **Close** actions.
+
+## 0.2-beta.2
+
+### Fixed
+
+- Fixed the GitHub authorization button freezing PinDB while opening the browser during in-app bug reporting (Issue #18).
+- Moved GitHub authorization and submitted-issue link opening off the JavaFX application thread.
+- Added a visible device code, authorization address, and **Copy Code** fallback when the browser cannot open automatically.
+
+## 0.2-beta.1
+
+### Added
+
+- Added a **Document** field type that stores the original file inside the `.pindb` SQLite database.
+- Added clickable document filenames in table and record views.
+- Added an in-app viewer for PDF, DOCX, text, and common image files.
+- Added printing, Save Copy, and system-application actions to the document viewer.
+- Added embedded-document support to logical database backup snapshots.
+- Added a clickable update-history browser under **Help → PinDB Help → Updates**, with online refresh, local caching, and bundled offline release notes.
+- Added an in-app bug reporter that creates labeled issues in the PinDB GitHub repository using GitHub device authorization.
+- Added privacy-conscious diagnostics that exclude database contents, embedded documents, filenames, and personal paths.
+- Added secure GitHub authorization storage through the Linux keyring when available, with an owner-only credential-file fallback.
+
+### Fixed
+
+- Fixed CSV imports keeping display-formatted dates instead of normalizing them to PinDB's internal date format (Issue #12).
+- Fixed typed DatePicker values being replaced by the previous or current date when Enter saved an entry (Issue #13).
+- Fixed large groups of printed summaries being clipped instead of continuing onto additional pages (Issue #16).
+- Fixed table-print pagination estimating wrapping with a different column width than the rendered table (Issue #17).
+
 ## 0.1.1-beta.6
 
 - Fixed the duplicate **Cancel** button in the new-entry dialog while preserving the exact visible order: **Cancel**, **Add & Add Another**, **Add Entry**.
