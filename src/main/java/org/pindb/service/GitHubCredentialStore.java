@@ -52,7 +52,7 @@ final class GitHubCredentialStore {
                 "refreshExpiresAt", token.refreshExpiresAt().getEpochSecond()
         ));
         if (!saveToKeyring(json)) {
-            saveToFallbackFile(json);
+            saveToFallbackFile(FALLBACK_FILE, json);
         }
     }
 
@@ -127,8 +127,8 @@ final class GitHubCredentialStore {
         }
     }
 
-    private static void saveToFallbackFile(String json) throws IOException {
-        Path parent = FALLBACK_FILE.getParent();
+    static void saveToFallbackFile(Path destination, String json) throws IOException {
+        Path parent = destination.getParent();
         if (parent != null) {
             Files.createDirectories(parent);
         }
@@ -147,12 +147,12 @@ final class GitHubCredentialStore {
                     StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
             Files.setPosixFilePermissions(temporary, OWNER_ONLY_PERMISSIONS);
             try {
-                Files.move(temporary, FALLBACK_FILE,
+                Files.move(temporary, destination,
                         StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException exception) {
-                Files.move(temporary, FALLBACK_FILE, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
             }
-            Files.setPosixFilePermissions(FALLBACK_FILE, OWNER_ONLY_PERMISSIONS);
+            Files.setPosixFilePermissions(destination, OWNER_ONLY_PERMISSIONS);
         } finally {
             Files.deleteIfExists(temporary);
         }
