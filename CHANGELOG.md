@@ -11,6 +11,7 @@
 
 - Fixed RPM upgrades unregistering PinDB's desktop entry after the new package had installed, which could remove PinDB from the application menu (Issue #33).
 - Fixed the generated RPM uninstall script launching nested `rpm -q` commands while DNF held the RPM transaction lock, eliminating the repeated `.rpm.lock` errors reported during removal (Issue #33).
+- Fixed the custom Fedora RPM specification being ignored by `jpackage` because its override filename did not match the PinDB package name, ensuring the safe upgrade and uninstall scriptlets are actually packaged (Issue #33).
 - Hardened the post-update restart so failure to delete the downloaded package cannot prevent PinDB from reopening, and detached the restarted process from the updater's output streams (Issue #33).
 - Fixed Markdown release-note body text using an unreadable default color in PinDB's dark theme, which could make the post-update dialog appear empty (Issue #33).
 
