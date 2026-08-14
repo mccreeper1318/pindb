@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.2.1
+
+### Added
+
+- Added clearer database-open diagnostics that distinguish empty files, non-SQLite files, corrupted SQLite databases, missing PinDB metadata, missing schema-version metadata, and databases created by newer PinDB versions (Issue #26).
+- Added recovery guidance when a `.pindb` file appears incomplete or damaged (Issue #26).
+- Added a system Java/CUPS printing fallback when JavaFX cannot discover a configured printer on Linux (Issue #32).
+- Added regression coverage for invalid database diagnostics, portable database copies after a normal close, record/document rollback behavior, and owner-only credential storage.
+
+### Changed
+
+- PinDB now checkpoints and truncates pending SQLite WAL data during a normal document-store shutdown so the primary `.pindb` file is safer to copy between systems as a self-contained file (Issue #26).
+- Upgraded the packaged runtime and build toolchain to Java 25 with JavaFX 25.0.3, incorporating the upstream Linux GTK popup-positioning fix used by menu drop-downs (Issue #31).
+- Updated Debian and Fedora CI/release builds to use Temurin Java 25.
+
+### Fixed
+
+- Fixed record values and embedded document BLOBs being able to become inconsistent when the document transaction failed after a record add or edit had already committed. PinDB now restores the immediately preceding internal snapshot when the document save fails (Issue #28).
+- Fixed fallback GitHub credentials being written before owner-only permissions were applied. Fallback credentials are now created in a `0600` temporary file before token bytes are written and then moved into place (Issue #29).
+- Fixed GitHub keyring I/O failures incorrectly setting the worker thread's interrupted flag. The interrupt status is now restored only for actual `InterruptedException` cases (Issue #30).
+- Fixed Linux menu drop-downs appearing far below the menu bar on affected Fedora/Nobara desktop configurations by moving to the JavaFX version containing the upstream GTK coordinate fix (Issue #31).
+- Fixed database printing immediately reporting that no printer was configured when JavaFX printer discovery failed even though the system print service could see the printer (Issue #32).
+
 ## 0.2-beta.4
 
 ### Added
