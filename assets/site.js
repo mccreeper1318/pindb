@@ -110,15 +110,7 @@
     }
   }
 
-  function localCounter() {
-    const key = "pindb-retro-preview-visits";
-    let visits = Number(localStorage.getItem(key) || "0") + 1;
-    localStorage.setItem(key, String(visits));
-    setText("visitor-counter", String(visits).padStart(6, "0"));
-  }
-
   document.addEventListener("DOMContentLoaded", function () {
-    localCounter();
     if (document.querySelector("[data-release-page]") || document.getElementById("latest-version")) {
       loadReleases();
     }
