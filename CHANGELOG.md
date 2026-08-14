@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Issue 35 fix
 
 ### Fixed
 
