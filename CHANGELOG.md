@@ -1,5 +1,17 @@
 # Changelog
 
+## Issue 36 Fix
+
+### Added
+
+- Added a fixed, package-installed privileged update helper with a narrow install-only interface for Debian and Fedora packages.
+- Added updater security regression coverage for package replacement, symlink substitution, and checksum-to-install race conditions, along with DEB and RPM checks that ensure the privileged helper is packaged as an executable without an application-menu shortcut.
+
+### Fixed
+- Fixed the updater executing a cache-directory shell script as root and installing directly from a user-writable package path.
+- Automatic package installation now requires a matching published SHA-256 checksum. The helper rejects symlinks, holds the source open securely, copies it into an owner-only root staging directory, and re-verifies the expected digest before giving only that staged copy to APT or DNF.
+
+
 ## 0.2.1-beta.2
 
 ### Changed
@@ -14,13 +26,6 @@
 - Fixed the custom Fedora RPM specification being ignored by `jpackage` because its override filename did not match the PinDB package name, ensuring the safe upgrade and uninstall scriptlets are actually packaged (Issue #33).
 - Hardened the post-update restart so failure to delete the downloaded package cannot prevent PinDB from reopening, and detached the restarted process from the updater's output streams (Issue #33).
 - Fixed Markdown release-note body text using an unreadable default color in PinDB's dark theme, which could make the post-update dialog appear empty (Issue #33).
-
-### Issue 36 Fix
-
-- Fixed the updater executing a cache-directory shell script as root and installing directly from a user-writable package path.
-- Added a fixed, package-installed privileged update helper with a narrow install-only interface for Debian and Fedora packages.
-- Automatic package installation now requires a matching published SHA-256 checksum. The helper rejects symlinks, holds the source open securely, copies it into an owner-only root staging directory, and re-verifies the expected digest before giving only that staged copy to APT or DNF.
-- Added updater security regression coverage for package replacement, symlink substitution, and checksum-to-install race conditions, along with DEB and RPM checks that ensure the privileged helper is packaged as an executable without an application-menu shortcut.
 
 ## 0.2.1-beta.1
 
