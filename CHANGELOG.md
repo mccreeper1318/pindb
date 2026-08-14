@@ -1,5 +1,11 @@
 # Changelog
 
+## Issue 35 fix
+
+### Fixed
+
+- Fixed restoring the oldest retained internal backup erasing the active database when creating the pre-restore safety snapshot pruned the selected backup. Backup validation, safety snapshot creation, core and embedded-document restoration, and retention pruning now complete atomically, with pruning deferred until the restore has succeeded (Issue #35).
+
 ## 0.2.1-beta.2
 
 ### Changed
