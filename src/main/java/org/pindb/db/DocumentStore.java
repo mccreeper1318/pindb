@@ -83,8 +83,10 @@ public final class DocumentStore implements AutoCloseable {
     }
 
     public void replaceDocuments(long recordId, Map<Long, DocumentData> documents) {
+        long recoverySnapshot = latestSnapshotId();
+        boolean previousAutoCommit;
         try {
-            boolean previousAutoCommit = connection.getAutoCommit();
+            previousAutoCommit = connection.getAutoCommit();
             connection.setAutoCommit(false);
             try (PreparedStatement delete = connection.prepareStatement(
                     "DELETE FROM document_values WHERE record_id=?")) {
@@ -113,49 +115,148 @@ public final class DocumentStore implements AutoCloseable {
             connection.commit();
             connection.setAutoCommit(previousAutoCommit);
         } catch (SQLException exception) {
-            try {
-                connection.rollback();
-                connection.setAutoCommit(true);
-            } catch (SQLException ignored) {
-                // The original database error is more useful.
+            rollbackQuietly();
+            DatabaseException failure = new DatabaseException(
+                    "Could not save embedded documents for entry " + recordId + ". The entry changes were rolled back.",
+                    exception);
+            if (recoverySnapshot > 0) {
+                try {
+                    restoreDatabaseFromSnapshot(recoverySnapshot);
+                } catch (DatabaseException recoveryFailure) {
+                    failure = new DatabaseException(
+                            "Could not save embedded documents for entry " + recordId
+                                    + ", and PinDB could not fully restore the previous snapshot. "
+                                    + "Do not make further changes until the database is checked or restored from backup.",
+                            exception);
+                    failure.addSuppressed(recoveryFailure);
+                }
             }
-            throw new DatabaseException("Could not save embedded documents for entry " + recordId + ".", exception);
+            throw failure;
         }
     }
 
     public void restoreSnapshot(long snapshotId) {
+        boolean previousAutoCommit;
         try {
-            boolean previousAutoCommit = connection.getAutoCommit();
+            previousAutoCommit = connection.getAutoCommit();
             connection.setAutoCommit(false);
-            try (Statement statement = connection.createStatement()) {
-                statement.executeUpdate("DELETE FROM document_values");
-            }
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO document_values(record_id,field_id,file_name,mime_type,file_size,data,created_at) "
-                            + "SELECT record_id,field_id,file_name,mime_type,file_size,data,created_at "
-                            + "FROM backup_document_values WHERE snapshot_id=?")) {
-                statement.setLong(1, snapshotId);
-                statement.executeUpdate();
-            }
+            restoreDocumentsFromSnapshot(snapshotId);
             connection.commit();
             connection.setAutoCommit(previousAutoCommit);
         } catch (SQLException exception) {
-            try {
-                connection.rollback();
-                connection.setAutoCommit(true);
-            } catch (SQLException ignored) {
-                // The original database error is more useful.
-            }
+            rollbackQuietly();
             throw new DatabaseException("Could not restore embedded documents from the selected backup.", exception);
+        }
+    }
+
+    private long latestSnapshotId() {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT id FROM backup_snapshots ORDER BY id DESC LIMIT 1")) {
+            return result.next() ? result.getLong(1) : -1;
+        } catch (SQLException exception) {
+            throw new DatabaseException("Could not locate the recovery snapshot before saving embedded documents.", exception);
+        }
+    }
+
+    private void restoreDatabaseFromSnapshot(long snapshotId) {
+        try {
+            boolean previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute("PRAGMA defer_foreign_keys=ON");
+                    statement.executeUpdate("DELETE FROM document_values");
+                    statement.executeUpdate("DELETE FROM record_values");
+                    statement.executeUpdate("DELETE FROM records");
+                    statement.executeUpdate("DELETE FROM field_definitions");
+                    statement.executeUpdate("DELETE FROM pindb_meta");
+                }
+                restoreCoreTable(snapshotId, "pindb_meta", "key,value",
+                        "SELECT key,value FROM backup_meta WHERE snapshot_id=?");
+                restoreCoreTable(snapshotId, "field_definitions",
+                        "id,name,field_type,position,required,default_value,min_value,max_value,unique_value,char_limit,dropdown_options,summary_type",
+                        "SELECT field_id,name,field_type,position,required,default_value,min_value,max_value,unique_value,char_limit,dropdown_options,summary_type "
+                                + "FROM backup_fields WHERE snapshot_id=?");
+                restoreCoreTable(snapshotId, "records", "id,created_at,updated_at,deleted_at",
+                        "SELECT record_id,created_at,updated_at,deleted_at FROM backup_records WHERE snapshot_id=?");
+                restoreCoreTable(snapshotId, "record_values", "record_id,field_id,value",
+                        "SELECT record_id,field_id,value FROM backup_values WHERE snapshot_id=?");
+                restoreDocumentsFromSnapshot(snapshotId);
+                connection.commit();
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(previousAutoCommit);
+            }
+        } catch (SQLException exception) {
+            throw new DatabaseException("Could not restore the database after the document save failed.", exception);
+        }
+    }
+
+    private void restoreCoreTable(long snapshotId, String table, String columns, String select) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO " + table + "(" + columns + ") " + select)) {
+            statement.setLong(1, snapshotId);
+            statement.executeUpdate();
+        }
+    }
+
+    private void restoreDocumentsFromSnapshot(long snapshotId) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("DELETE FROM document_values");
+        }
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO document_values(record_id,field_id,file_name,mime_type,file_size,data,created_at) "
+                        + "SELECT record_id,field_id,file_name,mime_type,file_size,data,created_at "
+                        + "FROM backup_document_values WHERE snapshot_id=?")) {
+            statement.setLong(1, snapshotId);
+            statement.executeUpdate();
+        }
+    }
+
+    private void rollbackQuietly() {
+        try {
+            connection.rollback();
+        } catch (SQLException ignored) {
+            // The original database error is more useful.
+        }
+        try {
+            connection.setAutoCommit(true);
+        } catch (SQLException ignored) {
+            // The original database error is more useful.
+        }
+    }
+
+    private void checkpointWal() throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(TRUNCATE)")) {
+            if (result.next() && result.getInt(1) != 0) {
+                throw new SQLException("SQLite could not obtain the lock needed to checkpoint the WAL.");
+            }
         }
     }
 
     @Override
     public void close() {
+        SQLException failure = null;
+        try {
+            checkpointWal();
+        } catch (SQLException exception) {
+            failure = exception;
+        }
         try {
             connection.close();
         } catch (SQLException exception) {
-            throw new DatabaseException("Could not close embedded document storage cleanly.", exception);
+            if (failure == null) {
+                failure = exception;
+            } else {
+                failure.addSuppressed(exception);
+            }
+        }
+        if (failure != null) {
+            throw new DatabaseException("Could not close embedded document storage cleanly or checkpoint pending SQLite data.",
+                    failure);
         }
     }
 }
