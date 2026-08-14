@@ -130,7 +130,8 @@ tasks.register('prepareUpdateHelperLauncher') {
         }
         propertiesFile.setText("main-jar=${packagedMainJar}\n"
                 + 'main-class=org.pindb.service.PrivilegedUpdateHelper\n'
-                + 'java-options=-Dfile.encoding=UTF-8\n', 'UTF-8')
+                + 'java-options=-Dfile.encoding=UTF-8\n'
+                + 'linux-shortcut=false\n', 'UTF-8')
     }
 }
 
