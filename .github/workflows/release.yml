@@ -230,6 +230,18 @@ jobs:
           rpm -qpi "$RPM"
           rpm -qpl "$RPM"
 
+          RPM_SCRIPTS="$(rpm -qp --scripts "$RPM")"
+          if grep -Fq 'rpm -q --whatprovides' <<< "$RPM_SCRIPTS"; then
+            echo "RPM scriptlets must not start a nested rpm ownership query."
+            printf '%s\n' "$RPM_SCRIPTS"
+            exit 1
+          fi
+          if ! grep -Fq 'if [ "$1" -eq 0 ]; then' <<< "$RPM_SCRIPTS"; then
+            echo "RPM desktop cleanup must be restricted to a real uninstall."
+            printf '%s\n' "$RPM_SCRIPTS"
+            exit 1
+          fi
+
           EXTRACT_DIR="$(mktemp -d)"
           trap 'rm -rf "$EXTRACT_DIR"' EXIT
           (

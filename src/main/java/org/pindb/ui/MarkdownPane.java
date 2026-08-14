@@ -110,35 +110,41 @@ public final class MarkdownPane extends ScrollPane {
                 next = code;
                 isBold = false;
             } else {
-                result.add(new Text(text.substring(position)));
+                result.add(markdownText(text.substring(position)));
                 break;
             }
             if (next > position) {
-                result.add(new Text(text.substring(position, next)));
+                result.add(markdownText(text.substring(position, next)));
             }
             if (isBold) {
                 int end = text.indexOf("**", next + 2);
                 if (end < 0) {
-                    result.add(new Text(text.substring(next)));
+                    result.add(markdownText(text.substring(next)));
                     break;
                 }
-                Text item = new Text(text.substring(next + 2, end));
+                Text item = markdownText(text.substring(next + 2, end));
                 item.setFont(Font.font(item.getFont().getFamily(), FontWeight.BOLD, item.getFont().getSize()));
                 result.add(item);
                 position = end + 2;
             } else {
                 int end = text.indexOf('`', next + 1);
                 if (end < 0) {
-                    result.add(new Text(text.substring(next)));
+                    result.add(markdownText(text.substring(next)));
                     break;
                 }
-                Text item = new Text(text.substring(next + 1, end));
+                Text item = markdownText(text.substring(next + 1, end));
                 item.setStyle("-fx-font-family: monospace; -fx-fill: #087f7b;");
                 result.add(item);
                 position = end + 1;
             }
         }
         return result;
+    }
+
+    private static Text markdownText(String value) {
+        Text text = new Text(value);
+        text.getStyleClass().add("markdown-text");
+        return text;
     }
 
     private static String stripLinks(String value) {

@@ -163,8 +163,12 @@ public final class UpdateInstaller {
             installing.set(false);
             dialog.close();
             try {
-                Files.deleteIfExists(update.packageFile());
                 restartAfterUpdate(update.notesFile(), tag);
+                try {
+                    Files.deleteIfExists(update.packageFile());
+                } catch (IOException cleanupFailure) {
+                    cleanupFailure.printStackTrace(System.err);
+                }
                 Platform.exit();
             } catch (IOException exception) {
                 writeFailureLog(update.packageFile(), exception, "restart");
@@ -399,7 +403,14 @@ public final class UpdateInstaller {
         if (launcher == null) {
             throw new IOException("The installed PinDB launcher could not be found after the update.");
         }
-        new ProcessBuilder(launcher.toString(), "--updated-tag=" + tag, "--updated-notes=" + notes).start();
+        new ProcessBuilder(restartCommand(launcher, notes, tag))
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start();
+    }
+
+    static List<String> restartCommand(Path launcher, Path notes, String tag) {
+        return List.of(launcher.toString(), "--updated-tag=" + tag, "--updated-notes=" + notes);
     }
 
     static String manualInstallCommand(Path packageFile, LinuxPackageType type,

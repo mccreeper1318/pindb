@@ -13,6 +13,7 @@ def semanticVersion = project.version.toString()
 def semanticParts = semanticVersion.split('-', 2)
 def linuxAppVersion = semanticParts[0]
 def prereleasePart = semanticParts.length == 2 ? semanticParts[1] : null
+def rpmResources = file('packaging/rpm')
 def debAppRelease = prereleasePart == null
         ? '1'
         : "0~${prereleasePart.replace('-', '.')}"
@@ -192,6 +193,7 @@ tasks.register('packageRpm', org.gradle.api.tasks.Exec) {
             '--linux-menu-group', 'Office',
             '--linux-app-category', 'Office',
             '--linux-shortcut',
+            '--resource-dir', rpmResources.absolutePath,
             '--file-associations', associations.absolutePath,
             '--java-options', '-Dfile.encoding=UTF-8',
             '--java-options', '-Dprism.order=es2,sw'

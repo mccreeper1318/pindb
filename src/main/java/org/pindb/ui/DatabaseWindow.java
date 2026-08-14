@@ -18,7 +18,6 @@ import javafx.scene.control.Hyperlink;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
-import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.ScrollPane;
@@ -106,11 +105,14 @@ public final class DatabaseWindow {
         stage.getIcons().add(new Image(Objects.requireNonNull(
                 getClass().getResourceAsStream("/org/pindb/app/icon-64.png"))));
 
-        BorderPane root = new BorderPane();
-        root.setTop(new VBox(menuBar(), header()));
-        root.setCenter(content());
-        root.setBottom(bottomBar());
+        InWindowMenuBar menus = menuBar();
+        BorderPane workspace = new BorderPane();
+        workspace.setTop(new VBox(menus.bar(), header()));
+        workspace.setCenter(content());
+        workspace.setBottom(bottomBar());
+        StackPane root = new StackPane(workspace, menus.overlay());
         scene = new Scene(root, 1180, 760);
+        menus.attach(root, scene);
         UiUtil.applyStyles(scene, context.settings());
         stage.setScene(scene);
         stage.setMinWidth(840);
@@ -166,7 +168,7 @@ public final class DatabaseWindow {
         onClosed.run();
     }
 
-    private MenuBar menuBar() {
+    private InWindowMenuBar menuBar() {
         Menu file = new Menu("File");
         MenuItem add = item("New Entry", event -> addEntry());
         add.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN));
@@ -210,7 +212,7 @@ public final class DatabaseWindow {
                 new javafx.scene.control.SeparatorMenuItem(),
                 item("Report a Bug…", event -> new BugReportDialog(stage, context.settings()).showAndWait()),
                 item("About PinDB", event -> new AboutDialog(stage, context.settings()).showAndWait()));
-        return new MenuBar(file, databaseMenu, viewMenu, help);
+        return new InWindowMenuBar(file, databaseMenu, viewMenu, help);
     }
 
     private javafx.scene.Node header() {

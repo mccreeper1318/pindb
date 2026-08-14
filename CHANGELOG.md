@@ -1,6 +1,20 @@
 # Changelog
 
-## 0.2.1
+## 0.2.1-beta.2
+
+### Changed
+
+- Replaced the database window's native JavaFX menu popups with in-window drop-down panels that stay anchored directly beneath the menu bar on affected Fedora/Nobara Wayland and KDE configurations (Issue #31).
+- Added Fedora package regression checks for safe RPM upgrade and uninstall script behavior.
+
+### Fixed
+
+- Fixed RPM upgrades unregistering PinDB's desktop entry after the new package had installed, which could remove PinDB from the application menu (Issue #33).
+- Fixed the generated RPM uninstall script launching nested `rpm -q` commands while DNF held the RPM transaction lock, eliminating the repeated `.rpm.lock` errors reported during removal (Issue #33).
+- Hardened the post-update restart so failure to delete the downloaded package cannot prevent PinDB from reopening, and detached the restarted process from the updater's output streams (Issue #33).
+- Fixed Markdown release-note body text using an unreadable default color in PinDB's dark theme, which could make the post-update dialog appear empty (Issue #33).
+
+## 0.2.1-beta.1
 
 ### Added
 

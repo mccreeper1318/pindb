@@ -61,4 +61,16 @@ class UpdateInstallerTest {
                 Path.of("/tmp/pindb.rpm"), LinuxPackageType.RPM, fedora)
                 .startsWith("sudo dnf install"));
     }
+
+    @Test
+    void buildsRestartCommandWithoutLosingPrereleaseTagOrNotesPath() {
+        assertEquals(List.of(
+                        "/opt/pindb/pindb/bin/PinDB",
+                        "--updated-tag=0.2.1-beta.2",
+                        "--updated-notes=/tmp/PinDB update notes.md"),
+                UpdateInstaller.restartCommand(
+                        Path.of("/opt/pindb/pindb/bin/PinDB"),
+                        Path.of("/tmp/PinDB update notes.md"),
+                        "0.2.1-beta.2"));
+    }
 }

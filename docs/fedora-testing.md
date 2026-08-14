@@ -8,6 +8,7 @@ Use this checklist before announcing an RPM release.
 - Confirm exactly one `.rpm` is written to `build/packages/`.
 - Inspect metadata with `rpm -qpi build/packages/*.rpm`.
 - Inspect installed paths with `rpm -qpl build/packages/*.rpm`.
+- Inspect package scripts with `rpm -qp --scripts build/packages/*.rpm`; confirm the pre-uninstall script removes desktop integration only when `$1` is `0` and contains no nested `rpm -q` ownership lookup.
 - Confirm the package version and release match the GitHub release tag.
 - Generate and verify the package SHA-256 checksum.
 
@@ -47,6 +48,8 @@ Use this checklist before announcing an RPM release.
 - Confirm the `pkexec` administrator prompt appears.
 - Complete a successful RPM-to-RPM update.
 - Confirm PinDB restarts and displays the release notes.
+- Confirm the updated PinDB desktop entry remains in the application menu after the upgrade.
+- Remove PinDB with DNF and confirm the uninstall prints no RPM transaction-lock errors.
 - Test a deliberately invalid checksum and confirm installation is refused.
 - Test a failed package-manager command and confirm the previous application files are preserved.
 - Confirm the failure dialog shows the downloaded RPM, manual DNF command, and diagnostic log path.
