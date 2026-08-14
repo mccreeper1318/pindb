@@ -26,6 +26,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
@@ -76,11 +77,11 @@ public final class UpdateInstaller {
                     throw new InterruptedException("Update download cancelled.");
                 }
                 Files.move(partial, destination, StandardCopyOption.REPLACE_EXISTING);
-                verifyChecksum(destination, releasePackage.checksumUri(), this::updateMessage);
+                String digest = verifyChecksum(destination, releasePackage.checksumUri(), this::updateMessage);
                 Path notes = directory.resolve("release-notes-" + release.version().normalized() + ".md");
                 Files.writeString(notes, release.markdownNotes() == null ? "" : release.markdownNotes(),
                         StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                return new DownloadedUpdate(destination, notes, releasePackage, distribution);
+                return new DownloadedUpdate(destination, notes, digest, releasePackage, distribution);
             }
         };
         taskMessages(downloadTask, status);
@@ -154,7 +155,8 @@ public final class UpdateInstaller {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                installPrivileged(update.packageFile(), update.releasePackage().type(), this::updateMessage);
+                installPrivileged(update.packageFile(), update.digest(), update.releasePackage().type(),
+                        this::updateMessage);
                 return null;
             }
         };
@@ -256,9 +258,9 @@ public final class UpdateInstaller {
         }
     }
 
-    private void verifyChecksum(Path packageFile, URI checksumUri, MessageReporter message) throws Exception {
+    private String verifyChecksum(Path packageFile, URI checksumUri, MessageReporter message) throws Exception {
         if (checksumUri == null) {
-            return;
+            throw new IOException("Automatic installation requires a published SHA-256 checksum.");
         }
         HttpRequest request = HttpRequest.newBuilder(checksumUri).timeout(Duration.ofSeconds(30))
                 .header("User-Agent", "PinDB-Updater").GET().build();
@@ -269,10 +271,13 @@ public final class UpdateInstaller {
         Optional<String> expected = parseExpectedChecksum(response.body(), packageFile.getFileName().toString());
         if (expected.isPresent()) {
             message.report("Verifying downloaded package…");
-            if (!sha256(packageFile).equalsIgnoreCase(expected.get())) {
+            String actual = sha256(packageFile);
+            if (!actual.equalsIgnoreCase(expected.get())) {
                 throw new IOException("The downloaded update failed its SHA-256 verification.");
             }
+            return actual;
         }
+        throw new IOException("The checksum file did not contain a usable SHA-256 digest.");
     }
 
     static Optional<String> parseExpectedChecksum(String checksumText, String packageName) throws IOException {
@@ -317,76 +322,79 @@ public final class UpdateInstaller {
         return HexFormat.of().formatHex(digest.digest());
     }
 
-    private static void installPrivileged(Path packageFile, LinuxPackageType type,
+    private static void installPrivileged(Path packageFile, String digest, LinuxPackageType type,
                                           MessageReporter message) throws Exception {
-        if (installedLauncher() == null) {
-            throw new IOException("Automatic installation is available after PinDB is installed from a native package.");
-        }
         Path pkexec = Path.of("/usr/bin/pkexec");
         if (!Files.isExecutable(pkexec)) {
             throw new IOException("The pkexec administrator tool is not installed at /usr/bin/pkexec.");
         }
-        Path manager = packageManagerCandidates(type).stream().filter(Files::isExecutable).findFirst()
+        packageManagerCandidates(type).stream().filter(Files::isExecutable).findFirst()
                 .orElseThrow(() -> new IOException(type == LinuxPackageType.DEB
                         ? "The apt-get package installer is unavailable."
                         : "Neither dnf5 nor dnf is available under /usr/bin."));
-        Path script = packageFile.getParent().resolve("install-pindb-update-root.sh");
-        Files.writeString(script, rootInstallScript(), StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        try {
-            message.report("Approve the administrator prompt to install the update…");
-            Process process = new ProcessBuilder(pkexec.toString(), "/bin/sh", script.toString(),
-                    packageFile.toAbsolutePath().toString(), manager.toString(), type.scriptValue())
-                    .redirectErrorStream(true).start();
-            String output;
-            try (InputStream input = process.getInputStream()) {
-                output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
-            }
-            int status = process.waitFor();
-            if (status != 0) {
-                throw new IOException("The administrator installer exited with status " + status + ".\n\n"
-                        + (output.isBlank() ? "No additional installer output was provided." : output));
-            }
-        } finally {
-            Files.deleteIfExists(script);
+        Path helper = installedUpdateHelper();
+        if (helper == null) {
+            throw new IOException("The secure PinDB update helper is unavailable. Reinstall PinDB from a native package.");
+        }
+        message.report("Approve the administrator prompt to install the update…");
+        Process process = new ProcessBuilder(privilegedInstallCommand(pkexec, helper, packageFile, digest, type))
+                .redirectErrorStream(true).start();
+        String output;
+        try (InputStream input = process.getInputStream()) {
+            output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
+        }
+        int status = process.waitFor();
+        if (status != 0) {
+            throw new IOException("The administrator installer exited with status " + status + ".\n\n"
+                    + (output.isBlank() ? "No additional installer output was provided." : output));
         }
     }
 
-    private static String rootInstallScript() {
-        return """
-                #!/bin/sh
-                set -u
-                PACKAGE="$1"
-                MANAGER="$2"
-                KIND="$3"
-                BACKUP="/opt/pindb-update-backup-$$"
-                HAD_OLD=0
-                if [ -d /opt/pindb ]; then
-                  cp -a /opt/pindb "$BACKUP" || exit 30
-                  HAD_OLD=1
-                fi
-                if [ "$KIND" = "deb" ]; then
-                  DEBIAN_FRONTEND=noninteractive "$MANAGER" install -y "$PACKAGE"
-                else
-                  "$MANAGER" install -y "$PACKAGE"
-                fi
-                STATUS=$?
-                if [ "$STATUS" -eq 0 ]; then
-                  [ "$HAD_OLD" -eq 1 ] && rm -rf "$BACKUP"
-                  exit 0
-                fi
-                if [ "$HAD_OLD" -eq 1 ]; then
-                  rm -rf /opt/pindb
-                  mv "$BACKUP" /opt/pindb
-                fi
-                exit "$STATUS"
-                """;
+    static List<Path> packageManagerCandidates(LinuxPackageType type) {
+        return PrivilegedUpdateHelper.packageManagerCandidates(type);
     }
 
-    static List<Path> packageManagerCandidates(LinuxPackageType type) {
-        return type == LinuxPackageType.DEB
-                ? List.of(Path.of("/usr/bin/apt-get"))
-                : List.of(Path.of("/usr/bin/dnf5"), Path.of("/usr/bin/dnf"));
+    static List<String> privilegedInstallCommand(Path pkexec, Path helper, Path packageFile, String digest,
+                                                 LinuxPackageType type) {
+        return List.of(pkexec.toString(), helper.toString(), "install", type.scriptValue(), digest,
+                packageFile.toAbsolutePath().normalize().toString());
+    }
+
+    static List<Path> installedUpdateHelperCandidates() {
+        return List.of(Path.of("/opt/pindb/pindb/bin/pindb-update-helper"),
+                Path.of("/opt/pindb/bin/pindb-update-helper"));
+    }
+
+    private static Path installedUpdateHelper() {
+        return installedUpdateHelperCandidates().stream()
+                .filter(UpdateInstaller::isSecureRootOwnedExecutable).findFirst().orElse(null);
+    }
+
+    private static boolean isSecureRootOwnedExecutable(Path candidate) {
+        Path absolute = candidate.toAbsolutePath().normalize();
+        Path current = absolute.getRoot();
+        try {
+            for (Path component : absolute) {
+                current = current.resolve(component);
+                Object uid = Files.getAttribute(current, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+                Object mode = Files.getAttribute(current, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+                if (!(uid instanceof Number owner) || owner.longValue() != 0L
+                        || !(mode instanceof Number permissions)
+                        || (permissions.intValue() & 0022) != 0
+                        || Files.isSymbolicLink(current)) {
+                    return false;
+                }
+                if (current.equals(absolute)) {
+                    return Files.isRegularFile(current, LinkOption.NOFOLLOW_LINKS) && Files.isExecutable(current);
+                }
+                if (!Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
+                    return false;
+                }
+            }
+        } catch (IOException | UnsupportedOperationException | SecurityException exception) {
+            return false;
+        }
+        return false;
     }
 
     static List<Path> installedLauncherCandidates() {
@@ -498,7 +506,7 @@ public final class UpdateInstaller {
         alert.showAndWait();
     }
 
-    private record DownloadedUpdate(Path packageFile, Path notesFile,
+    private record DownloadedUpdate(Path packageFile, Path notesFile, String digest,
                                     ReleasePackage releasePackage, LinuxDistribution distribution) {
     }
 

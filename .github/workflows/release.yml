@@ -148,6 +148,17 @@ jobs:
           if [[ "$SAFE_DEB" != "$DEB" ]]; then
             mv "$DEB" "$SAFE_DEB"
           fi
+
+          EXTRACT_DIR="$(mktemp -d)"
+          trap 'rm -rf "$EXTRACT_DIR"' EXIT
+          dpkg-deb -x "$SAFE_DEB" "$EXTRACT_DIR"
+          mapfile -t HELPERS < <(find "$EXTRACT_DIR" -type f -path '*/bin/pindb-update-helper')
+          if [[ "${#HELPERS[@]}" -ne 1 || ! -x "${HELPERS[0]:-}" ]]; then
+            echo "The Debian package must contain exactly one executable PinDB update helper."
+            printf '%s\n' "${HELPERS[@]}"
+            exit 1
+          fi
+
           echo "package=$SAFE_DEB" >> "$GITHUB_OUTPUT"
 
       - name: Generate Debian checksum
@@ -248,6 +259,13 @@ jobs:
             cd "$EXTRACT_DIR"
             rpm2cpio "$GITHUB_WORKSPACE/$RPM" | cpio -idmu
           )
+
+          mapfile -t HELPERS < <(find "$EXTRACT_DIR" -type f -path '*/bin/pindb-update-helper')
+          if [[ "${#HELPERS[@]}" -ne 1 || ! -x "${HELPERS[0]:-}" ]]; then
+            echo "The RPM must contain exactly one executable PinDB update helper."
+            printf '%s\n' "${HELPERS[@]}"
+            exit 1
+          fi
 
           mapfile -t DESKTOP_FILES < <(find "$EXTRACT_DIR" -type f -iname '*pindb*.desktop')
           if [[ "${#DESKTOP_FILES[@]}" -ne 1 ]]; then

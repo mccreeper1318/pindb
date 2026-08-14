@@ -6,6 +6,12 @@
 
 - Replaced the database window's native JavaFX menu popups with in-window drop-down panels that stay anchored directly beneath the menu bar on affected Fedora/Nobara Wayland and KDE configurations (Issue #31).
 - Added Fedora package regression checks for safe RPM upgrade and uninstall script behavior.
+- Automatic package installation now requires a matching published SHA-256 checksum and re-verifies the package from a root-owned staged copy immediately before invoking APT or DNF (Issue #36).
+
+### Added
+
+- Added a fixed, package-installed privileged update helper with a narrow install-only interface for Debian and Fedora packages (Issue #36).
+- Added updater security regression coverage for package replacement, symlink substitution, and checksum-to-install race conditions (Issue #36).
 
 ### Fixed
 
@@ -14,6 +20,7 @@
 - Fixed the custom Fedora RPM specification being ignored by `jpackage` because its override filename did not match the PinDB package name, ensuring the safe upgrade and uninstall scriptlets are actually packaged (Issue #33).
 - Hardened the post-update restart so failure to delete the downloaded package cannot prevent PinDB from reopening, and detached the restarted process from the updater's output streams (Issue #33).
 - Fixed Markdown release-note body text using an unreadable default color in PinDB's dark theme, which could make the post-update dialog appear empty (Issue #33).
+- Fixed the updater executing a cache-directory shell script as root and installing directly from a user-writable package path. The privileged helper now rejects symlinks, holds the source open securely, copies it into an owner-only root staging directory, verifies the expected digest there, and gives only that staged copy to the package manager (Issue #36).
 
 ## 0.2.1-beta.1
 
