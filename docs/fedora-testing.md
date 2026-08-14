@@ -27,11 +27,15 @@ Use this checklist before announcing an RPM release.
 - Create, save, close, and reopen a database.
 - Open a database created on a Debian-family installation.
 - Test table and record-card views.
+- Open each **File**, **Database**, **View**, and **Help** menu and confirm the drop-down appears directly beneath the menu bar rather than being offset farther down the window.
 - Test CSV import and export.
 - Test PDF, DOCX, text, and image document previews.
-- Test database and document printing through Fedora's configured printer system.
+- Test database printing through Fedora's configured printer system.
+- If JavaFX printer discovery is unavailable, confirm PinDB's system Java/CUPS fallback still finds the configured printer and opens a print dialog.
+- Test document printing.
 - Test GitHub device authorization and in-application bug reporting.
 - Confirm configuration, cache, and state files use the normal XDG user directories.
+- Close a modified database normally, copy only the `.pindb` file to another location, and confirm the copied database opens with all records and embedded documents intact.
 
 ## Automatic update
 
