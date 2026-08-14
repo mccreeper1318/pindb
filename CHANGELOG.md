@@ -11,6 +11,11 @@
 - Fixed the updater executing a cache-directory shell script as root and installing directly from a user-writable package path.
 - Automatic package installation now requires a matching published SHA-256 checksum. The helper rejects symlinks, holds the source open securely, copies it into an owner-only root staging directory, and re-verifies the expected digest before giving only that staged copy to APT or DNF.
 
+## Issue 35 fix
+
+### Fixed
+
+- Fixed restoring the oldest retained internal backup erasing the active database when creating the pre-restore safety snapshot pruned the selected backup. Backup validation, safety snapshot creation, core and embedded-document restoration, and retention pruning now complete atomically, with pruning deferred until the restore has succeeded (Issue #35).
 
 ## 0.2.1-beta.2
 

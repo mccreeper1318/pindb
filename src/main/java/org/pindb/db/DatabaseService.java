@@ -521,20 +521,7 @@ public final class DatabaseService implements AutoCloseable {
 
     public void createSnapshot(String reason) {
         transaction(() -> {
-            long snapshotId;
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO backup_snapshots(created_at,reason) VALUES(?,?)", Statement.RETURN_GENERATED_KEYS)) {
-                statement.setString(1, LocalDateTime.now().toString());
-                statement.setString(2, Objects.requireNonNullElse(reason, "Automatic backup"));
-                statement.executeUpdate();
-                try (ResultSet keys = statement.getGeneratedKeys()) {
-                    if (!keys.next()) {
-                        throw new SQLException("Could not create backup snapshot.");
-                    }
-                    snapshotId = keys.getLong(1);
-                }
-            }
-            copyToSnapshot(snapshotId);
+            createSnapshotInternal(reason);
             pruneSnapshotsInternal(info().backupLimit());
             return null;
         });
@@ -555,13 +542,16 @@ public final class DatabaseService implements AutoCloseable {
     }
 
     public void restoreSnapshot(long snapshotId) {
-        if (backupSnapshots().stream().noneMatch(snapshot -> snapshot.id() == snapshotId)) {
-            throw new DatabaseException("The selected backup no longer exists.");
-        }
-        createSnapshot("Before restoring backup " + snapshotId);
         transaction(() -> {
+            validateSnapshotInternal(snapshotId);
+            boolean restoreDocuments = documentStoragePresentInternal();
+            createSnapshotInternal("Before restoring backup " + snapshotId);
+
             try (Statement statement = connection.createStatement()) {
                 statement.execute("PRAGMA defer_foreign_keys=ON");
+                if (restoreDocuments) {
+                    statement.executeUpdate("DELETE FROM document_values");
+                }
                 statement.executeUpdate("DELETE FROM record_values");
                 statement.executeUpdate("DELETE FROM records");
                 statement.executeUpdate("DELETE FROM field_definitions");
@@ -592,6 +582,16 @@ public final class DatabaseService implements AutoCloseable {
                 statement.setLong(1, snapshotId);
                 statement.executeUpdate();
             }
+            if (restoreDocuments) {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO document_values(record_id,field_id,file_name,mime_type,file_size,data,created_at) "
+                                + "SELECT record_id,field_id,file_name,mime_type,file_size,data,created_at "
+                                + "FROM backup_document_values WHERE snapshot_id=?")) {
+                    statement.setLong(1, snapshotId);
+                    statement.executeUpdate();
+                }
+            }
+            pruneSnapshotsInternal(info().backupLimit());
             return null;
         });
     }
@@ -601,6 +601,83 @@ public final class DatabaseService implements AutoCloseable {
             deleteSnapshotInternal(snapshotId);
             return null;
         });
+    }
+
+    private long createSnapshotInternal(String reason) throws SQLException {
+        long snapshotId;
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO backup_snapshots(created_at,reason) VALUES(?,?)", Statement.RETURN_GENERATED_KEYS)) {
+            statement.setString(1, LocalDateTime.now().toString());
+            statement.setString(2, Objects.requireNonNullElse(reason, "Automatic backup"));
+            statement.executeUpdate();
+            try (ResultSet keys = statement.getGeneratedKeys()) {
+                if (!keys.next()) {
+                    throw new SQLException("Could not create backup snapshot.");
+                }
+                snapshotId = keys.getLong(1);
+            }
+        }
+        copyToSnapshot(snapshotId);
+        return snapshotId;
+    }
+
+    private void validateSnapshotInternal(long snapshotId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT 1 FROM backup_snapshots WHERE id=?")) {
+            statement.setLong(1, snapshotId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) {
+                    throw new DatabaseException("The selected backup no longer exists.");
+                }
+            }
+        }
+
+        Map<String, String> metadata = new LinkedHashMap<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT key,value FROM backup_meta WHERE snapshot_id=? "
+                        + "AND key IN ('database_name','schema_version','backup_limit')")) {
+            statement.setLong(1, snapshotId);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    metadata.put(result.getString("key"), result.getString("value"));
+                }
+            }
+        }
+
+        if (!metadata.keySet().containsAll(List.of("database_name", "schema_version", "backup_limit"))) {
+            throw new DatabaseException("The selected backup is incomplete and is missing required PinDB metadata. "
+                    + "The active database was not changed.");
+        }
+        try {
+            int schemaVersion = Integer.parseInt(metadata.get("schema_version"));
+            int backupLimit = Integer.parseInt(metadata.get("backup_limit"));
+            if (schemaVersion < 1 || schemaVersion > DatabaseMigrator.CURRENT_SCHEMA_VERSION || backupLimit < 1) {
+                throw new NumberFormatException("Metadata values are outside the supported range.");
+            }
+        } catch (NumberFormatException exception) {
+            throw new DatabaseException("The selected backup contains invalid or unsupported PinDB metadata. "
+                    + "The active database was not changed.", exception);
+        }
+    }
+
+    private boolean documentStoragePresentInternal() throws SQLException {
+        boolean documentsPresent = tableExistsInternal("document_values");
+        boolean documentBackupsPresent = tableExistsInternal("backup_document_values");
+        if (documentsPresent != documentBackupsPresent) {
+            throw new DatabaseException("The database's embedded document storage is incomplete. "
+                    + "The selected backup was not restored and the active database was not changed.");
+        }
+        return documentsPresent;
+    }
+
+    private boolean tableExistsInternal(String tableName) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")) {
+            statement.setString(1, tableName);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next();
+            }
+        }
     }
 
     private void copyToSnapshot(long snapshotId) throws SQLException {

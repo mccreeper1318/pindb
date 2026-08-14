@@ -46,7 +46,7 @@ class DocumentStoreTest {
 
             DocumentData replacement = textDocument("second.txt", "second version");
             documents.replaceDocuments(recordId, Map.of(createdField.id(), replacement));
-            documents.restoreSnapshot(snapshotId);
+            database.restoreSnapshot(snapshotId);
 
             DocumentData restored = documents.document(recordId, createdField.id()).orElseThrow();
             assertEquals("first.txt", restored.fileName());
