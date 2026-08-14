@@ -4,11 +4,15 @@ import org.pindb.util.AppPaths;
 import org.pindb.util.MiniJson;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Map;
@@ -18,6 +22,9 @@ import java.util.Set;
 final class GitHubCredentialStore {
     private static final String SECRET_TOOL = "/usr/bin/secret-tool";
     private static final Path FALLBACK_FILE = AppPaths.configDirectory().resolve("github-authorization.json");
+    private static final Set<PosixFilePermission> OWNER_ONLY_PERMISSIONS = EnumSet.of(
+            PosixFilePermission.OWNER_READ,
+            PosixFilePermission.OWNER_WRITE);
 
     Optional<GitHubAuthService.Token> load() {
         String json = loadFromKeyring().orElseGet(this::loadFromFile);
@@ -45,9 +52,7 @@ final class GitHubCredentialStore {
                 "refreshExpiresAt", token.refreshExpiresAt().getEpochSecond()
         ));
         if (!saveToKeyring(json)) {
-            Files.writeString(FALLBACK_FILE, json, StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            secureFallbackFile();
+            saveToFallbackFile(json);
         }
     }
 
@@ -61,7 +66,9 @@ final class GitHubCredentialStore {
             try {
                 new ProcessBuilder(SECRET_TOOL, "clear", "application", "pindb", "account", "github")
                         .start().waitFor();
-            } catch (IOException | InterruptedException ignored) {
+            } catch (IOException ignored) {
+                // A broken keyring must not poison the worker thread or block the file fallback.
+            } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
             }
         }
@@ -77,18 +84,24 @@ final class GitHubCredentialStore {
                     .redirectErrorStream(true).start();
             String value = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
             return process.waitFor() == 0 && !value.isBlank() ? Optional.of(value) : Optional.empty();
-        } catch (IOException | InterruptedException exception) {
+        } catch (IOException exception) {
+            return Optional.empty();
+        } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             return Optional.empty();
         }
     }
 
     private String loadFromFile() {
+        if (!Files.isRegularFile(FALLBACK_FILE)) {
+            return "";
+        }
         try {
-            return Files.isRegularFile(FALLBACK_FILE)
-                    ? Files.readString(FALLBACK_FILE, StandardCharsets.UTF_8)
-                    : "";
-        } catch (IOException exception) {
+            // Harden fallback files created by older PinDB versions before reading token data.
+            Files.setPosixFilePermissions(FALLBACK_FILE, OWNER_ONLY_PERMISSIONS);
+            return Files.readString(FALLBACK_FILE, StandardCharsets.UTF_8);
+        } catch (UnsupportedOperationException | IOException exception) {
+            // If owner-only permissions cannot be guaranteed, do not read credentials from this fallback.
             return "";
         }
     }
@@ -102,12 +115,46 @@ final class GitHubCredentialStore {
                     "--label=PinDB GitHub authorization",
                     "application", "pindb", "account", "github")
                     .redirectErrorStream(true).start();
-            process.getOutputStream().write(value.getBytes(StandardCharsets.UTF_8));
-            process.getOutputStream().close();
+            try (OutputStream output = process.getOutputStream()) {
+                output.write(value.getBytes(StandardCharsets.UTF_8));
+            }
             return process.waitFor() == 0;
-        } catch (IOException | InterruptedException exception) {
+        } catch (IOException exception) {
+            return false;
+        } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             return false;
+        }
+    }
+
+    private static void saveToFallbackFile(String json) throws IOException {
+        Path parent = FALLBACK_FILE.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+
+        Path temporary;
+        try {
+            temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp",
+                    PosixFilePermissions.asFileAttribute(OWNER_ONLY_PERMISSIONS));
+        } catch (UnsupportedOperationException exception) {
+            throw new IOException("This filesystem cannot create the GitHub credential fallback with owner-only permissions.",
+                    exception);
+        }
+
+        try {
+            Files.writeString(temporary, json, StandardCharsets.UTF_8,
+                    StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.setPosixFilePermissions(temporary, OWNER_ONLY_PERMISSIONS);
+            try {
+                Files.move(temporary, FALLBACK_FILE,
+                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException exception) {
+                Files.move(temporary, FALLBACK_FILE, StandardCopyOption.REPLACE_EXISTING);
+            }
+            Files.setPosixFilePermissions(FALLBACK_FILE, OWNER_ONLY_PERMISSIONS);
+        } finally {
+            Files.deleteIfExists(temporary);
         }
     }
 
@@ -116,17 +163,6 @@ final class GitHubCredentialStore {
             return Long.parseLong(MiniJson.string(value));
         } catch (NumberFormatException exception) {
             return 0L;
-        }
-    }
-
-    private static void secureFallbackFile() {
-        try {
-            Set<PosixFilePermission> permissions = EnumSet.of(
-                    PosixFilePermission.OWNER_READ,
-                    PosixFilePermission.OWNER_WRITE);
-            Files.setPosixFilePermissions(FALLBACK_FILE, permissions);
-        } catch (UnsupportedOperationException | IOException ignored) {
-            // Some file systems do not expose POSIX permissions.
         }
     }
 }
