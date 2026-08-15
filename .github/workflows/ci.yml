@@ -38,6 +38,25 @@ jobs:
       - name: Run tests and build Debian package
         run: ./gradlew --no-daemon clean test packageDeb
 
+      - name: Verify packaged Debian update helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t PACKAGES < <(find build/packages -maxdepth 1 -type f -name '*.deb')
+          if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one Debian package; found ${#PACKAGES[@]}."
+            exit 1
+          fi
+          EXTRACT_DIR="$(mktemp -d)"
+          trap 'rm -rf "$EXTRACT_DIR"' EXIT
+          dpkg-deb -x "${PACKAGES[0]}" "$EXTRACT_DIR"
+          mapfile -t HELPERS < <(find "$EXTRACT_DIR" -type f -path '*/bin/pindb-update-helper')
+          if [[ "${#HELPERS[@]}" -ne 1 || ! -x "${HELPERS[0]:-}" ]]; then
+            echo "The Debian package must contain exactly one executable PinDB update helper."
+            printf '%s\n' "${HELPERS[@]}"
+            exit 1
+          fi
+
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
@@ -121,6 +140,13 @@ jobs:
             cd "$EXTRACT_DIR"
             rpm2cpio "$GITHUB_WORKSPACE/$RPM" | cpio -idmu
           )
+
+          mapfile -t HELPERS < <(find "$EXTRACT_DIR" -type f -path '*/bin/pindb-update-helper')
+          if [[ "${#HELPERS[@]}" -ne 1 || ! -x "${HELPERS[0]:-}" ]]; then
+            echo "The RPM must contain exactly one executable PinDB update helper."
+            printf '%s\n' "${HELPERS[@]}"
+            exit 1
+          fi
 
           mapfile -t DESKTOP_FILES < <(find "$EXTRACT_DIR" -type f -iname '*pindb*.desktop')
           if [[ "${#DESKTOP_FILES[@]}" -ne 1 ]]; then

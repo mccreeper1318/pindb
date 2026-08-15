@@ -143,11 +143,12 @@ When an update is accepted on a supported traditional Linux installation, PinDB:
 
 1. Detects whether the system uses Debian or RPM packages.
 2. Downloads the matching `.deb` or `.rpm` package for the current architecture.
-3. Verifies its SHA-256 checksum when supplied.
+3. Requires and verifies its published SHA-256 checksum.
 4. Requests administrator approval through the normal Linux privilege prompt.
-5. Installs the package with `apt-get`, `dnf5`, or `dnf` as appropriate.
-6. Restarts PinDB.
-7. Displays the release notes.
+5. Uses PinDB's fixed, root-owned update helper to securely stage and re-verify the package.
+6. Installs only the verified staged package with `apt-get`, `dnf5`, or `dnf` as appropriate.
+7. Restarts PinDB.
+8. Displays the release notes.
 
 Stable updates are checked by default. Pre-release updates can be enabled in Settings.
 

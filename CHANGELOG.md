@@ -1,5 +1,16 @@
 # Changelog
 
+## Issue 36 Fix
+
+### Added
+
+- Added a fixed, package-installed privileged update helper with a narrow install-only interface for Debian and Fedora packages.
+- Added updater security regression coverage for package replacement, symlink substitution, and checksum-to-install race conditions, along with DEB and RPM checks that ensure the privileged helper is packaged as an executable without an application-menu shortcut.
+
+### Fixed
+- Fixed the updater executing a cache-directory shell script as root and installing directly from a user-writable package path.
+- Automatic package installation now requires a matching published SHA-256 checksum. The helper rejects symlinks, holds the source open securely, copies it into an owner-only root staging directory, and re-verifies the expected digest before giving only that staged copy to APT or DNF.
+
 ## Issue 35 fix
 
 ### Fixed

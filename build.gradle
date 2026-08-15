@@ -14,6 +14,8 @@ def semanticParts = semanticVersion.split('-', 2)
 def linuxAppVersion = semanticParts[0]
 def prereleasePart = semanticParts.length == 2 ? semanticParts[1] : null
 def rpmResources = file('packaging/rpm')
+def packagedMainJar = "pindb-${project.version}.jar"
+def updaterLauncherProperties = layout.buildDirectory.file('jpackage/pindb-update-helper.properties')
 def debAppRelease = prereleasePart == null
         ? '1'
         : "0~${prereleasePart.replace('-', '.')}"
@@ -117,10 +119,26 @@ def preparePackageDirectory = { File packagesDir, String extension ->
     }
 }
 
+tasks.register('prepareUpdateHelperLauncher') {
+    dependsOn tasks.installDist
+    inputs.property('mainJar', packagedMainJar)
+    outputs.file(updaterLauncherProperties)
+    doLast {
+        File propertiesFile = updaterLauncherProperties.get().asFile
+        if (!propertiesFile.parentFile.mkdirs() && !propertiesFile.parentFile.isDirectory()) {
+            throw new GradleException("Unable to create helper launcher directory: ${propertiesFile.parentFile}")
+        }
+        propertiesFile.setText("main-jar=${packagedMainJar}\n"
+                + 'main-class=org.pindb.service.PrivilegedUpdateHelper\n'
+                + 'java-options=-Dfile.encoding=UTF-8\n'
+                + 'linux-shortcut=false\n', 'UTF-8')
+    }
+}
+
 tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
     group = 'distribution'
     description = 'Builds a self-contained Debian package with jpackage.'
-    dependsOn tasks.installDist
+    dependsOn tasks.installDist, tasks.prepareUpdateHelperLauncher
 
     onlyIf {
         osName.contains('linux')
@@ -128,7 +146,6 @@ tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
 
     def packagesDir = layout.buildDirectory.dir('packages').get().asFile
     def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
-    def mainJar = "pindb-${project.version}.jar"
     def iconFile = file('src/main/resources/org/pindb/app/icon.png')
     def associations = file('packaging/pindb-file-associations.properties')
 
@@ -145,8 +162,9 @@ tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
             '--linux-app-release', debAppRelease,
             '--vendor', 'PinDB Project',
             '--description', 'A flexible personal database application.',
-            '--main-jar', mainJar,
+            '--main-jar', packagedMainJar,
             '--main-class', application.mainClass.get(),
+            '--add-launcher', "pindb-update-helper=${updaterLauncherProperties.get().asFile.absolutePath}",
             '--icon', iconFile.absolutePath,
             '--install-dir', '/opt/pindb',
             '--linux-package-name', 'pindb',
@@ -160,7 +178,7 @@ tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
 tasks.register('packageRpm', org.gradle.api.tasks.Exec) {
     group = 'distribution'
     description = 'Builds a self-contained RPM package for Fedora-family Linux distributions with jpackage.'
-    dependsOn tasks.installDist
+    dependsOn tasks.installDist, tasks.prepareUpdateHelperLauncher
 
     onlyIf {
         osName.contains('linux')
@@ -168,7 +186,6 @@ tasks.register('packageRpm', org.gradle.api.tasks.Exec) {
 
     def packagesDir = layout.buildDirectory.dir('packages').get().asFile
     def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
-    def mainJar = "pindb-${project.version}.jar"
     def iconFile = file('src/main/resources/org/pindb/app/icon.png')
     def associations = file('packaging/pindb-file-associations.properties')
 
@@ -185,8 +202,9 @@ tasks.register('packageRpm', org.gradle.api.tasks.Exec) {
             '--linux-app-release', rpmAppRelease,
             '--vendor', 'PinDB Project',
             '--description', 'A flexible personal database application.',
-            '--main-jar', mainJar,
+            '--main-jar', packagedMainJar,
             '--main-class', application.mainClass.get(),
+            '--add-launcher', "pindb-update-helper=${updaterLauncherProperties.get().asFile.absolutePath}",
             '--icon', iconFile.absolutePath,
             '--install-dir', '/opt/pindb',
             '--linux-package-name', 'pindb',

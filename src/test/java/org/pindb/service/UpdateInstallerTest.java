@@ -49,6 +49,30 @@ class UpdateInstallerTest {
     }
 
     @Test
+    void includesPackagedRootOwnedUpdateHelperLocation() {
+        assertTrue(UpdateInstaller.installedUpdateHelperCandidates().stream()
+                .anyMatch(path -> path.toString().equals(
+                        "/opt/pindb/pindb/bin/pindb-update-helper")));
+    }
+
+    @Test
+    void privilegedCommandExecutesOnlyPackagedHelper() {
+        List<String> command = UpdateInstaller.privilegedInstallCommand(
+                Path.of("/usr/bin/pkexec"),
+                Path.of("/opt/pindb/pindb/bin/pindb-update-helper"),
+                Path.of("/tmp/pindb.rpm"), HASH, LinuxPackageType.RPM);
+
+        assertEquals(List.of(
+                "/usr/bin/pkexec",
+                "/opt/pindb/pindb/bin/pindb-update-helper",
+                "install",
+                "rpm",
+                HASH,
+                "/tmp/pindb.rpm"), command);
+        assertTrue(command.stream().noneMatch(value -> value.equals("/bin/sh")));
+    }
+
+    @Test
     void includesDnf5AndDnfCandidatesForRpmUpdates() {
         assertEquals(List.of(Path.of("/usr/bin/dnf5"), Path.of("/usr/bin/dnf")),
                 UpdateInstaller.packageManagerCandidates(LinuxPackageType.RPM));
