@@ -2,7 +2,7 @@ package org.pindb.service;
 
 import org.pindb.AppVersion;
 import org.pindb.platform.LinuxDistribution;
-import org.pindb.platform.LinuxPackageType;
+import org.pindb.platform.PackageType;
 import org.pindb.platform.SystemArchitecture;
 import org.pindb.util.MiniJson;
 
@@ -27,6 +27,7 @@ public final class UpdateService {
     private final HttpClient client;
     private final LinuxDistribution distribution;
     private final SystemArchitecture architecture;
+    private final String osName;
 
     public UpdateService() {
         this(HttpClient.newBuilder()
@@ -34,13 +35,19 @@ public final class UpdateService {
                         .followRedirects(HttpClient.Redirect.NORMAL)
                         .build(),
                 LinuxDistribution.current(),
-                SystemArchitecture.current());
+                SystemArchitecture.current(),
+                System.getProperty("os.name", ""));
     }
 
     UpdateService(HttpClient client, LinuxDistribution distribution, SystemArchitecture architecture) {
+        this(client, distribution, architecture, System.getProperty("os.name", ""));
+    }
+
+    UpdateService(HttpClient client, LinuxDistribution distribution, SystemArchitecture architecture, String osName) {
         this.client = client;
         this.distribution = distribution;
         this.architecture = architecture;
+        this.osName = osName == null ? "" : osName;
     }
 
     public Optional<ReleaseInfo> checkForUpdate(boolean includePrereleases) throws IOException, InterruptedException {
@@ -68,7 +75,7 @@ public final class UpdateService {
 
     private Optional<ReleaseInfo> toRelease(Map<String, Object> release) {
         try {
-            Optional<LinuxPackageType> packageType = distribution.packageType();
+            Optional<PackageType> packageType = currentPackageType();
             if (packageType.isEmpty()) {
                 return Optional.empty();
             }
@@ -98,8 +105,19 @@ public final class UpdateService {
         }
     }
 
+    private Optional<PackageType> currentPackageType() {
+        if (isWindows(osName)) {
+            return Optional.of(PackageType.WINDOWS_EXE);
+        }
+        return distribution.packageType().map(type -> type.name().equals("DEB") ? PackageType.DEB : PackageType.RPM);
+    }
+
+    static boolean isWindows(String osName) {
+        return osName != null && osName.toLowerCase(Locale.ROOT).contains("win");
+    }
+
     static Optional<ReleasePackage> selectPackage(List<Map<String, Object>> assets,
-                                                   LinuxPackageType packageType,
+                                                   PackageType packageType,
                                                    SystemArchitecture architecture) {
         List<ReleasePackage> candidates = assets.stream()
                 .map(asset -> toPackage(asset, assets, packageType))
@@ -118,7 +136,7 @@ public final class UpdateService {
 
     private static Optional<ReleasePackage> toPackage(Map<String, Object> asset,
                                                        List<Map<String, Object>> allAssets,
-                                                       LinuxPackageType packageType) {
+                                                       PackageType packageType) {
         String name = MiniJson.string(asset.get("name"));
         String lowerName = name.toLowerCase(Locale.ROOT);
         if (!lowerName.contains("pindb") || !packageType.matchesFileName(name)) {
@@ -153,7 +171,8 @@ public final class UpdateService {
         return assets.stream()
                 .filter(asset -> {
                     String name = MiniJson.string(asset.get("name")).toLowerCase(Locale.ROOT);
-                    return name.equals("checksums.sha256") || name.equals("checksums-linux.sha256");
+                    return name.equals("checksums.sha256") || name.equals("checksums-linux.sha256")
+                            || name.equals("checksums-windows.sha256");
                 })
                 .findFirst();
     }
