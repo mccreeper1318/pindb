@@ -4,16 +4,23 @@ PinDB is a desktop personal database application for organizing structured infor
 
 Each database is stored as a portable SQLite file with the `.pindb` extension. A single file contains its field definitions, entries, display preferences, deleted records, internal backups, and embedded documents.
 
-PinDB provides self-contained packages for Debian-family and Fedora-family Linux distributions.
+PinDB provides self-contained packages for Windows 11 and Debian-family and Fedora-family Linux distributions.
 
 ## Download and install
 
-Download the newest package for your distribution from the [PinDB Releases](https://github.com/mccreeper1318/pindb/releases) page:
+Download the newest package for your operating system from the [PinDB Releases](https://github.com/mccreeper1318/pindb/releases) page:
 
+- Use the Windows x64 `.exe` installer on 64-bit Windows 11.
 - Use the `.deb` package on Linux Mint, Ubuntu, Debian, and related distributions.
 - Use the `.rpm` package on Fedora Workstation, Fedora KDE, and other traditional Fedora spins.
 
-Both packages include a private Java runtime, so Java does not need to be installed separately for normal use.
+All official packages include a private Java runtime, so Java does not need to be installed separately for normal use.
+
+### Windows 11
+
+Download the Windows x64 `.exe` installer and run it normally. PinDB installs per-user, so a system-wide Java installation is not required.
+
+The Windows installer provides Start Menu integration, can create a desktop shortcut, and associates `.pindb` database files with PinDB so databases can be opened directly from File Explorer.
 
 ### Debian, Ubuntu, and Linux Mint
 
@@ -54,7 +61,7 @@ Installing a newer native package upgrades the existing PinDB installation while
 5. Select **Create Database**.
 6. Use the **+** button to begin adding entries.
 
-Existing `.pindb` files can be opened from the launcher, the recent-databases list, or a Linux file manager.
+Existing `.pindb` files can be opened from the launcher, the recent-databases list, Windows File Explorer, or a Linux file manager.
 
 ## Features
 
@@ -139,6 +146,8 @@ Keep separate copies of important `.pindb` files as part of a normal backup rout
 
 PinDB can check GitHub Releases for new versions from inside the application.
 
+On Windows 11, PinDB selects the matching Windows x64 `.exe`, downloads it to the user's local application cache, verifies its published SHA-256 checksum, and launches the verified installer after approval. The installer performs the per-user upgrade without using the Linux privileged-update helper.
+
 When an update is accepted on a supported traditional Linux installation, PinDB:
 
 1. Detects whether the system uses Debian or RPM packages.
@@ -162,7 +171,7 @@ A GitHub account is required. The first report uses GitHub's device-authorizatio
 
 The report form can include the PinDB version and basic system diagnostics. PinDB does not automatically include database contents, embedded documents, document filenames, database filenames, or personal file paths.
 
-GitHub authorization is stored in the Linux keyring when available. The fallback credential file is created with owner-only permissions before credential data is written.
+On Linux, GitHub authorization is stored in the system keyring when available. The fallback credential file is created with owner-only permissions before credential data is written.
 
 ## Data compatibility
 
@@ -176,7 +185,8 @@ The copy is placed beside the original database. Older PinDB versions may not be
 
 ## Current limitations
 
-- Official release packages currently target 64-bit x86 Debian-family and Fedora-family systems.
+- Official release packages currently target 64-bit x86 Windows 11 and 64-bit x86 Debian-family and Fedora-family Linux systems.
+- The Windows installer is currently unsigned, so Windows may display a security/reputation warning when it is first run.
 - Automatic installation is not supported on Fedora Atomic desktops such as Silverblue and Kinoite.
 - Database encryption is not currently included.
 - Embedded document previews are not intended to reproduce every detail of a full office suite.
@@ -192,7 +202,8 @@ All builds require:
 
 - Git
 - JDK 25, including `jpackage`
-- A 64-bit Linux system for building the official Linux packages
+
+Linux package builds require a 64-bit Linux system.
 
 Debian packaging additionally requires:
 
@@ -204,6 +215,11 @@ RPM packaging additionally requires:
 
 - `rpm-build`
 - `rpmbuild`
+
+Windows `.exe` packaging requires:
+
+- A 64-bit Windows system
+- WiX Toolset, as required by `jpackage` for Windows installer generation
 
 PinDB uses the included Gradle wrapper. A system-wide Gradle installation is not required.
 
@@ -225,8 +241,16 @@ git switch agent/dev_0.2.1
 
 ## Run the tests
 
+On Linux:
+
 ```bash
 ./gradlew clean test
+```
+
+On Windows:
+
+```powershell
+.\gradlew.bat clean test
 ```
 
 The generated JaCoCo reports are written under:
@@ -237,8 +261,16 @@ build/reports/jacoco/
 
 ## Run PinDB from source
 
+On Linux:
+
 ```bash
 ./gradlew run
+```
+
+On Windows:
+
+```powershell
+.\gradlew.bat run
 ```
 
 A development run uses the version supplied with `-PappVersion`. Without that property, the source-tree default is `0.0.0-dev`.
@@ -247,6 +279,14 @@ Example:
 
 ```bash
 ./gradlew run -PappVersion=0.2.1
+```
+
+## Build the Windows installer
+
+On a Windows x64 build system with WiX installed:
+
+```powershell
+.\gradlew.bat clean test packageWindows -PappVersion=0.2.1
 ```
 
 ## Build the Debian package
@@ -265,15 +305,15 @@ On Fedora or another RPM build system with `rpm-build` installed:
 ./gradlew clean test packageRpm -PappVersion=0.2.1
 ```
 
-Both tasks write their self-contained package to:
+All package tasks write their self-contained package to:
 
 ```text
 build/packages/
 ```
 
-The packages include a private runtime generated by `jpackage` and install PinDB under `/opt/pindb` with an application-menu shortcut and `.pindb` file association.
+The packages include a private runtime generated by `jpackage` and register PinDB with the operating system, including `.pindb` file association. Linux packages install under `/opt/pindb`; the Windows package uses a per-user installation.
 
-Native `jpackage` packages should be built on a distribution from the corresponding package family. The CI and release workflows build the `.deb` on Ubuntu and the `.rpm` inside Fedora.
+Native `jpackage` packages must be built on the corresponding operating system. The CI and release workflows build the `.exe` on Windows, the `.deb` on Ubuntu, and the `.rpm` inside Fedora.
 
 ## Open the project in IntelliJ IDEA
 
@@ -291,20 +331,21 @@ src/main/resources/     Styles, icons, configuration, and packaged resources
 src/test/java/          JUnit tests
 packaging/              Native package and file-association resources
 docs/                   Release and updater documentation
-.github/workflows/      Debian and Fedora build, test, and release automation
+.github/workflows/      Windows, Debian, and Fedora build, test, and release automation
 ```
 
 ## Release builds
 
-The release workflow runs when a GitHub Release is published. It:
+The release workflows run when a GitHub Release is published. They:
 
-1. Validates the release tag and pre-release status.
-2. Runs the complete test suite in the Debian and Fedora build jobs.
-3. Builds a self-contained `.deb` package on Ubuntu.
-4. Builds a self-contained `.rpm` package in Fedora.
-5. Verifies the native package versions and metadata.
-6. Generates a SHA-256 checksum for each package.
-7. Uploads both packages and both checksum files to the GitHub Release.
+1. Validate the release tag and pre-release status.
+2. Run the applicable test suites on Windows, Debian, and Fedora build environments.
+3. Build a self-contained Windows x64 `.exe` installer on Windows.
+4. Build a self-contained `.deb` package on Ubuntu.
+5. Build a self-contained `.rpm` package in Fedora.
+6. Verify the native package versions and metadata.
+7. Generate SHA-256 checksums for the packages.
+8. Upload the packages and checksum files to the GitHub Release.
 
 Supported tag formats include:
 
@@ -331,17 +372,13 @@ Use the [GitHub Issues](https://github.com/mccreeper1318/pindb/issues) page for 
 A useful bug report should include:
 
 - The PinDB version
-- Linux distribution and version
-- Package type used (`.deb` or `.rpm`)
+- Operating system and version
+- Package type used (`.exe`, `.deb`, or `.rpm`)
 - Steps that reproduce the problem
 - Expected behavior
 - Actual behavior
 - Relevant error messages or logs
 
-Before submitting code changes:
-
-```bash
-./gradlew clean test
-```
+Before submitting code changes, run the test suite appropriate for your platform.
 
 Keep changes focused, include tests for new behavior when practical, and avoid committing real `.pindb` files or documents containing private information.
