@@ -1,13 +1,13 @@
 package org.pindb.service;
 
-import org.pindb.platform.PackageType;
+import org.pindb.platform.LinuxPackageType;
 import org.pindb.platform.SystemArchitecture;
 
 import java.net.URI;
 import java.util.Objects;
 
 public record ReleasePackage(
-        PackageType type,
+        LinuxPackageType type,
         SystemArchitecture architecture,
         String fileName,
         URI downloadUri,
