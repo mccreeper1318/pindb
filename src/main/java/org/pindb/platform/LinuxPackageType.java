@@ -4,7 +4,8 @@ import java.util.Locale;
 
 public enum LinuxPackageType {
     DEB(".deb", "deb"),
-    RPM(".rpm", "rpm");
+    RPM(".rpm", "rpm"),
+    WINDOWS_EXE(".exe", "exe");
 
     private final String extension;
     private final String scriptValue;
