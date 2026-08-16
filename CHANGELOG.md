@@ -7,6 +7,9 @@
 - Fixed Issue #55 so PinDB's post-update launcher waits for the old updater process to exit before JavaFX starts, preventing the restart handoff race that could leave the application closed after a successful update.
 - Persisted pending release notes before installation and added a startup fallback so the changelog is still shown after the update even when the temporary notes file is unavailable or automatic restart fails.
 - Added version matching and regression coverage for post-update launch detection and release-note handoff behavior.
+- Fixed Issue #57 by moving full pending release-note bodies out of Java `Preferences` and into a file under PinDB's state directory, avoiding the 8,192-character preference value limit that could prevent an update from starting.
+- Pending release-note persistence is now best-effort, uses atomic replacement where supported, cleans up after retrieval, and remains compatible with older preference-backed pending notes.
+- Added regression coverage for release-note bodies larger than `Preferences.MAX_VALUE_LENGTH` and legacy pending-note migration.
 
 ## 0.2.1-beta.3
 
