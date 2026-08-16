@@ -1,5 +1,13 @@
 # Changelog
 
+## 55-updater-did-not-auto-restart-app-after-update-did-not-properly-show-changelog-after-update
+
+### Fixed
+
+- Fixed Issue #55 so PinDB's post-update launcher waits for the old updater process to exit before JavaFX starts, preventing the restart handoff race that could leave the application closed after a successful update.
+- Persisted pending release notes before installation and added a startup fallback so the changelog is still shown after the update even when the temporary notes file is unavailable or automatic restart fails.
+- Added version matching and regression coverage for post-update launch detection and release-note handoff behavior.
+
 ## 0.2.1-beta.3
 
 ### Added
