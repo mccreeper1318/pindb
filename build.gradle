@@ -5,23 +5,17 @@ plugins {
 }
 
 group = 'org.pindb'
-version = providers.gradleProperty('appVersion')
-        .orElse('0.0.0-dev')
-        .get()
+version = providers.gradleProperty('appVersion').orElse('0.0.0-dev').get()
 
 def semanticVersion = project.version.toString()
 def semanticParts = semanticVersion.split('-', 2)
-def linuxAppVersion = semanticParts[0]
+def packageAppVersion = semanticParts[0]
 def prereleasePart = semanticParts.length == 2 ? semanticParts[1] : null
 def rpmResources = file('packaging/rpm')
 def packagedMainJar = "pindb-${project.version}.jar"
 def updaterLauncherProperties = layout.buildDirectory.file('jpackage/pindb-update-helper.properties')
-def debAppRelease = prereleasePart == null
-        ? '1'
-        : "0~${prereleasePart.replace('-', '.')}"
-def rpmAppRelease = prereleasePart == null
-        ? '1'
-        : "0.${prereleasePart.replaceAll(/[^0-9A-Za-z.]+/, '.')}"
+def debAppRelease = prereleasePart == null ? '1' : "0~${prereleasePart.replace('-', '.')}"
+def rpmAppRelease = prereleasePart == null ? '1' : "0.${prereleasePart.replaceAll(/[^0-9A-Za-z.]+/, '.')}"
 
 def javafxVersion = '25.0.3'
 def sqliteVersion = '3.53.2.1'
@@ -31,21 +25,11 @@ def poiVersion = '5.5.1'
 
 def osName = System.getProperty('os.name').toLowerCase(Locale.ROOT)
 def osArch = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
-def javafxPlatform = osName.contains('linux')
-        ? (osArch.contains('aarch64') || osArch.contains('arm64') ? 'linux-aarch64' : 'linux')
-        : osName.contains('mac')
-        ? (osArch.contains('aarch64') || osArch.contains('arm64') ? 'mac-aarch64' : 'mac')
-        : 'win'
+def javafxPlatform = osName.contains('linux') ? (osArch.contains('aarch64') || osArch.contains('arm64') ? 'linux-aarch64' : 'linux') : osName.contains('mac') ? (osArch.contains('aarch64') || osArch.contains('arm64') ? 'mac-aarch64' : 'mac') : 'win'
 
-repositories {
-    mavenCentral()
-}
+repositories { mavenCentral() }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 dependencies {
     implementation "org.openjfx:javafx-base:${javafxVersion}:${javafxPlatform}"
@@ -56,7 +40,6 @@ dependencies {
     implementation "org.apache.pdfbox:pdfbox:${pdfboxVersion}"
     implementation "org.apache.poi:poi-ooxml:${poiVersion}"
     runtimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"
-
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -65,57 +48,27 @@ dependencies {
 application {
     mainClass = 'org.pindb.PinDBLauncher'
     applicationName = 'PinDB'
-    applicationDefaultJvmArgs = [
-            '-Dfile.encoding=UTF-8',
-            '-Dprism.order=es2,sw'
-    ]
+    applicationDefaultJvmArgs = ['-Dfile.encoding=UTF-8', '-Dprism.order=es2,sw']
 }
 
-base {
-    archivesName = 'pindb'
-}
+base { archivesName = 'pindb' }
 
 jar {
-    manifest {
-        attributes(
-                'Main-Class': application.mainClass.get(),
-                'Implementation-Title': 'PinDB',
-                'Implementation-Version': project.version
-        )
-    }
+    manifest { attributes('Main-Class': application.mainClass.get(), 'Implementation-Title': 'PinDB', 'Implementation-Version': project.version) }
 }
 
 processResources {
-    filesMatching('org/pindb/app/version.properties') {
-        expand(version: project.version)
-    }
-    from('CHANGELOG.md') {
-        into 'org/pindb/app'
-    }
+    filesMatching('org/pindb/app/version.properties') { expand(version: project.version) }
+    from('CHANGELOG.md') { into 'org/pindb/app' }
 }
 
-test {
-    useJUnitPlatform()
-    finalizedBy jacocoTestReport
-}
-
-jacocoTestReport {
-    reports {
-        xml.required = true
-        html.required = true
-    }
-}
+test { useJUnitPlatform(); finalizedBy jacocoTestReport }
+jacocoTestReport { reports { xml.required = true; html.required = true } }
 
 def preparePackageDirectory = { File packagesDir, String extension ->
-    if (!packagesDir.mkdirs() && !packagesDir.isDirectory()) {
-        throw new GradleException("Unable to create package directory: ${packagesDir}")
-    }
-    packagesDir.listFiles()?.findAll { file ->
-        file.isFile() && (file.name.endsWith(extension) || file.name.endsWith(extension + '.sha256'))
-    }?.each { file ->
-        if (!file.delete()) {
-            throw new GradleException("Unable to remove old package: ${file}")
-        }
+    if (!packagesDir.mkdirs() && !packagesDir.isDirectory()) throw new GradleException("Unable to create package directory: ${packagesDir}")
+    packagesDir.listFiles()?.findAll { it.isFile() && (it.name.endsWith(extension) || it.name.endsWith(extension + '.sha256')) }?.each {
+        if (!it.delete()) throw new GradleException("Unable to remove old package: ${it}")
     }
 }
 
@@ -125,105 +78,50 @@ tasks.register('prepareUpdateHelperLauncher') {
     outputs.file(updaterLauncherProperties)
     doLast {
         File propertiesFile = updaterLauncherProperties.get().asFile
-        if (!propertiesFile.parentFile.mkdirs() && !propertiesFile.parentFile.isDirectory()) {
-            throw new GradleException("Unable to create helper launcher directory: ${propertiesFile.parentFile}")
-        }
-        propertiesFile.setText("main-jar=${packagedMainJar}\n"
-                + 'main-class=org.pindb.service.PrivilegedUpdateHelper\n'
-                + 'java-options=-Dfile.encoding=UTF-8\n'
-                + 'linux-shortcut=false\n', 'UTF-8')
+        if (!propertiesFile.parentFile.mkdirs() && !propertiesFile.parentFile.isDirectory()) throw new GradleException("Unable to create helper launcher directory: ${propertiesFile.parentFile}")
+        propertiesFile.setText("main-jar=${packagedMainJar}\nmain-class=org.pindb.service.PrivilegedUpdateHelper\njava-options=-Dfile.encoding=UTF-8\nlinux-shortcut=false\n", 'UTF-8')
     }
 }
 
 tasks.register('packageDeb', org.gradle.api.tasks.Exec) {
-    group = 'distribution'
-    description = 'Builds a self-contained Debian package with jpackage.'
+    group = 'distribution'; description = 'Builds a self-contained Debian package with jpackage.'
     dependsOn tasks.installDist, tasks.prepareUpdateHelperLauncher
-
-    onlyIf {
-        osName.contains('linux')
-    }
-
+    onlyIf { osName.contains('linux') }
     def packagesDir = layout.buildDirectory.dir('packages').get().asFile
     def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
     def iconFile = file('src/main/resources/org/pindb/app/icon.png')
     def associations = file('packaging/pindb-file-associations.properties')
-
-    doFirst {
-        preparePackageDirectory(packagesDir, '.deb')
-    }
-
-    commandLine 'jpackage',
-            '--type', 'deb',
-            '--dest', packagesDir.absolutePath,
-            '--input', inputDir.absolutePath,
-            '--name', 'PinDB',
-            '--app-version', linuxAppVersion,
-            '--linux-app-release', debAppRelease,
-            '--vendor', 'PinDB Project',
-            '--description', 'A flexible personal database application.',
-            '--main-jar', packagedMainJar,
-            '--main-class', application.mainClass.get(),
-            '--add-launcher', "pindb-update-helper=${updaterLauncherProperties.get().asFile.absolutePath}",
-            '--icon', iconFile.absolutePath,
-            '--install-dir', '/opt/pindb',
-            '--linux-package-name', 'pindb',
-            '--linux-menu-group', 'Office',
-            '--linux-shortcut',
-            '--file-associations', associations.absolutePath,
-            '--java-options', '-Dfile.encoding=UTF-8',
-            '--java-options', '-Dprism.order=es2,sw'
+    doFirst { preparePackageDirectory(packagesDir, '.deb') }
+    commandLine 'jpackage', '--type', 'deb', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', packageAppVersion, '--linux-app-release', debAppRelease, '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--add-launcher', "pindb-update-helper=${updaterLauncherProperties.get().asFile.absolutePath}", '--icon', iconFile.absolutePath, '--install-dir', '/opt/pindb', '--linux-package-name', 'pindb', '--linux-menu-group', 'Office', '--linux-shortcut', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
 }
 
 tasks.register('packageRpm', org.gradle.api.tasks.Exec) {
-    group = 'distribution'
-    description = 'Builds a self-contained RPM package for Fedora-family Linux distributions with jpackage.'
+    group = 'distribution'; description = 'Builds a self-contained RPM package for Fedora-family Linux distributions with jpackage.'
     dependsOn tasks.installDist, tasks.prepareUpdateHelperLauncher
-
-    onlyIf {
-        osName.contains('linux')
-    }
-
+    onlyIf { osName.contains('linux') }
     def packagesDir = layout.buildDirectory.dir('packages').get().asFile
     def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
     def iconFile = file('src/main/resources/org/pindb/app/icon.png')
     def associations = file('packaging/pindb-file-associations.properties')
+    doFirst { preparePackageDirectory(packagesDir, '.rpm') }
+    commandLine 'jpackage', '--type', 'rpm', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', packageAppVersion, '--linux-app-release', rpmAppRelease, '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--add-launcher', "pindb-update-helper=${updaterLauncherProperties.get().asFile.absolutePath}", '--icon', iconFile.absolutePath, '--install-dir', '/opt/pindb', '--linux-package-name', 'pindb', '--linux-menu-group', 'Office', '--linux-app-category', 'Office', '--linux-shortcut', '--resource-dir', rpmResources.absolutePath, '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
+}
 
-    doFirst {
-        preparePackageDirectory(packagesDir, '.rpm')
-    }
-
-    commandLine 'jpackage',
-            '--type', 'rpm',
-            '--dest', packagesDir.absolutePath,
-            '--input', inputDir.absolutePath,
-            '--name', 'PinDB',
-            '--app-version', linuxAppVersion,
-            '--linux-app-release', rpmAppRelease,
-            '--vendor', 'PinDB Project',
-            '--description', 'A flexible personal database application.',
-            '--main-jar', packagedMainJar,
-            '--main-class', application.mainClass.get(),
-            '--add-launcher', "pindb-update-helper=${updaterLauncherProperties.get().asFile.absolutePath}",
-            '--icon', iconFile.absolutePath,
-            '--install-dir', '/opt/pindb',
-            '--linux-package-name', 'pindb',
-            '--linux-menu-group', 'Office',
-            '--linux-app-category', 'Office',
-            '--linux-shortcut',
-            '--resource-dir', rpmResources.absolutePath,
-            '--file-associations', associations.absolutePath,
-            '--java-options', '-Dfile.encoding=UTF-8',
-            '--java-options', '-Dprism.order=es2,sw'
+tasks.register('packageWindows', org.gradle.api.tasks.Exec) {
+    group = 'distribution'; description = 'Builds a self-contained per-user Windows EXE installer with jpackage.'
+    dependsOn tasks.installDist
+    onlyIf { osName.contains('windows') }
+    def packagesDir = layout.buildDirectory.dir('packages').get().asFile
+    def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
+    def associations = file('packaging/pindb-file-associations.properties')
+    doFirst { preparePackageDirectory(packagesDir, '.exe') }
+    commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', packageAppVersion, '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--win-menu', '--win-menu-group', 'PinDB', '--win-dir-chooser', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
 }
 
 tasks.register('verifyReleaseTag') {
-    group = 'verification'
-    description = 'Validates PinDB release tag formats such as 0.1, v0.1, v.0.1 and 0.2-beta.1.'
+    group = 'verification'; description = 'Validates PinDB release tag formats such as 0.1, v0.1, v.0.1 and 0.2-beta.1.'
     doLast {
         def tag = providers.gradleProperty('releaseTag').orNull
-        if (tag == null || !(tag ==~ /^(?:v\.?)?\d+\.\d+(?:\.\d+)*(?:-[0-9A-Za-z.-]+)?$/)) {
-            throw new GradleException("Invalid PinDB release tag: ${tag}")
-        }
+        if (tag == null || !(tag ==~ /^(?:v\.?)?\d+\.\d+(?:\.\d+)*(?:-[0-9A-Za-z.-]+)?$/)) throw new GradleException("Invalid PinDB release tag: ${tag}")
     }
 }
