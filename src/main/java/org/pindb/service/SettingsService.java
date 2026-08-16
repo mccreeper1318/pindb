@@ -1,9 +1,14 @@
 package org.pindb.service;
 
+import org.pindb.util.AppPaths;
 import org.pindb.util.MiniJson;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -28,7 +33,21 @@ public final class SettingsService {
     }
 
     private static final int MAX_RECENT_FILES = 12;
-    private final Preferences preferences = Preferences.userNodeForPackage(SettingsService.class);
+    private static final String PENDING_TAG_KEY = "updates.pendingTag";
+    private static final String LEGACY_PENDING_NOTES_KEY = "updates.pendingNotes";
+    private static final String PENDING_RELEASE_NOTES_FILENAME = "pending-release-notes.md";
+
+    private final Preferences preferences;
+    private final Path pendingReleaseNotesFileOverride;
+
+    public SettingsService() {
+        this(Preferences.userNodeForPackage(SettingsService.class), null);
+    }
+
+    SettingsService(Preferences preferences, Path pendingReleaseNotesFileOverride) {
+        this.preferences = Objects.requireNonNull(preferences, "preferences");
+        this.pendingReleaseNotesFileOverride = pendingReleaseNotesFileOverride;
+    }
 
     public boolean autoCheckUpdates() {
         return preferences.getBoolean("updates.autoCheck", true);
@@ -125,16 +144,85 @@ public final class SettingsService {
     }
 
     public void setPendingReleaseNotes(String tag, String markdown) {
-        preferences.put("updates.pendingTag", Objects.requireNonNullElse(tag, ""));
-        preferences.put("updates.pendingNotes", Objects.requireNonNullElse(markdown, ""));
+        Path notesFile = null;
+        try {
+            notesFile = pendingReleaseNotesFile();
+            writePendingReleaseNotes(notesFile, Objects.requireNonNullElse(markdown, ""));
+            preferences.put(PENDING_TAG_KEY, Objects.requireNonNullElse(tag, ""));
+            preferences.remove(LEGACY_PENDING_NOTES_KEY);
+        } catch (IOException | RuntimeException ignored) {
+            clearPendingReleaseNotePreferences();
+            deleteQuietly(notesFile);
+            // Release-note persistence is a fallback. It must never prevent the update itself from starting.
+        }
     }
 
     public PendingReleaseNotes takePendingReleaseNotes() {
-        String tag = preferences.get("updates.pendingTag", "");
-        String notes = preferences.get("updates.pendingNotes", "");
-        preferences.remove("updates.pendingTag");
-        preferences.remove("updates.pendingNotes");
+        String tag = preferences.get(PENDING_TAG_KEY, "");
+        String notes = preferences.get(LEGACY_PENDING_NOTES_KEY, "");
+        clearPendingReleaseNotePreferences();
+
+        Path notesFile = null;
+        try {
+            notesFile = pendingReleaseNotesFile();
+            if (Files.isRegularFile(notesFile)) {
+                notes = Files.readString(notesFile, StandardCharsets.UTF_8);
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // Fall back to legacy preference-backed notes when available.
+        } finally {
+            deleteQuietly(notesFile);
+        }
+
         return tag.isBlank() && notes.isBlank() ? null : new PendingReleaseNotes(tag, notes);
+    }
+
+    private Path pendingReleaseNotesFile() {
+        if (pendingReleaseNotesFileOverride != null) {
+            return pendingReleaseNotesFileOverride;
+        }
+        return AppPaths.stateDirectory().resolve(PENDING_RELEASE_NOTES_FILENAME);
+    }
+
+    private static void writePendingReleaseNotes(Path destination, String markdown) throws IOException {
+        Path parent = destination.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+
+        Path temporary = destination.resolveSibling(destination.getFileName() + ".tmp");
+        try {
+            Files.writeString(temporary, markdown, StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, destination,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    private void clearPendingReleaseNotePreferences() {
+        try {
+            preferences.remove(PENDING_TAG_KEY);
+            preferences.remove(LEGACY_PENDING_NOTES_KEY);
+        } catch (RuntimeException ignored) {
+            // Preference cleanup is best-effort and should not interfere with updating or startup.
+        }
+    }
+
+    private static void deleteQuietly(Path path) {
+        if (path == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException | RuntimeException ignored) {
+            // Best-effort cleanup only.
+        }
     }
 
     public record PendingReleaseNotes(String tag, String markdown) {
