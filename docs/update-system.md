@@ -6,18 +6,17 @@ Supported tag forms include `0.2`, `v0.2.1`, `v.0.2.1`, and `0.2-beta.3`. Numeri
 
 ## Platform and package selection
 
-PinDB reads `/etc/os-release`, with `/usr/lib/os-release` as a fallback, to classify the running Linux distribution.
-
 - Debian, Ubuntu, Linux Mint, and related systems select `.deb` assets.
 - Fedora, RHEL-family systems, and traditional Fedora spins select `.rpm` assets.
-- Package assets must include `pindb` in the filename and match the current CPU architecture.
-- A matching `<package>.sha256`, `checksums.sha256`, or `checksums-linux.sha256` asset is required for automatic installation.
+- Windows 11 selects the Windows `.exe` installer asset.
+- Package assets must include `pindb` in the filename and match the current CPU architecture when an architecture is encoded in the filename.
+- A matching `<package>.sha256`, `checksums.sha256`, `checksums-linux.sha256`, or `checksums-windows.sha256` asset is required for automatic installation.
 
-The initial official Debian and Fedora packages target 64-bit x86 systems. The selection model also recognizes ARM64 package names so that architecture can be added later without another updater redesign.
+Linux distribution classification reads `/etc/os-release`, with `/usr/lib/os-release` as a fallback. Windows is detected from the Java operating-system property. The initial official Debian, Fedora, and Windows packages target 64-bit x86 systems. The selection model also recognizes ARM64 package names for future expansion.
 
-A release without a matching package for the detected distribution and architecture is not offered as an installable update.
+A release without a matching package for the detected platform and architecture is not offered as an installable update.
 
-## Installation
+## Linux installation
 
 Updates always require approval. The selected package downloads to the user's XDG cache directory and is checksum-verified before installation. PinDB never runs scripts from that user-writable directory with elevated privileges.
 
@@ -32,7 +31,15 @@ Package replacement, symlink substitution, or modification between the desktop c
 
 Before invoking the package manager, PinDB copies the existing `/opt/pindb` application directory. If the package-manager command fails, the updater restores those application files. Diagnostic details are written to `~/.local/state/pindb/update-error.log`.
 
-After a successful package installation, PinDB restarts the installed launcher and passes the release tag and release notes to the updated application.
+After a successful Linux package installation, PinDB restarts the installed launcher and passes the release tag and release notes to the updated application.
+
+## Windows 11 installation and updates
+
+Windows releases are self-contained unsigned x64 `.exe` installers produced by `jpackage` on a Windows GitHub Actions runner. They include the Java runtime and install per-user, so a separate Java installation is not required and normal installation does not target the system-wide Program Files directory.
+
+The installer creates Start Menu integration, registers `.pindb` files, permits the user to choose the installation directory, and can offer a desktop shortcut. PinDB configuration is stored under `%APPDATA%\\PinDB`; state, cache, update downloads, and diagnostics are stored under `%LOCALAPPDATA%\\PinDB`.
+
+For an in-application Windows update, PinDB downloads the matching `.exe`, requires and verifies its SHA-256 checksum, launches that verified installer, and exits so the installer can replace the application. Because the installer is currently unsigned, Windows may identify the publisher as unknown or display SmartScreen warnings. Users should obtain installers only from the official PinDB GitHub release.
 
 ## Fedora Atomic desktops
 
@@ -40,10 +47,11 @@ Fedora Atomic variants such as Silverblue and Kinoite are detected through `VARI
 
 ## Manual recovery
 
-When installation fails, the error dialog retains the downloaded package and shows the appropriate manual command:
+When installation fails, the error dialog retains the downloaded package and shows the appropriate manual command. On Windows, run the retained `.exe` directly.
 
 ```text
 sudo apt install "/path/to/pindb.deb"
 sudo dnf install "/path/to/pindb.rpm"
 sudo rpm-ostree install "/path/to/pindb.rpm"
+"C:\\path\\to\\PinDB-version-windows-x64.exe"
 ```
