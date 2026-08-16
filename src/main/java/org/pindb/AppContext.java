@@ -128,6 +128,7 @@ public final class AppContext {
             if (action == UpdateDialog.Action.REMIND_LATER) {
                 settings.snoozeUpdatesForHours(24);
             } else if (action == UpdateDialog.Action.UPDATE) {
+                settings.setPendingReleaseNotes(available.tag(), available.markdownNotes());
                 new UpdateInstaller(settings).downloadAndInstall(owner, available);
             }
         }));
