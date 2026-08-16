@@ -34,19 +34,19 @@ public final class PinDBApplication extends Application {
         String updatedTag = valueOf(arguments, "--updated-tag=");
         String notesPath = valueOf(arguments, "--updated-notes=");
         String failedPath = valueOf(arguments, "--update-failed=");
-        SettingsService.PendingReleaseNotes pendingNotes = context.settings().takePendingReleaseNotes();
+        String pendingTarget = updatedTag != null ? updatedTag : AppVersion.VERSION;
+        SettingsService.PendingReleaseNotes pendingNotes = context.settings().takePendingReleaseNotes(pendingTarget);
 
         if (failedPath != null && !failedPath.isBlank()) {
             UpdateInstaller.showFailedInstallPrompt(context.launcher().stage(), Path.of(failedPath));
         }
         if (updatedTag != null) {
             String markdown = readUpdatedNotes(notesPath);
-            if ((markdown == null || markdown.isBlank())
-                    && pendingNotes != null && sameVersion(updatedTag, pendingNotes.tag())) {
+            if ((markdown == null || markdown.isBlank()) && pendingNotes != null) {
                 markdown = pendingNotes.markdown();
             }
             new ReleaseNotesDialog(context.launcher().stage(), context.settings(), updatedTag, markdown).showAndWait();
-        } else if (pendingNotes != null && sameVersion(AppVersion.VERSION, pendingNotes.tag())) {
+        } else if (pendingNotes != null) {
             new ReleaseNotesDialog(context.launcher().stage(), context.settings(),
                     pendingNotes.tag(), pendingNotes.markdown()).showAndWait();
         }
