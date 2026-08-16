@@ -157,11 +157,13 @@ public final class SettingsService {
         }
     }
 
-    public PendingReleaseNotes takePendingReleaseNotes() {
+    public PendingReleaseNotes takePendingReleaseNotes(String expectedVersion) {
         String tag = preferences.get(PENDING_TAG_KEY, "");
-        String notes = preferences.get(LEGACY_PENDING_NOTES_KEY, "");
-        clearPendingReleaseNotePreferences();
+        if (!sameVersion(tag, expectedVersion)) {
+            return null;
+        }
 
+        String notes = preferences.get(LEGACY_PENDING_NOTES_KEY, "");
         Path notesFile = null;
         try {
             notesFile = pendingReleaseNotesFile();
@@ -171,10 +173,22 @@ public final class SettingsService {
         } catch (IOException | RuntimeException ignored) {
             // Fall back to legacy preference-backed notes when available.
         } finally {
+            clearPendingReleaseNotePreferences();
             deleteQuietly(notesFile);
         }
 
         return tag.isBlank() && notes.isBlank() ? null : new PendingReleaseNotes(tag, notes);
+    }
+
+    private static boolean sameVersion(String left, String right) {
+        if (left == null || left.isBlank() || right == null || right.isBlank()) {
+            return false;
+        }
+        try {
+            return Version.parse(left).equals(Version.parse(right));
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
     }
 
     private Path pendingReleaseNotesFile() {
