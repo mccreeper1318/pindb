@@ -13,6 +13,9 @@
 - Fixed Issue #58 so pending release notes are only consumed when the running PinDB version matches the stored update target, preventing another older PinDB instance from deleting the fallback notes while an update is still installing.
 - Startup now passes the expected updated version into pending-note retrieval, and mismatched versions leave both the pending tag and Markdown file intact for the actual target version.
 - Added regression coverage confirming mismatched versions preserve pending notes and the matching target consumes them, including equivalent `v`-prefixed version tags.
+- Fixed Issue #59 by storing pending release-note bodies in separate files keyed by normalized target version, preventing concurrent updates from pairing one release tag with another release's changelog.
+- Fixed Issue #60 so transient read failures no longer consume or delete the only pending release-note fallback; the target-specific or legacy file is preserved so a later startup can retry after the filesystem problem is resolved.
+- Added regression coverage for concurrent pending versions, retrying unreadable version-specific notes, and preserving unreadable legacy fallback files until a successful read.
 
 ## 0.2.1-beta.3
 
