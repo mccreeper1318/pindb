@@ -19,5 +19,13 @@
 .table-view .column-header, .table-view .filler { -fx-background-color: transparent; }
 .menu-bar, .tool-bar { -fx-background-color: #111827; }
 .menu-item .label { -fx-text-fill: #172033; }
+.in-window-menu-bar { -fx-background-color: #111827; }
+.in-window-menu-title { -fx-text-fill: #e5edf5; }
+.in-window-menu-title:hover, .in-window-menu-title:showing { -fx-background-color: #263348; }
+.in-window-menu-popup { -fx-background-color: #1f2937; -fx-border-color: #405068; }
+.in-window-menu-item-text { -fx-text-fill: #e5edf5; }
+.in-window-menu-accelerator { -fx-text-fill: #a9b6c6; }
+.in-window-menu-item:hover .label, .in-window-menu-item:focused .label { -fx-text-fill: white; }
 .dialog-pane { -fx-background-color: #111827; }
 .markdown-code { -fx-background-color: #263348; }
+.markdown-text { -fx-fill: #e5edf5; }

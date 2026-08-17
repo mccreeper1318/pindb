@@ -1,5 +1,6 @@
 package org.pindb.service;
 
+import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.print.PageLayout;
@@ -7,7 +8,9 @@ import javafx.print.PageOrientation;
 import javafx.print.Printer;
 import javafx.print.PrinterJob;
 import javafx.scene.Node;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.control.Label;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
@@ -16,6 +19,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
+import javafx.scene.transform.Scale;
 import javafx.stage.Window;
 import org.pindb.model.DatabaseInfo;
 import org.pindb.model.FieldDefinition;
@@ -26,6 +30,12 @@ import org.pindb.model.RecordData;
 import org.pindb.model.SummaryType;
 import org.pindb.ui.UiUtil;
 
+import javax.print.PrintServiceLookup;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.awt.print.PageFormat;
+import java.awt.print.Printable;
+import java.awt.print.PrinterException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
@@ -46,6 +56,7 @@ public final class PrintService {
     private static final double PAGE_PADDING = 12;
     private static final double CELL_BASE_HEIGHT = 25;
     private static final double TEXT_LINE_HEIGHT = 15;
+    private static final double FALLBACK_RENDER_SCALE = 2.0;
 
     private PrintService() {
     }
@@ -54,10 +65,7 @@ public final class PrintService {
                                 List<RecordData> records, PrintOptions options) {
         PrinterJob job = PrinterJob.createPrinterJob();
         if (job == null) {
-            UiUtil.warning(owner, "Printing Unavailable",
-                    "PinDB could not find a configured printer. Add a printer in Linux system settings, "
-                            + "then restart PinDB.");
-            return false;
+            return printWithDesktopFallback(owner, info, allFields, records, options);
         }
         if (!job.showPrintDialog(owner)) {
             return false;
@@ -70,21 +78,10 @@ public final class PrintService {
                 selectedLayout.getPaper(), orientation, Printer.MarginType.DEFAULT);
         job.getJobSettings().setPageLayout(pageLayout);
 
-        List<FieldDefinition> fields = selectedFields(allFields, options.fieldIds());
-        List<Node> bodies = options.arrangement() == PrintArrangement.COLUMNS
-                ? columnBodies(fields, records, options, pageLayout)
-                : rowBodies(fields, records, options, pageLayout);
-        if (options.includeSummaries()) {
-            appendSummaryBody(bodies, fields, records, options, pageLayout);
-        }
-        if (bodies.isEmpty()) {
-            bodies.add(new Label("No entries in this database."));
-        }
-
+        PrintArea area = new PrintArea(pageLayout.getPrintableWidth(), pageLayout.getPrintableHeight());
+        List<Node> pages = printablePages(info, allFields, records, options, area);
         boolean success = true;
-        int pageCount = bodies.size();
-        for (int index = 0; index < pageCount; index++) {
-            Node printablePage = page(info, bodies.get(index), options, index + 1, pageCount, pageLayout);
+        for (Node printablePage : pages) {
             printablePage.applyCss();
             printablePage.autosize();
             if (!job.printPage(pageLayout, printablePage)) {
@@ -100,6 +97,100 @@ public final class PrintService {
         return success;
     }
 
+    private static boolean printWithDesktopFallback(Window owner, DatabaseInfo info,
+                                                    List<FieldDefinition> allFields,
+                                                    List<RecordData> records, PrintOptions options) {
+        javax.print.PrintService[] services;
+        try {
+            services = PrintServiceLookup.lookupPrintServices(null, null);
+        } catch (RuntimeException exception) {
+            UiUtil.error(owner, "Printing Unavailable",
+                    "JavaFX could not find a printer, and PinDB could not query the system print service.", exception);
+            return false;
+        }
+
+        if (services.length == 0) {
+            UiUtil.warning(owner, "Printing Unavailable",
+                    "Neither JavaFX nor the system Java/CUPS print service could find a configured printer. "
+                            + "Check that the printer is enabled in system settings and that the CUPS service is running.");
+            return false;
+        }
+
+        try {
+            java.awt.print.PrinterJob awtJob = java.awt.print.PrinterJob.getPrinterJob();
+            if (awtJob.getPrintService() == null) {
+                awtJob.setPrintService(services[0]);
+            }
+            if (!awtJob.printDialog()) {
+                return false;
+            }
+
+            PageFormat pageFormat = awtJob.defaultPage();
+            pageFormat.setOrientation(options.landscape() ? PageFormat.LANDSCAPE : PageFormat.PORTRAIT);
+            pageFormat = awtJob.validatePage(pageFormat);
+            PrintArea area = new PrintArea(pageFormat.getImageableWidth(), pageFormat.getImageableHeight());
+            List<Node> pages = printablePages(info, allFields, records, options, area);
+            List<BufferedImage> renderedPages = pages.stream().map(PrintService::renderFallbackPage).toList();
+            PageFormat finalPageFormat = pageFormat;
+
+            awtJob.setPrintable((graphics, format, pageIndex) -> {
+                if (pageIndex < 0 || pageIndex >= renderedPages.size()) {
+                    return Printable.NO_SUCH_PAGE;
+                }
+                BufferedImage image = renderedPages.get(pageIndex);
+                Graphics2D graphics2D = (Graphics2D) graphics.create();
+                try {
+                    graphics2D.translate(finalPageFormat.getImageableX(), finalPageFormat.getImageableY());
+                    graphics2D.drawImage(image,
+                            0, 0,
+                            (int) Math.round(finalPageFormat.getImageableWidth()),
+                            (int) Math.round(finalPageFormat.getImageableHeight()),
+                            null);
+                } finally {
+                    graphics2D.dispose();
+                }
+                return Printable.PAGE_EXISTS;
+            }, finalPageFormat);
+
+            awtJob.print();
+            return true;
+        } catch (PrinterException | RuntimeException exception) {
+            UiUtil.error(owner, "Printing Failed",
+                    "The system printer was detected, but PinDB could not submit the print job.", exception);
+            return false;
+        }
+    }
+
+    private static BufferedImage renderFallbackPage(Node page) {
+        page.applyCss();
+        page.autosize();
+        SnapshotParameters parameters = new SnapshotParameters();
+        parameters.setTransform(new Scale(FALLBACK_RENDER_SCALE, FALLBACK_RENDER_SCALE));
+        WritableImage image = page.snapshot(parameters, null);
+        return SwingFXUtils.fromFXImage(image, null);
+    }
+
+    private static List<Node> printablePages(DatabaseInfo info, List<FieldDefinition> allFields,
+                                             List<RecordData> records, PrintOptions options, PrintArea area) {
+        List<FieldDefinition> fields = selectedFields(allFields, options.fieldIds());
+        List<Node> bodies = options.arrangement() == PrintArrangement.COLUMNS
+                ? columnBodies(fields, records, options, area)
+                : rowBodies(fields, records, options, area);
+        if (options.includeSummaries()) {
+            appendSummaryBody(bodies, fields, records, options, area);
+        }
+        if (bodies.isEmpty()) {
+            bodies.add(new Label("No entries in this database."));
+        }
+
+        int pageCount = bodies.size();
+        List<Node> pages = new ArrayList<>(pageCount);
+        for (int index = 0; index < pageCount; index++) {
+            pages.add(page(info, bodies.get(index), options, index + 1, pageCount, area));
+        }
+        return pages;
+    }
+
     private static List<FieldDefinition> selectedFields(List<FieldDefinition> all, List<Long> selectedIds) {
         Map<Long, FieldDefinition> byId = new LinkedHashMap<>();
         all.forEach(field -> byId.put(field.id(), field));
@@ -107,10 +198,10 @@ public final class PrintService {
     }
 
     private static List<Node> columnBodies(List<FieldDefinition> fields, List<RecordData> records,
-                                           PrintOptions options, PageLayout layout) {
+                                           PrintOptions options, PrintArea area) {
         List<Node> pages = new ArrayList<>();
-        double bodyHeight = availableBodyHeight(options, layout);
-        double columnWidth = printableColumnWidth(layout, fields.size());
+        double bodyHeight = availableBodyHeight(options, area);
+        double columnWidth = printableColumnWidth(area, fields.size());
         int index = 0;
         boolean firstPage = true;
         while (index < records.size() || (records.isEmpty() && firstPage)) {
@@ -151,10 +242,10 @@ public final class PrintService {
     }
 
     private static List<Node> rowBodies(List<FieldDefinition> fields, List<RecordData> records,
-                                        PrintOptions options, PageLayout layout) {
+                                        PrintOptions options, PrintArea area) {
         List<Node> pages = new ArrayList<>();
-        double bodyHeight = availableBodyHeight(options, layout);
-        double valueWidth = Math.max(160, layout.getPrintableWidth() - 175);
+        double bodyHeight = availableBodyHeight(options, area);
+        double valueWidth = Math.max(160, area.width() - 175);
         int index = 0;
         if (records.isEmpty()) {
             pages.add(new Label("No entries in this database."));
@@ -220,13 +311,13 @@ public final class PrintService {
     }
 
     private static void appendSummaryBody(List<Node> bodies, List<FieldDefinition> fields,
-                                          List<RecordData> records, PrintOptions options, PageLayout layout) {
+                                          List<RecordData> records, PrintOptions options, PrintArea area) {
         List<Map.Entry<FieldDefinition, String>> entries = new ArrayList<>(summaries(fields, records).entrySet());
         if (entries.isEmpty()) {
             return;
         }
-        double bodyHeight = availableBodyHeight(options, layout);
-        double lineWidth = Math.max(80, layout.getPrintableWidth() - 16);
+        double bodyHeight = availableBodyHeight(options, area);
+        double lineWidth = Math.max(80, area.width() - 16);
         int index = 0;
         int summaryPage = 1;
         while (index < entries.size()) {
@@ -303,10 +394,14 @@ public final class PrintService {
     }
 
     static double printableColumnWidth(PageLayout layout, int fieldCount) {
-        return Math.max(1, (layout.getPrintableWidth() - 8) / Math.max(1, fieldCount));
+        return printableColumnWidth(new PrintArea(layout.getPrintableWidth(), layout.getPrintableHeight()), fieldCount);
     }
 
-    private static double availableBodyHeight(PrintOptions options, PageLayout layout) {
+    private static double printableColumnWidth(PrintArea area, int fieldCount) {
+        return Math.max(1, (area.width() - 8) / Math.max(1, fieldCount));
+    }
+
+    private static double availableBodyHeight(PrintOptions options, PrintArea area) {
         double reserved = PAGE_PADDING * 2;
         if (options.showDatabaseName() || options.showPrintDate()) {
             reserved += HEADER_RESERVE;
@@ -314,7 +409,7 @@ public final class PrintService {
         if (options.showPageNumbers()) {
             reserved += FOOTER_RESERVE;
         }
-        return Math.max(100, layout.getPrintableHeight() - reserved);
+        return Math.max(100, area.height() - reserved);
     }
 
     private static double estimateHeadingHeight(List<FieldDefinition> fields, double width) {
@@ -346,11 +441,11 @@ public final class PrintService {
     }
 
     private static BorderPane page(DatabaseInfo info, Node body, PrintOptions options,
-                                   int pageNumber, int pageCount, PageLayout layout) {
+                                   int pageNumber, int pageCount, PrintArea area) {
         BorderPane page = new BorderPane();
-        page.setPrefSize(layout.getPrintableWidth(), layout.getPrintableHeight());
-        page.setMinSize(layout.getPrintableWidth(), layout.getPrintableHeight());
-        page.setMaxSize(layout.getPrintableWidth(), layout.getPrintableHeight());
+        page.setPrefSize(area.width(), area.height());
+        page.setMinSize(area.width(), area.height());
+        page.setMaxSize(area.width(), area.height());
         page.setPadding(new Insets(4));
         page.setStyle("-fx-background-color: white; -fx-text-fill: black;");
 
@@ -396,5 +491,8 @@ public final class PrintService {
                 ? "-fx-font-weight: bold; -fx-background-color: #e9eef3;"
                 : "-fx-background-color: white;"));
         return label;
+    }
+
+    private record PrintArea(double width, double height) {
     }
 }

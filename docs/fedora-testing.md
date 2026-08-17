@@ -8,6 +8,8 @@ Use this checklist before announcing an RPM release.
 - Confirm exactly one `.rpm` is written to `build/packages/`.
 - Inspect metadata with `rpm -qpi build/packages/*.rpm`.
 - Inspect installed paths with `rpm -qpl build/packages/*.rpm`.
+- Confirm the package contains one executable `pindb-update-helper` under PinDB's `bin` directory.
+- Inspect package scripts with `rpm -qp --scripts build/packages/*.rpm`; confirm the pre-uninstall script removes desktop integration only when `$1` is `0` and contains no nested `rpm -q` ownership lookup.
 - Confirm the package version and release match the GitHub release tag.
 - Generate and verify the package SHA-256 checksum.
 
@@ -27,11 +29,15 @@ Use this checklist before announcing an RPM release.
 - Create, save, close, and reopen a database.
 - Open a database created on a Debian-family installation.
 - Test table and record-card views.
+- Open each **File**, **Database**, **View**, and **Help** menu and confirm the drop-down appears directly beneath the menu bar rather than being offset farther down the window.
 - Test CSV import and export.
 - Test PDF, DOCX, text, and image document previews.
-- Test database and document printing through Fedora's configured printer system.
+- Test database printing through Fedora's configured printer system.
+- If JavaFX printer discovery is unavailable, confirm PinDB's system Java/CUPS fallback still finds the configured printer and opens a print dialog.
+- Test document printing.
 - Test GitHub device authorization and in-application bug reporting.
 - Confirm configuration, cache, and state files use the normal XDG user directories.
+- Close a modified database normally, copy only the `.pindb` file to another location, and confirm the copied database opens with all records and embedded documents intact.
 
 ## Automatic update
 
@@ -41,9 +47,14 @@ Use this checklist before announcing an RPM release.
 - Confirm the correct x86-64 asset is selected when multiple architectures exist.
 - Confirm PinDB prefers `dnf5` and falls back to `dnf` when required.
 - Confirm the `pkexec` administrator prompt appears.
+- Confirm the privileged command launches the packaged `pindb-update-helper`, never a script under the user's cache directory.
 - Complete a successful RPM-to-RPM update.
 - Confirm PinDB restarts and displays the release notes.
+- Confirm the updated PinDB desktop entry remains in the application menu after the upgrade.
+- Remove PinDB with DNF and confirm the uninstall prints no RPM transaction-lock errors.
 - Test a deliberately invalid checksum and confirm installation is refused.
+- Replace the downloaded RPM after desktop-side checksum verification and confirm privileged staging refuses it.
+- Substitute a symbolic link for the downloaded RPM and confirm the helper refuses it.
 - Test a failed package-manager command and confirm the previous application files are preserved.
 - Confirm the failure dialog shows the downloaded RPM, manual DNF command, and diagnostic log path.
 

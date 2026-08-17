@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.2.1-rc.1
+
+### Added
+
+- Added version matching and regression coverage for post-update launch detection and release-note handoff behavior.
+- Added regression coverage for release-note bodies larger than `Preferences.MAX_VALUE_LENGTH` and legacy pending-note migration.
+- Added regression coverage confirming mismatched versions preserve pending notes and the matching target consumes them, including equivalent `v`-prefixed version tags.
+- Added regression coverage for concurrent pending versions, retrying unreadable version-specific notes, and preserving unreadable legacy fallback files until a successful read.
+
+### Changed
+
+- Persisted pending release notes before installation and added a startup fallback so the changelog is still shown after the update even when the temporary notes file is unavailable or automatic restart fails.
+- Pending release-note persistence is now best-effort, uses atomic replacement where supported, cleans up after retrieval, and remains compatible with older preference-backed pending notes.
+- Startup now passes the expected updated version into pending-note retrieval, and mismatched versions leave both the pending tag and Markdown file intact for the actual target version.
+
+### Fixed
+
+- Fixed Issue #55 so PinDB's post-update launcher waits for the old updater process to exit before JavaFX starts, preventing the restart handoff race that could leave the application closed after a successful update.
+- Fixed Issue #57 by moving full pending release-note bodies out of Java `Preferences` and into a file under PinDB's state directory, avoiding the 8,192-character preference value limit that could prevent an update from starting.
+- Fixed Issue #58 so pending release notes are only consumed when the running PinDB version matches the stored update target, preventing another older PinDB instance from deleting the fallback notes while an update is still installing.
+- Fixed Issue #59 by storing pending release-note bodies in separate files keyed by normalized target version, preventing concurrent updates from pairing one release tag with another release's changelog.
+- Fixed Issue #60 so transient read failures no longer consume or delete the only pending release-note fallback; the target-specific or legacy file is preserved so a later startup can retry after the filesystem problem is resolved.
+
+## 0.2.1-beta.3
+
+### Added
+
+- Added a fixed, package-installed privileged update helper with a narrow install-only interface for Debian and Fedora packages.
+- Added updater security regression coverage for package replacement, symlink substitution, and checksum-to-install race conditions, along with DEB and RPM checks that ensure the privileged helper is packaged as an executable without an application-menu shortcut.
+
+### Fixed
+- Fixed the updater executing a cache-directory shell script as root and installing directly from a user-writable package path.
+- Automatic package installation now requires a matching published SHA-256 checksum. The helper rejects symlinks, holds the source open securely, copies it into an owner-only root staging directory, and re-verifies the expected digest before giving only that staged copy to APT or DNF.
+- Fixed restoring the oldest retained internal backup erasing the active database when creating the pre-restore safety snapshot pruned the selected backup. Backup validation, safety snapshot creation, core and embedded-document restoration, and retention pruning now complete atomically, with pruning deferred until the restore has succeeded (Issue #35).
+
+## 0.2.1-beta.2
+
+### Changed
+
+- Replaced the database window's native JavaFX menu popups with in-window drop-down panels that stay anchored directly beneath the menu bar on affected Fedora/Nobara Wayland and KDE configurations (Issue #31).
+- Added Fedora package regression checks for safe RPM upgrade and uninstall script behavior.
+
+### Fixed
+
+- Fixed RPM upgrades unregistering PinDB's desktop entry after the new package had installed, which could remove PinDB from the application menu (Issue #33).
+- Fixed the generated RPM uninstall script launching nested `rpm -q` commands while DNF held the RPM transaction lock, eliminating the repeated `.rpm.lock` errors reported during removal (Issue #33).
+- Fixed the custom Fedora RPM specification being ignored by `jpackage` because its override filename did not match the PinDB package name, ensuring the safe upgrade and uninstall scriptlets are actually packaged (Issue #33).
+- Hardened the post-update restart so failure to delete the downloaded package cannot prevent PinDB from reopening, and detached the restarted process from the updater's output streams (Issue #33).
+- Fixed Markdown release-note body text using an unreadable default color in PinDB's dark theme, which could make the post-update dialog appear empty (Issue #33).
+
+## 0.2.1-beta.1
+
+### Added
+
+- Added clearer database-open diagnostics that distinguish empty files, non-SQLite files, corrupted SQLite databases, missing PinDB metadata, missing schema-version metadata, and databases created by newer PinDB versions (Issue #26).
+- Added recovery guidance when a `.pindb` file appears incomplete or damaged (Issue #26).
+- Added a system Java/CUPS printing fallback when JavaFX cannot discover a configured printer on Linux (Issue #32).
+- Added regression coverage for invalid database diagnostics, portable database copies after a normal close, record/document rollback behavior, and owner-only credential storage.
+
+### Changed
+
+- PinDB now checkpoints and truncates pending SQLite WAL data during a normal document-store shutdown so the primary `.pindb` file is safer to copy between systems as a self-contained file (Issue #26).
+- Upgraded the packaged runtime and build toolchain to Java 25 with JavaFX 25.0.3, incorporating the upstream Linux GTK popup-positioning fix used by menu drop-downs (Issue #31).
+- Updated Debian and Fedora CI/release builds to use Temurin Java 25.
+
+### Fixed
+
+- Fixed record values and embedded document BLOBs being able to become inconsistent when the document transaction failed after a record add or edit had already committed. PinDB now restores the immediately preceding internal snapshot when the document save fails (Issue #28).
+- Fixed fallback GitHub credentials being written before owner-only permissions were applied. Fallback credentials are now created in a `0600` temporary file before token bytes are written and then moved into place (Issue #29).
+- Fixed GitHub keyring I/O failures incorrectly setting the worker thread's interrupted flag. The interrupt status is now restored only for actual `InterruptedException` cases (Issue #30).
+- Fixed Linux menu drop-downs appearing far below the menu bar on affected Fedora/Nobara desktop configurations by moving to the JavaFX version containing the upstream GTK coordinate fix (Issue #31).
+- Fixed database printing immediately reporting that no printer was configured when JavaFX printer discovery failed even though the system print service could see the printer (Issue #32).
+
 ## 0.2-beta.4
 
 ### Added

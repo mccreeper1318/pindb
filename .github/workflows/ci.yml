@@ -20,11 +20,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
           cache: gradle
 
       - name: Install Debian packaging tools
@@ -37,6 +37,25 @@ jobs:
 
       - name: Run tests and build Debian package
         run: ./gradlew --no-daemon clean test packageDeb
+
+      - name: Verify packaged Debian update helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t PACKAGES < <(find build/packages -maxdepth 1 -type f -name '*.deb')
+          if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one Debian package; found ${#PACKAGES[@]}."
+            exit 1
+          fi
+          EXTRACT_DIR="$(mktemp -d)"
+          trap 'rm -rf "$EXTRACT_DIR"' EXIT
+          dpkg-deb -x "${PACKAGES[0]}" "$EXTRACT_DIR"
+          mapfile -t HELPERS < <(find "$EXTRACT_DIR" -type f -path '*/bin/pindb-update-helper')
+          if [[ "${#HELPERS[@]}" -ne 1 || ! -x "${HELPERS[0]:-}" ]]; then
+            echo "The Debian package must contain exactly one executable PinDB update helper."
+            printf '%s\n' "${HELPERS[@]}"
+            exit 1
+          fi
 
       - name: Upload test report
         if: always()
@@ -75,11 +94,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
           cache: gradle
 
       - name: Make Gradle wrapper executable
@@ -103,12 +122,31 @@ jobs:
           rpm -qpi "$RPM"
           rpm -qpl "$RPM"
 
+          RPM_SCRIPTS="$(rpm -qp --scripts "$RPM")"
+          if grep -Fq 'rpm -q --whatprovides' <<< "$RPM_SCRIPTS"; then
+            echo "RPM scriptlets must not start a nested rpm ownership query."
+            printf '%s\n' "$RPM_SCRIPTS"
+            exit 1
+          fi
+          if ! grep -Fq 'if [ "$1" -eq 0 ]; then' <<< "$RPM_SCRIPTS"; then
+            echo "RPM desktop cleanup must be restricted to a real uninstall."
+            printf '%s\n' "$RPM_SCRIPTS"
+            exit 1
+          fi
+
           EXTRACT_DIR="$(mktemp -d)"
           trap 'rm -rf "$EXTRACT_DIR"' EXIT
           (
             cd "$EXTRACT_DIR"
             rpm2cpio "$GITHUB_WORKSPACE/$RPM" | cpio -idmu
           )
+
+          mapfile -t HELPERS < <(find "$EXTRACT_DIR" -type f -path '*/bin/pindb-update-helper')
+          if [[ "${#HELPERS[@]}" -ne 1 || ! -x "${HELPERS[0]:-}" ]]; then
+            echo "The RPM must contain exactly one executable PinDB update helper."
+            printf '%s\n' "${HELPERS[@]}"
+            exit 1
+          fi
 
           mapfile -t DESKTOP_FILES < <(find "$EXTRACT_DIR" -type f -iname '*pindb*.desktop')
           if [[ "${#DESKTOP_FILES[@]}" -ne 1 ]]; then

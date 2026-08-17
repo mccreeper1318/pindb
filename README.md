@@ -65,6 +65,8 @@ Existing `.pindb` files can be opened from the launcher, the recent-databases li
 - Automatically saves entry and configuration changes.
 - Remembers whether each database uses table view or record view.
 - Creates a safety copy before performing a database-schema migration.
+- Checkpoints SQLite WAL data during a normal database-window shutdown so a closed `.pindb` file can be copied as a self-contained database.
+- Provides specific diagnostics for empty, non-SQLite, corrupted, incomplete, and unsupported-newer database files.
 
 ### Custom fields
 
@@ -93,6 +95,7 @@ Fields can be added, edited, removed, and rearranged through the field-managemen
 - Create field-specific filters.
 - View information in a spreadsheet-style table or readable record cards.
 - Move deleted entries to **Recently Deleted** before permanently removing them.
+- Keeps record values and embedded document BLOBs consistent if a document save fails by restoring the preceding internal snapshot.
 
 ### Embedded documents
 
@@ -118,6 +121,7 @@ Because embedded files are stored inside the database, adding large documents wi
 - Choose portrait or landscape orientation.
 - Include headings, database names, print dates, page numbers, and field summaries.
 - Print only the entries currently visible after searching or filtering.
+- Uses a system Java/CUPS fallback on Linux when JavaFX printer discovery cannot see a configured printer.
 
 CSV exports contain document filenames, not embedded document contents.
 
@@ -129,7 +133,7 @@ CSV exports contain document filenames, not embedded document contents.
 - Restores fields, entries, and stored documents from a selected snapshot.
 - Creates an untouched external copy before a schema migration.
 
-Keep separate copies of important `.pindb` files as part of a normal backup routine. Internal snapshots help recover database changes, but they do not protect against losing or damaging the entire file.
+Keep separate copies of important `.pindb` files as part of a normal backup routine. Internal snapshots help recover database changes, but they do not protect against losing or damaging the entire file. For the safest manual transfer, close the database window normally before copying the `.pindb` file.
 
 ### Updates and release history
 
@@ -139,11 +143,12 @@ When an update is accepted on a supported traditional Linux installation, PinDB:
 
 1. Detects whether the system uses Debian or RPM packages.
 2. Downloads the matching `.deb` or `.rpm` package for the current architecture.
-3. Verifies its SHA-256 checksum when supplied.
+3. Requires and verifies its published SHA-256 checksum.
 4. Requests administrator approval through the normal Linux privilege prompt.
-5. Installs the package with `apt-get`, `dnf5`, or `dnf` as appropriate.
-6. Restarts PinDB.
-7. Displays the release notes.
+5. Uses PinDB's fixed, root-owned update helper to securely stage and re-verify the package.
+6. Installs only the verified staged package with `apt-get`, `dnf5`, or `dnf` as appropriate.
+7. Restarts PinDB.
+8. Displays the release notes.
 
 Stable updates are checked by default. Pre-release updates can be enabled in Settings.
 
@@ -157,12 +162,14 @@ A GitHub account is required. The first report uses GitHub's device-authorizatio
 
 The report form can include the PinDB version and basic system diagnostics. PinDB does not automatically include database contents, embedded documents, document filenames, database filenames, or personal file paths.
 
+GitHub authorization is stored in the Linux keyring when available. The fallback credential file is created with owner-only permissions before credential data is written.
+
 ## Data compatibility
 
 New PinDB versions may migrate databases created by earlier versions. Before a schema migration, PinDB creates a file named similarly to:
 
 ```text
-Database.pre-migration-2026-07-30T123456.pindb
+Database.pre-migration-20260730-123456.pindb
 ```
 
 The copy is placed beside the original database. Older PinDB versions may not be able to open a database after it has been migrated by a newer version.
@@ -184,7 +191,7 @@ PinDB is still an early-stage application. Keep external backups of important da
 All builds require:
 
 - Git
-- JDK 21, including `jpackage`
+- JDK 25, including `jpackage`
 - A 64-bit Linux system for building the official Linux packages
 
 Debian packaging additionally requires:
@@ -200,7 +207,7 @@ RPM packaging additionally requires:
 
 PinDB uses the included Gradle wrapper. A system-wide Gradle installation is not required.
 
-JavaFX, SQLite JDBC, Apache PDFBox, Apache POI, JUnit, and the other Java dependencies are downloaded automatically from Maven Central during the build.
+JavaFX 25.0.3, SQLite JDBC, Apache PDFBox, Apache POI, JUnit, and the other Java dependencies are downloaded automatically from Maven Central during the build.
 
 ## Clone the repository
 
@@ -210,10 +217,10 @@ cd pindb
 chmod +x gradlew
 ```
 
-To work with the active 0.2 development branch:
+To work with the active 0.2.1 development branch:
 
 ```bash
-git switch agent/0.2-dev
+git switch agent/dev_0.2.1
 ```
 
 ## Run the tests
@@ -239,7 +246,7 @@ A development run uses the version supplied with `-PappVersion`. Without that pr
 Example:
 
 ```bash
-./gradlew run -PappVersion=0.2-beta.3
+./gradlew run -PappVersion=0.2.1
 ```
 
 ## Build the Debian package
@@ -247,7 +254,7 @@ Example:
 On a Debian-family build system:
 
 ```bash
-./gradlew clean test packageDeb -PappVersion=0.2-beta.3
+./gradlew clean test packageDeb -PappVersion=0.2.1
 ```
 
 ## Build the Fedora RPM
@@ -255,7 +262,7 @@ On a Debian-family build system:
 On Fedora or another RPM build system with `rpm-build` installed:
 
 ```bash
-./gradlew clean test packageRpm -PappVersion=0.2-beta.3
+./gradlew clean test packageRpm -PappVersion=0.2.1
 ```
 
 Both tasks write their self-contained package to:
@@ -272,7 +279,7 @@ Native `jpackage` packages should be built on a distribution from the correspond
 
 1. Clone the repository.
 2. Open the repository folder as a Gradle project.
-3. Set the project SDK and Gradle JVM to JDK 21.
+3. Set the project SDK and Gradle JVM to JDK 25.
 4. Allow Gradle to download and index the dependencies.
 5. Run the Gradle `run` task or the `org.pindb.PinDBLauncher` main class.
 
