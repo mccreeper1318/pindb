@@ -1,37 +1,27 @@
 # Changelog
 
-## 34-release-windows-support
+## 0.2.1-rc.1
 
 ### Added
 
-- Added Windows 11 x64 support for Issue #34, including a self-contained unsigned `.exe` installer built with `jpackage` and a bundled Java runtime.
-- Added per-user Windows installation, Start Menu integration, optional desktop shortcut prompting, install-directory selection, and `.pindb` file association support.
-- Added Windows-aware application data paths using `%APPDATA%` for configuration and `%LOCALAPPDATA%` for state, cache, and downloaded updates.
-- Added Windows GitHub Release package discovery, x64 architecture matching, `.exe` checksum discovery, SHA-256 verification, and launching of verified Windows update installers from PinDB.
-- Added a Windows release workflow using a Windows runner and WiX to build, checksum, normalize, and attach `PinDB-<version>-windows-x64.exe` to GitHub Releases.
-- Added Windows CI coverage and regression tests for Windows platform detection and Windows x64 release-package selection.
+- Added version matching and regression coverage for post-update launch detection and release-note handoff behavior.
+- Added regression coverage for release-note bodies larger than `Preferences.MAX_VALUE_LENGTH` and legacy pending-note migration.
+- Added regression coverage confirming mismatched versions preserve pending notes and the matching target consumes them, including equivalent `v`-prefixed version tags.
+- Added regression coverage for concurrent pending versions, retrying unreadable version-specific notes, and preserving unreadable legacy fallback files until a successful read.
 
 ### Changed
 
-- Extended native package handling so PinDB can distinguish Debian `.deb`, Fedora `.rpm`, and Windows `.exe` release assets while preserving the existing Linux privileged-update security path.
-- Updated architecture detection to recognize `x64` Windows release asset names.
-
-## 55-updater-did-not-auto-restart-app-after-update-did-not-properly-show-changelog-after-update
+- Persisted pending release notes before installation and added a startup fallback so the changelog is still shown after the update even when the temporary notes file is unavailable or automatic restart fails.
+- Pending release-note persistence is now best-effort, uses atomic replacement where supported, cleans up after retrieval, and remains compatible with older preference-backed pending notes.
+- Startup now passes the expected updated version into pending-note retrieval, and mismatched versions leave both the pending tag and Markdown file intact for the actual target version.
 
 ### Fixed
 
 - Fixed Issue #55 so PinDB's post-update launcher waits for the old updater process to exit before JavaFX starts, preventing the restart handoff race that could leave the application closed after a successful update.
-- Persisted pending release notes before installation and added a startup fallback so the changelog is still shown after the update even when the temporary notes file is unavailable or automatic restart fails.
-- Added version matching and regression coverage for post-update launch detection and release-note handoff behavior.
 - Fixed Issue #57 by moving full pending release-note bodies out of Java `Preferences` and into a file under PinDB's state directory, avoiding the 8,192-character preference value limit that could prevent an update from starting.
-- Pending release-note persistence is now best-effort, uses atomic replacement where supported, cleans up after retrieval, and remains compatible with older preference-backed pending notes.
-- Added regression coverage for release-note bodies larger than `Preferences.MAX_VALUE_LENGTH` and legacy pending-note migration.
 - Fixed Issue #58 so pending release notes are only consumed when the running PinDB version matches the stored update target, preventing another older PinDB instance from deleting the fallback notes while an update is still installing.
-- Startup now passes the expected updated version into pending-note retrieval, and mismatched versions leave both the pending tag and Markdown file intact for the actual target version.
-- Added regression coverage confirming mismatched versions preserve pending notes and the matching target consumes them, including equivalent `v`-prefixed version tags.
 - Fixed Issue #59 by storing pending release-note bodies in separate files keyed by normalized target version, preventing concurrent updates from pairing one release tag with another release's changelog.
 - Fixed Issue #60 so transient read failures no longer consume or delete the only pending release-note fallback; the target-specific or legacy file is preserved so a later startup can retry after the filesystem problem is resolved.
-- Added regression coverage for concurrent pending versions, retrying unreadable version-specific notes, and preserving unreadable legacy fallback files until a successful read.
 
 ## 0.2.1-beta.3
 
