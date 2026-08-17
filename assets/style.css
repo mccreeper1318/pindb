@@ -255,7 +255,7 @@ li::marker { color: var(--magenta); }
 }
 .sidebox ul { margin-bottom: 0; padding-left: 1.2rem; }
 
-.package-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 14px 0 22px; }
+.package-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin: 14px 0 22px; }
 .package-card { position: relative; overflow: hidden; padding: 17px; }
 .package-card::before {
   position: absolute;
@@ -265,6 +265,7 @@ li::marker { color: var(--magenta); }
   background: linear-gradient(var(--pink), var(--magenta));
 }
 .package-card.fedora::before { background: linear-gradient(var(--blue), var(--cyan)); }
+.package-card.windows::before { background: linear-gradient(var(--orange), var(--magenta)); }
 .package-card h3 {
   margin: -17px -17px 13px;
   padding: 12px 16px;
@@ -275,6 +276,7 @@ li::marker { color: var(--magenta); }
 }
 .package-card.fedora h3 { background: rgba(74, 158, 255, .09); }
 .package-card.debian h3 { background: rgba(255, 93, 146, .09); }
+.package-card.windows h3 { background: rgba(255, 117, 0, .09); }
 
 .release-panel { margin: 16px 0 22px; padding: 18px; }
 .release-panel > h2 {
@@ -301,6 +303,7 @@ li::marker { color: var(--magenta); }
   letter-spacing: .08em;
 }
 .platform-badge.fedora { background: rgba(74, 158, 255, .2); border-color: var(--blue); }
+.platform-badge.windows { background: rgba(255, 117, 0, .18); border-color: var(--orange); }
 
 .download-button {
   display: inline-flex;
@@ -325,6 +328,7 @@ li::marker { color: var(--magenta); }
 .download-button:active { transform: translateY(1px); }
 .download-button.primary { color: #081b18 !important; background: linear-gradient(135deg, #62f5ad, #1fcf83); border-color: #79ffc1; }
 .download-button.fedora { background: linear-gradient(135deg, #3858e8, #a21bd6); border-color: #d03ef4; }
+.download-button.windows { background: linear-gradient(135deg, #e85b16, #b921a8); border-color: #ff8b4f; }
 .download-button.unavailable, a.unavailable {
   color: #747f94 !important;
   background: #1c202e;

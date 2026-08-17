@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="About PinDB and its Debian and Fedora Linux packages.">
+  <meta name="description" content="About PinDB and its Windows, Debian, and Fedora packages.">
   <title>About - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -32,16 +32,20 @@
 
 <div class="columns">
   <section>
-    <p>PinDB is intended to make small personal databases approachable for people who do not want to design SQL tables or maintain a server.</p>
+    <p>PinDB makes small personal databases approachable for people who do not want to design SQL tables or maintain a server.</p>
     <p>The application uses JavaFX for its interface and SQLite for portable database storage.</p>
 
-    <h2>Linux support</h2>
-    <p>PinDB provides self-contained native packages for two major Linux package families:</p>
+    <h2>Windows and Linux support</h2>
+    <p>PinDB provides self-contained native packages for three supported platform families:</p>
     <ul>
+      <li><code>.exe</code> for 64-bit Windows 11, beginning with the 0.3 Beta 1 preview.</li>
       <li><code>.deb</code> for Linux Mint, Ubuntu, Debian, and related systems.</li>
-      <li><code>.rpm</code> for Fedora Workstation, Fedora KDE, and traditional Fedora spins beginning with 0.2 Beta 4.</li>
+      <li><code>.rpm</code> for Fedora Workstation, Fedora KDE, and traditional Fedora spins.</li>
     </ul>
-    <p>Both packages include a private Java runtime. Databases use the same portable <code>.pindb</code> format on either system.</p>
+    <p>Every official package includes a private Java runtime. Databases use the same portable <code>.pindb</code> format across supported systems.</p>
+
+    <h2>Windows preview</h2>
+    <p>The Windows 11 package installs per-user and provides Start Menu integration, optional desktop shortcuts, installation-folder selection, and <code>.pindb</code> file associations. The current installer is unsigned, so Windows may display an unknown-publisher or SmartScreen reputation warning.</p>
 
     <h2>Fedora Atomic desktops</h2>
     <p>Silverblue, Kinoite, and other Atomic desktops can layer the RPM manually with <code>rpm-ostree</code>. PinDB does not attempt to run its normal DNF automatic installer on those immutable systems.</p>
@@ -50,6 +54,8 @@
     <ul>
       <li><a href="https://github.com/mccreeper1318/pindb">GitHub repository</a></li>
       <li><a href="https://github.com/mccreeper1318/pindb/releases">Releases and downloads</a></li>
+      <li><a href="windows.html">Windows installation guide</a></li>
+      <li><a href="debian.html">Debian installation guide</a></li>
       <li><a href="fedora.html">Fedora installation guide</a></li>
       <li><a href="https://github.com/mccreeper1318/pindb/issues">Bug reports and feature requests</a></li>
     </ul>
@@ -58,15 +64,15 @@
     <p class="note">PinDB is an early-stage application. Keep external backups of important databases. Verify exported and printed information before relying on it for legal, medical, tax, or financial records.</p>
 
     <h2>Website information</h2>
-    <p>This website intentionally uses a plain, small, late-1990s-inspired design.</p>
+    <p>This lightweight site uses responsive HTML, CSS, and optional JavaScript for live GitHub Release links. It does not use analytics or tracking.</p>
   </section>
 
   <aside>
     <div class="sidebox">
       <h2>Made With</h2>
       <ul>
-        <li>Java 21</li>
-        <li>JavaFX</li>
+        <li>Java 25</li>
+        <li>JavaFX 25.0.3</li>
         <li>SQLite</li>
         <li>Apache PDFBox</li>
         <li>Apache POI</li>
@@ -76,9 +82,10 @@
     </div>
     <div class="sidebox">
       <h2>Packages</h2>
+      <p><b>Windows:</b> .exe</p>
       <p><b>Debian:</b> .deb</p>
       <p><b>Fedora:</b> .rpm</p>
-      <p><b>Architecture:</b> x86-64</p>
+      <p><b>Architecture:</b> x86-64 / x64</p>
       <p><b>Runtime:</b> Included</p>
     </div>
     <div class="sidebox">

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PinDB features, including Debian and Fedora Linux support.">
+  <meta name="description" content="PinDB features for Windows 11, Debian-family Linux, and Fedora-family Linux.">
   <title>Features - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -31,7 +31,7 @@
 <h1>Features</h1>
 
 <h2>Portable databases</h2>
-<p>Every database is kept in one <code>.pindb</code> SQLite file. The file contains fields, entries, display choices, deleted records, internal backups, and embedded documents.</p>
+<p>Every database is kept in one <code>.pindb</code> SQLite file. The file contains fields, entries, display choices, deleted records, internal backups, and embedded documents. Close the database before copying it between Windows and Linux.</p>
 
 <h2>Field types</h2>
 <table class="old-table">
@@ -65,34 +65,39 @@
   <li>Import a CSV file as a new database.</li>
   <li>Keep timestamped internal backup snapshots.</li>
   <li>Create an untouched safety copy before database migrations.</li>
+  <li>Checkpoint pending SQLite data during a normal close so the main <code>.pindb</code> file is portable.</li>
 </ul>
 
-<h2>Debian and Fedora packages</h2>
+<h2>Windows and Linux packages</h2>
 <div class="package-grid">
+  <div class="package-card windows">
+    <h3>Windows 11</h3>
+    <p>Self-contained, per-user <code>.exe</code> installer for Windows 11 x64 beginning with 0.3 Beta 1.</p>
+    <p>Includes Start Menu integration, optional desktop shortcuts, install-directory selection, and <code>.pindb</code> file associations.</p>
+  </div>
   <div class="package-card debian">
     <h3>Debian-family Linux</h3>
     <p>Self-contained <code>.deb</code> package for Linux Mint, Ubuntu, Debian, and related systems.</p>
-    <p>Automatic installation uses <code>apt-get</code> through <code>pkexec</code>.</p>
+    <p>Automatic installation uses the packaged privileged helper with <code>apt-get</code>.</p>
   </div>
   <div class="package-card fedora">
     <h3>Fedora-family Linux</h3>
-    <p>Self-contained <code>.rpm</code> package for Fedora Workstation, Fedora KDE, and traditional Fedora spins beginning with 0.2 Beta 4.</p>
-    <p>Automatic installation uses <code>dnf5</code> or <code>dnf</code> through <code>pkexec</code>.</p>
+    <p>Self-contained <code>.rpm</code> package for Fedora Workstation, Fedora KDE, and traditional Fedora spins.</p>
+    <p>Automatic installation uses the packaged privileged helper with <code>dnf5</code> or <code>dnf</code>.</p>
   </div>
 </div>
-<p>Both packages include a private Java runtime, an application-menu shortcut, the PinDB icon, and a <code>.pindb</code> file association.</p>
+<p>Every official package includes a private Java runtime, an application launcher, the PinDB icon, and a <code>.pindb</code> file association.</p>
 
 <h2>Update safety</h2>
 <ul>
-  <li>Selects the package type that matches the current Linux distribution.</li>
-  <li>Selects a release asset matching the current system architecture.</li>
-  <li>Verifies the downloaded package with SHA-256 when a checksum is published.</li>
-  <li>Preserves the existing application files while the package manager runs.</li>
-  <li>Restores the previous application files if installation fails.</li>
-  <li>Restarts PinDB and displays release notes after a successful update.</li>
+  <li>Selects the native package type and architecture that match the current system.</li>
+  <li>Requires a matching published SHA-256 checksum before automatic installation.</li>
+  <li>On Windows, launches the verified per-user installer only after approval.</li>
+  <li>On traditional Linux systems, passes a securely staged package to the fixed privileged helper.</li>
+  <li>Restarts PinDB and preserves release notes after a successful Linux update.</li>
+  <li>Leaves pending release notes intact when another older PinDB instance starts during an update.</li>
 </ul>
-<p class="note">Fedora Atomic desktops such as Silverblue and Kinoite use a manual <code>rpm-ostree</code> installation path instead of PinDB's automatic DNF installer.</p>
-
+<p class="note">The Windows installer is currently unsigned, so Windows may display an unknown-publisher or SmartScreen reputation warning. Fedora Atomic desktops use a manual <code>rpm-ostree</code> installation path.</p>
     </main>
     <footer class="footer">
       <div>PinDB Project &mdash; Hosted with simple HTML suitable for GitHub Pages.</div>

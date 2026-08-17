@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PinDB - a flexible personal database application for Debian and Fedora Linux.">
+  <meta name="description" content="PinDB - a flexible personal database application for Windows 11, Debian, Ubuntu, Linux Mint, and Fedora.">
   <title>Home - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -28,9 +28,9 @@
       <a href="about.html">ABOUT</a>
     </nav>
     <main class="content">
-<div class="marquee"><span>*** PinDB 0.2 BETA 4 ADDS FEDORA RPM SUPPORT *** DEBIAN AND FEDORA DOWNLOADS AVAILABLE FROM GITHUB RELEASES ***</span></div>
+<div class="marquee"><span>*** PINDB 0.2.1 IS THE CURRENT STABLE LINUX RELEASE *** PINDB 0.3 BETA 1 ADDS WINDOWS 11 X64 SUPPORT ***</span></div>
 
-<p class="welcome">Organize your information without writing SQL or running a database server.</p>
+<p class="welcome">Organize your information without writing SQL or running a database server—now on Windows 11 and Linux.</p>
 
 <div class="columns">
   <section>
@@ -40,16 +40,23 @@
 
     <div class="box">
       <h2>Quick Download</h2>
-      <p>Self-contained packages are provided for 64-bit Debian-family and Fedora-family Linux systems.</p>
+      <p>Choose the current stable Linux release or try the Windows 11 preview. Every official package includes a private Java runtime.</p>
       <p>
-        <a class="download-button primary" href="download.html">DOWNLOAD .DEB</a>
-        <a class="download-button fedora" href="download.html">DOWNLOAD .RPM</a>
+        <a class="download-button primary" href="download.html#stable-downloads">STABLE .DEB</a>
+        <a class="download-button fedora" href="download.html#stable-downloads">STABLE .RPM</a>
+        <a class="download-button windows" href="download.html#windows-downloads">WINDOWS 11 .EXE</a>
       </p>
-      <p class="small">Both packages include a private Java runtime. Normal users do not need to install Java separately.</p>
+      <p class="small">PinDB 0.2.1 is the stable Linux release. Windows support begins with the 0.3 Beta 1 preview.</p>
     </div>
 
-    <h2>Linux packages</h2>
+    <h2>Available platforms</h2>
     <div class="package-grid">
+      <div class="package-card windows">
+        <h3>Windows 11</h3>
+        <p>Self-contained per-user installer for 64-bit Windows 11.</p>
+        <p><code>.exe</code> &mdash; x64 &mdash; 0.3 Beta 1+</p>
+        <p class="small"><a href="windows.html">Read the Windows installation guide.</a></p>
+      </div>
       <div class="package-card debian">
         <h3>Debian Package</h3>
         <p>For Linux Mint, Ubuntu, Debian, and related distributions.</p>
@@ -64,15 +71,29 @@
       </div>
     </div>
 
+    <h2>Release highlights</h2>
+    <div class="package-grid">
+      <div class="package-card debian">
+        <h3>0.2.1 Stable</h3>
+        <p>A Linux reliability and security release with safer updates, stronger database diagnostics, backup-restore fixes, Java 25, and Fedora menu and printing improvements.</p>
+        <p><a href="https://github.com/mccreeper1318/pindb/releases/tag/0.2.1">Read the 0.2.1 release notes.</a></p>
+      </div>
+      <div class="package-card windows">
+        <h3>0.3 Beta 1</h3>
+        <p>Adds Windows 11 x64 support, a per-user installer, Start Menu integration, optional desktop shortcuts, <code>.pindb</code> file associations, and verified Windows updates.</p>
+        <p><a href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.1">Read the 0.3 Beta 1 release notes.</a></p>
+      </div>
+    </div>
+
     <h2>Why PinDB?</h2>
     <ul>
       <li>One portable file for each database.</li>
-      <li>No SQL knowledge required.</li>
+      <li>No SQL knowledge or database server required.</li>
       <li>Table and record-card views.</li>
       <li>Embedded PDF, DOCX, image, and text documents.</li>
       <li>Search, sorting, filters, summaries, printing, and CSV tools.</li>
       <li>Automatic update checks through GitHub Releases.</li>
-      <li>Automatic package installation on supported Debian and traditional Fedora systems.</li>
+      <li>Native packages for Windows 11, Debian-family Linux, and Fedora-family Linux.</li>
     </ul>
   </section>
 
@@ -80,18 +101,21 @@
     <div class="sidebox">
       <h2>Project Status</h2>
       <img src="assets/icon.png" alt="PinDB logo" width="160" height="160">
-      <p><b>Platform:</b> Linux</p>
-      <p><b>Packages:</b> .deb / .rpm</p>
-      <p><b>Fedora support:</b> 0.2 Beta 4+</p>
-      <p><b>Source:</b> Java 21 / JavaFX</p>
+      <p><b>Platforms:</b> Windows 11 / Linux</p>
+      <p><b>Packages:</b> .exe / .deb / .rpm</p>
+      <p><b>Stable:</b> <span id="latest-stable-version">0.2.1</span></p>
+      <p><b>Preview:</b> <span id="latest-beta-version">0.3-beta.1</span></p>
+      <p><b>Source:</b> Java 25 / JavaFX 25</p>
       <p><b>Database:</b> SQLite</p>
-      <p><b>Newest listed release:</b> <span id="latest-version">checking...</span></p>
+      <p><b>Newest listed release:</b> <span id="latest-version">0.3-beta.1</span></p>
     </div>
 
     <div class="sidebox">
       <h2>Useful Links</h2>
       <ul>
         <li><a href="https://github.com/mccreeper1318/pindb/releases">All releases</a></li>
+        <li><a href="windows.html">Windows guide</a></li>
+        <li><a href="debian.html">Debian guide</a></li>
         <li><a href="fedora.html">Fedora guide</a></li>
         <li><a href="https://github.com/mccreeper1318/pindb/issues">Report a problem</a></li>
         <li><a href="https://github.com/mccreeper1318/pindb">Source repository</a></li>

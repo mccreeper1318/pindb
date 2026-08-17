@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Build PinDB Debian and Fedora packages from source.">
+  <meta name="description" content="Build PinDB Windows, Debian, and Fedora packages from source.">
   <title>Build From Source - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -30,69 +30,83 @@
     <main class="content">
 <h1>Build PinDB From Source</h1>
 
-<p>PinDB is a Java 21 application built with Gradle and JavaFX.</p>
+<p>PinDB is a Java 25 application built with Gradle and JavaFX 25.</p>
 
 <h2>General requirements</h2>
 <ul>
   <li>Git</li>
-  <li>JDK 21 with <code>jpackage</code></li>
+  <li>JDK 25, including <code>jpackage</code></li>
   <li>Internet access for Gradle dependency downloads</li>
-  <li>A 64-bit Linux build system</li>
+  <li>A 64-bit build system matching the native package you want to create</li>
 </ul>
 
 <h2>Package-specific requirements</h2>
 <table class="status-table">
   <tr><th>Package</th><th>Build system and tools</th></tr>
-  <tr><td>Debian <code>.deb</code></td><td>Debian-family Linux with <code>dpkg</code>, <code>dpkg-deb</code>, and <code>fakeroot</code></td></tr>
-  <tr><td>Fedora <code>.rpm</code></td><td>Fedora or another RPM-based build system with <code>rpm-build</code> and <code>rpmbuild</code></td></tr>
+  <tr><td>Windows <code>.exe</code></td><td>64-bit Windows with WiX Toolset, as required by <code>jpackage</code>.</td></tr>
+  <tr><td>Debian <code>.deb</code></td><td>Debian-family Linux with <code>dpkg</code>, <code>dpkg-deb</code>, and <code>fakeroot</code>.</td></tr>
+  <tr><td>Fedora <code>.rpm</code></td><td>Fedora or another RPM-based build system with <code>rpm-build</code> and <code>rpmbuild</code>.</td></tr>
 </table>
-<p>Native <code>jpackage</code> installers should be built on a system from the corresponding package family.</p>
+<p>Native <code>jpackage</code> installers must be built on the corresponding operating system.</p>
 
 <h2>Clone and test</h2>
+<p>Use the stable tag for the 0.2.1 source or the development branch for the 0.3 preview:</p>
 <pre>git clone https://github.com/mccreeper1318/pindb.git
 cd pindb
-chmod +x gradlew
-git switch agent/0.2-dev
+git switch --detach 0.2.1</pre>
+<pre>git switch dev/0.3</pre>
+<p>Linux:</p>
+<pre>chmod +x gradlew
 ./gradlew clean test</pre>
+<p>Windows PowerShell:</p>
+<pre>.\gradlew.bat clean test</pre>
 
 <h2>Run from source</h2>
-<pre>./gradlew run -PappVersion=0.2-beta.4</pre>
+<p>Linux:</p>
+<pre>./gradlew run -PappVersion=0.3-beta.1</pre>
+<p>Windows PowerShell:</p>
+<pre>.\gradlew.bat run -PappVersion=0.3-beta.1</pre>
+
+<h2>Build the Windows installer</h2>
+<p>On Windows x64 with WiX installed:</p>
+<pre>.\gradlew.bat clean test packageWindows -PappVersion=0.3-beta.1</pre>
 
 <h2>Build the Debian package</h2>
-<pre>./gradlew clean test packageDeb -PappVersion=0.2-beta.4</pre>
+<pre>./gradlew clean test packageDeb -PappVersion=0.3-beta.1</pre>
 
 <h2>Build the Fedora RPM</h2>
-<p>On Fedora, install the native RPM packaging tools and use a JDK 21 distribution that includes <code>jpackage</code>.</p>
+<p>On Fedora, install the native RPM packaging tools first:</p>
 <pre>sudo dnf install rpm-build desktop-file-utils cpio
-./gradlew clean test packageRpm -PappVersion=0.2-beta.4</pre>
+./gradlew clean test packageRpm -PappVersion=0.3-beta.1</pre>
 
-<p>Both package tasks write their output to:</p>
+<p>Every package task writes its self-contained installer to:</p>
 <pre>build/packages/</pre>
 
 <h2>Inspect the RPM</h2>
 <pre>rpm -qpi build/packages/*.rpm
 rpm -qpl build/packages/*.rpm</pre>
-<p>The package should include the PinDB launcher, private Java runtime, desktop entry, icon, and <code>.pindb</code> file association.</p>
+<p>The native packages should include the PinDB launcher, private Java runtime, icon, and <code>.pindb</code> file association. Linux packages install under <code>/opt/pindb</code>; Windows uses a per-user installation.</p>
 
 <h2>Automated builds</h2>
-<p>The GitHub Actions build workflow tests and packages both formats independently:</p>
+<p>The GitHub Actions workflows test and package each native format independently:</p>
 <ul>
-  <li>The Debian package is built on Ubuntu.</li>
-  <li>The RPM is built inside a Fedora container using Temurin Java 21.</li>
-  <li>The RPM metadata, desktop entry, launcher reference, and icon are checked before the artifact is accepted.</li>
+  <li>The Windows x64 <code>.exe</code> is built on Windows with Java 25 and WiX.</li>
+  <li>The Debian package is built on Ubuntu with Java 25.</li>
+  <li>The RPM is built inside Fedora with Temurin Java 25.</li>
+  <li>Package metadata, launchers, icons, and file associations are checked before release.</li>
+  <li>SHA-256 checksum files are generated and attached beside each installer.</li>
 </ul>
-<p>The release workflow creates a checksum for each package and attaches both packages and both checksum files to the GitHub Release.</p>
 
 <h2>Open in IntelliJ IDEA</h2>
 <ol>
   <li>Open the cloned repository as a Gradle project.</li>
-  <li>Set both the project SDK and Gradle JVM to JDK 21.</li>
+  <li>Set both the project SDK and Gradle JVM to JDK 25.</li>
   <li>Allow Gradle to load the dependencies.</li>
   <li>Run the Gradle <code>run</code> task or <code>org.pindb.PinDBLauncher</code>.</li>
 </ol>
 
 <h2>Contributing</h2>
-<p>Keep changes focused, run <code>./gradlew clean test</code>, and do not commit databases or documents containing private information.</p>
+<p>Keep changes focused, run the applicable clean test task, and do not commit databases or documents containing private information.</p>
 <p><a class="download-button" href="https://github.com/mccreeper1318/pindb/issues">View Issues</a> <a class="download-button" href="https://github.com/mccreeper1318/pindb">Browse Source</a></p>
     </main>
     <footer class="footer">

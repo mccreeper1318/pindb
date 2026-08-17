@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install and update PinDB on 64-bit Windows 11.">
+  <title>Windows 11 Guide - PinDB</title>
+  <link rel="icon" href="assets/icon.png" type="image/png">
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="masthead">
+      <div class="brand">
+        <img class="brand-icon" src="assets/icon.png" alt="PinDB logo">
+        <div class="logo">PinDB<span class="blink">_</span></div>
+      </div>
+      <p class="tagline">A FLEXIBLE PERSONAL DATABASE FOR YOUR COMPUTER</p>
+    </header>
+    <nav class="navbar" aria-label="Main navigation">
+      <a href="index.html">HOME</a>
+      <a href="download.html" class="current">DOWNLOAD</a>
+      <a href="features.html">FEATURES</a>
+      <a href="gallery.html">GALLERY</a>
+      <a href="manual.html">USER GUIDE</a>
+      <a href="build.html">BUILD FROM SOURCE</a>
+      <a href="about.html">ABOUT</a>
+    </nav>
+    <main class="content">
+<div data-release-page></div>
+<h1>Windows 11 Installation Guide</h1>
+
+<p class="welcome">Windows support begins with PinDB 0.3 Beta 1 for 64-bit Windows 11.</p>
+
+<h2>Download status</h2>
+<div class="package-card windows">
+  <h3>PinDB 0.3 Beta 1 for Windows 11 x64</h3>
+  <span class="platform-badge windows">EXE</span>
+  <div class="download-links">
+    <a id="beta-exe" class="download-button windows unavailable" aria-disabled="true">Windows installer is temporarily unavailable</a>
+    <a id="beta-exe-checksum" class="small unavailable" aria-disabled="true">Checksum unavailable</a>
+  </div>
+  <p id="release-status" class="small">Checking the GitHub Release for the Windows installer...</p>
+</div>
+
+<h2>System requirements</h2>
+<ul>
+  <li>64-bit Windows 11 on an x64 processor.</li>
+  <li>Permission to install an application for your Windows user account.</li>
+  <li>No separate Java installation; the installer includes a private Java 25 runtime.</li>
+</ul>
+
+<h2>Before running the installer</h2>
+<p class="note"><b>The Windows installer is currently unsigned.</b> Windows cannot verify a named software publisher and may show an unknown-publisher or Microsoft Defender SmartScreen reputation warning. This does not by itself mean the file is malicious, but it removes the identity assurance supplied by a code-signing certificate.</p>
+<ol>
+  <li>Download the <code>.exe</code> and matching <code>.sha256</code> file only from the official <a href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.1">PinDB 0.3 Beta 1 GitHub Release</a>.</li>
+  <li>Open PowerShell in the download folder.</li>
+  <li>Run both commands below and confirm that the hexadecimal hashes match.</li>
+</ol>
+<pre>Get-FileHash .\PinDB-0.3-beta.1-windows-x64.exe -Algorithm SHA256
+Get-Content .\PinDB-0.3-beta.1-windows-x64.exe.sha256</pre>
+<p>If SmartScreen blocks the verified installer, review the file name and source, select <b>More info</b>, and choose <b>Run anyway</b> only if you are comfortable proceeding.</p>
+
+<h2>Install PinDB</h2>
+<ol>
+  <li>Run the verified <code>PinDB-0.3-beta.1-windows-x64.exe</code> installer.</li>
+  <li>Choose the installation folder and whether to create a desktop shortcut.</li>
+  <li>Complete the per-user installation.</li>
+  <li>Open PinDB from the Start Menu.</li>
+</ol>
+<p>The installer associates <code>.pindb</code> files with PinDB, allowing a database to be opened directly from File Explorer.</p>
+
+<h2>Application data</h2>
+<p>PinDB follows Windows application-data conventions. Configuration is kept under the user's roaming application-data location referenced by <code>%APPDATA%</code>. State, caches, and downloaded update files use the local application-data location referenced by <code>%LOCALAPPDATA%</code>. Your database files remain wherever you choose to save them.</p>
+
+<h2>Updates on Windows</h2>
+<p>When Windows preview updates are enabled, PinDB can find the matching Windows x64 <code>.exe</code>, download it to the local application cache, require and verify its published SHA-256 checksum, and launch the verified installer after approval. Windows updates do not use the Linux privileged-update helper.</p>
+
+<h2>Uninstall</h2>
+<ol>
+  <li>Open <b>Settings → Apps → Installed apps</b>.</li>
+  <li>Find <b>PinDB</b>.</li>
+  <li>Open its menu and select <b>Uninstall</b>.</li>
+</ol>
+<p>Uninstalling the application does not delete <code>.pindb</code> database files saved in your own folders. Keep an external backup of important databases.</p>
+
+<h2>Troubleshooting</h2>
+<dl>
+  <dt><b>The download button is unavailable.</b></dt><dd>The Windows installer asset has not yet been attached to the 0.3 Beta 1 release. Use the stable Linux packages if appropriate or check the GitHub Release again later.</dd>
+  <dt><b>Windows says the publisher is unknown.</b></dt><dd>The current installer is unsigned. Verify the SHA-256 checksum and confirm the download came from the official PinDB repository before deciding whether to continue.</dd>
+  <dt><b>A database does not open by double-clicking.</b></dt><dd>Start PinDB from the Start Menu and open the file from the launcher. Reinstalling can restore the <code>.pindb</code> file association.</dd>
+</dl>
+
+<p><a class="download-button windows" href="download.html">RETURN TO DOWNLOADS</a> <a class="download-button" href="https://github.com/mccreeper1318/pindb/issues">REPORT A WINDOWS PROBLEM</a></p>
+    </main>
+    <footer class="footer">
+      <div>PinDB Project &mdash; Hosted with simple HTML suitable for GitHub Pages.</div>
+      <div>Responsive on desktop, tablet, and mobile. JavaScript is optional except for live release links.</div>
+      <div>&copy; <span id="year">2026</span> PinDB Project &nbsp;|&nbsp; <a href="https://github.com/mccreeper1318/pindb">View Source on GitHub</a></div>
+    </footer>
+  </div>
+</body>
+</html>

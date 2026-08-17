@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Download PinDB for Debian and Fedora Linux.">
+  <meta name="description" content="Download PinDB for Windows 11, Debian, Ubuntu, Linux Mint, and Fedora.">
   <title>Download - PinDB</title>
   <link rel="icon" href="assets/icon.png" type="image/png">
   <link rel="stylesheet" href="assets/style.css">
@@ -31,47 +31,58 @@
 <div data-release-page></div>
 <h1>Download PinDB</h1>
 
-<p class="note"><b>Linux packages:</b> PinDB provides self-contained installers for 64-bit Debian-family and Fedora-family systems. Both include a private Java runtime.</p>
+<p class="note"><b>Self-contained installers:</b> PinDB provides 64-bit packages for Windows 11 and Debian-family and Fedora-family Linux systems. Every official package includes a private Java runtime.</p>
 
-<div class="release-panel">
-  <h2>Latest stable release: <span id="stable-version">checking GitHub...</span></h2>
+<div class="release-panel" id="stable-downloads">
+  <h2>Latest stable release: <span id="stable-version">0.2.1</span></h2>
+  <p>Recommended for normal Linux use. PinDB 0.2.1 is currently available as DEB and RPM packages.</p>
   <div class="package-grid">
     <div class="package-card debian">
       <h3>Debian / Ubuntu / Linux Mint</h3>
       <span class="platform-badge">DEB</span>
       <div class="download-links">
-        <a id="stable-deb" class="download-button primary" href="https://github.com/mccreeper1318/pindb/releases/latest">Download stable .deb</a>
-        <a id="stable-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/latest">View Debian checksum</a>
+        <a id="stable-deb" class="download-button primary" href="https://github.com/mccreeper1318/pindb/releases/download/0.2.1/pindb_0.2.1-1_amd64.deb">Download pindb_0.2.1-1_amd64.deb</a>
+        <a id="stable-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.2.1/pindb_0.2.1-1_amd64.deb.sha256">Checksum: pindb_0.2.1-1_amd64.deb.sha256</a>
       </div>
     </div>
     <div class="package-card fedora">
       <h3>Fedora Workstation and Spins</h3>
       <span class="platform-badge fedora">RPM</span>
       <div class="download-links">
-        <a id="stable-rpm" class="download-button fedora unavailable" aria-disabled="true">No stable Fedora RPM published yet</a>
-        <a id="stable-rpm-checksum" class="small unavailable" aria-disabled="true">Checksum unavailable</a>
+        <a id="stable-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases/download/0.2.1/pindb-0.2.1-1.x86_64.rpm">Download pindb-0.2.1-1.x86_64.rpm</a>
+        <a id="stable-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.2.1/pindb-0.2.1-1.x86_64.rpm.sha256">Checksum: pindb-0.2.1-1.x86_64.rpm.sha256</a>
       </div>
     </div>
   </div>
 </div>
 
-<div class="release-panel">
-  <h2>Latest beta release: <span id="beta-version">0.2-beta.4</span></h2>
+<div class="release-panel" id="beta-downloads">
+  <h2>Latest preview release: <span id="beta-version">0.3-beta.1</span></h2>
+  <p>PinDB 0.3 Beta 1 introduces Windows 11 x64 support. Preview builds are intended for testing and may contain unfinished behavior.</p>
   <div class="package-grid">
+    <div class="package-card windows">
+      <h3>Windows 11 x64</h3>
+      <span class="platform-badge windows">EXE</span>
+      <div class="download-links">
+        <a id="beta-exe" class="download-button windows unavailable" aria-disabled="true">Windows installer is temporarily unavailable</a>
+        <a id="beta-exe-checksum" class="small unavailable" aria-disabled="true">Checksum unavailable</a>
+      </div>
+      <p class="small">The Windows release job has not published its installer asset yet. This button will activate automatically when the file is attached to the release.</p>
+    </div>
     <div class="package-card debian">
       <h3>Debian / Ubuntu / Linux Mint</h3>
       <span class="platform-badge">DEB</span>
       <div class="download-links">
-        <a id="beta-deb" class="download-button" href="https://github.com/mccreeper1318/pindb/releases/download/0.2-beta.4/pindb_0.2-0.beta.4_amd64.deb">Download pindb_0.2-0.beta.4_amd64.deb</a>
-        <a id="beta-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.2-beta.4/pindb_0.2-0.beta.4_amd64.deb.sha256">Checksum: pindb_0.2-0.beta.4_amd64.deb.sha256</a>
+        <a id="beta-deb" class="download-button" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.1/pindb_0.3-0.beta.1_amd64.deb">Download pindb_0.3-0.beta.1_amd64.deb</a>
+        <a id="beta-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.1/pindb_0.3-0.beta.1_amd64.deb.sha256">Checksum: pindb_0.3-0.beta.1_amd64.deb.sha256</a>
       </div>
     </div>
     <div class="package-card fedora">
       <h3>Fedora Workstation and Spins</h3>
       <span class="platform-badge fedora">RPM</span>
       <div class="download-links">
-        <a id="beta-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases/download/0.2-beta.4/pindb-0.2-0.beta.4.x86_64.rpm">Download pindb-0.2-0.beta.4.x86_64.rpm</a>
-        <a id="beta-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.2-beta.4/pindb-0.2-0.beta.4.x86_64.rpm.sha256">Checksum: pindb-0.2-0.beta.4.x86_64.rpm.sha256</a>
+        <a id="beta-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.1/pindb-0.3-0.beta.1.x86_64.rpm">Download pindb-0.3-0.beta.1.x86_64.rpm</a>
+        <a id="beta-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.1/pindb-0.3-0.beta.1.x86_64.rpm.sha256">Checksum: pindb-0.3-0.beta.1.x86_64.rpm.sha256</a>
       </div>
     </div>
   </div>
@@ -81,6 +92,11 @@
 
 <h2 id="install-guides">Complete installation guides</h2>
 <div class="package-grid">
+  <div class="package-card windows">
+    <h3>Windows 11 guide</h3>
+    <p>System requirements, unsigned-installer warnings, checksum verification, updates, file locations, and uninstalling.</p>
+    <p><a class="download-button windows" href="windows.html">READ THE WINDOWS GUIDE</a></p>
+  </div>
   <div class="package-card debian">
     <h3>Debian-family guide</h3>
     <p>Installation, APT updates, checksum verification, uninstalling, and troubleshooting for Debian, Ubuntu, Linux Mint, and related distributions.</p>
@@ -92,6 +108,16 @@
     <p><a class="download-button fedora" href="fedora.html">READ THE FEDORA GUIDE</a></p>
   </div>
 </div>
+
+<h2 id="windows-downloads">Install on Windows 11</h2>
+<ol>
+  <li>Download the Windows x64 <code>.exe</code> and its matching <code>.sha256</code> file when they are available.</li>
+  <li>Verify the installer checksum as shown below.</li>
+  <li>Run the installer and choose the installation folder and shortcut options.</li>
+  <li>Launch <b>PinDB</b> from the Start Menu or open a <code>.pindb</code> file from File Explorer.</li>
+</ol>
+<p class="note"><b>Unsigned installer:</b> The 0.3 Beta 1 Windows installer is not code-signed. Windows may show an unknown-publisher or Microsoft Defender SmartScreen reputation warning. Only use the installer downloaded from the official PinDB GitHub Release, verify its SHA-256 checksum, and review the warning before choosing <b>More info → Run anyway</b>.</p>
+<p><a class="download-button windows" href="windows.html">READ THE COMPLETE WINDOWS GUIDE</a></p>
 
 <h2 id="debian-downloads">Install on Debian, Ubuntu, or Linux Mint</h2>
 <ol>
@@ -120,34 +146,40 @@
 <pre>sudo rpm-ostree install ./pindb-*.x86_64.rpm</pre>
 
 <h2>Automatic application updates</h2>
-<p>On supported traditional Linux installations, PinDB can select the correct package type for the current system, download the package, verify its SHA-256 checksum when supplied, request administrator approval, install it, restart, and display the release notes.</p>
+<p>PinDB can select the correct native package, download it, and verify its published SHA-256 checksum before starting the platform-specific update process.</p>
 <table class="status-table">
-  <tr><th>System</th><th>Automatic installer</th></tr>
-  <tr><td>Debian / Ubuntu / Linux Mint</td><td><code>apt-get</code> through <code>pkexec</code></td></tr>
-  <tr><td>Fedora Workstation and traditional spins</td><td><code>dnf5</code> or <code>dnf</code> through <code>pkexec</code></td></tr>
-  <tr><td>Fedora Atomic desktops</td><td>Manual <code>rpm-ostree</code> installation required</td></tr>
+  <tr><th>System</th><th>Update method</th></tr>
+  <tr><td>Windows 11 x64</td><td>Downloads and verifies the matching <code>.exe</code>, then launches the per-user installer after approval.</td></tr>
+  <tr><td>Debian / Ubuntu / Linux Mint</td><td>Installs the <code>.deb</code> with <code>apt-get</code> through the packaged privileged helper.</td></tr>
+  <tr><td>Fedora Workstation and traditional spins</td><td>Installs the <code>.rpm</code> with <code>dnf5</code> or <code>dnf</code> through the packaged privileged helper.</td></tr>
+  <tr><td>Fedora Atomic desktops</td><td>Manual <code>rpm-ostree</code> installation and reboot required.</td></tr>
 </table>
 
 <h2>Verify a download</h2>
-<p>Download the checksum file that matches the package. Run the command from the folder containing both files:</p>
+<p>Download the checksum file that matches the package and compare it before installation.</p>
+<p>Windows PowerShell:</p>
+<pre>Get-FileHash .\PinDB-0.3-beta.1-windows-x64.exe -Algorithm SHA256
+Get-Content .\PinDB-0.3-beta.1-windows-x64.exe.sha256</pre>
+<p>The hexadecimal values should match. Linux:</p>
 <pre>sha256sum -c downloaded-package.deb.sha256
 sha256sum -c downloaded-package.rpm.sha256</pre>
-<p>The check should report <code>OK</code> before installation.</p>
+<p>The Linux command should report <code>OK</code>.</p>
 
 <h2>Source archives</h2>
 <p>
-  <a class="download-button" href="https://github.com/mccreeper1318/pindb/archive/refs/heads/main.zip">Main branch ZIP</a>
-  <a class="download-button" href="https://github.com/mccreeper1318/pindb/archive/refs/heads/main.tar.gz">Main branch TAR.GZ</a>
+  <a class="download-button primary" href="https://github.com/mccreeper1318/pindb/archive/refs/tags/0.2.1.zip">0.2.1 stable source ZIP</a>
+  <a class="download-button windows" href="https://github.com/mccreeper1318/pindb/archive/refs/tags/0.3-beta.1.zip">0.3 Beta 1 source ZIP</a>
+  <a class="download-button" href="https://github.com/mccreeper1318/pindb">Browse repository</a>
 </p>
 
 <h2>Platform status</h2>
 <table class="status-table">
   <tr><th>Platform</th><th>Status</th></tr>
-  <tr><td>Linux Mint / Ubuntu / Debian x86-64</td><td>Official <code>.deb</code> package</td></tr>
-  <tr><td>Fedora Workstation / Fedora KDE / traditional Fedora spins x86-64</td><td>Official <code>.rpm</code> package beginning with 0.2 Beta 4</td></tr>
-  <tr><td>Fedora Silverblue / Kinoite / Atomic desktops</td><td>RPM can be layered manually with <code>rpm-ostree</code></td></tr>
-  <tr><td>Windows</td><td>Not currently released</td></tr>
-  <tr><td>macOS</td><td>Not currently released</td></tr>
+  <tr><td>Windows 11 x64</td><td>Preview support beginning with 0.3 Beta 1; unsigned <code>.exe</code> installer pending publication.</td></tr>
+  <tr><td>Linux Mint / Ubuntu / Debian x86-64</td><td>Official stable <code>.deb</code> package.</td></tr>
+  <tr><td>Fedora Workstation / Fedora KDE / traditional Fedora spins x86-64</td><td>Official stable <code>.rpm</code> package.</td></tr>
+  <tr><td>Fedora Silverblue / Kinoite / Atomic desktops</td><td>RPM can be layered manually with <code>rpm-ostree</code>.</td></tr>
+  <tr><td>macOS</td><td>Not currently released.</td></tr>
 </table>
     </main>
     <footer class="footer">

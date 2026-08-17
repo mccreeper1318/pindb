@@ -71,17 +71,21 @@
       setText(`${prefix}-version`, "not published");
       setPackageLink(`${prefix}-deb`, null, null, "Debian package", channelLabel);
       setPackageLink(`${prefix}-rpm`, null, null, "Fedora RPM", channelLabel);
+      setPackageLink(`${prefix}-exe`, null, null, "Windows installer", channelLabel);
       return;
     }
 
     const deb = choosePackage(release, ".deb");
     const rpm = choosePackage(release, ".rpm");
+    const exe = choosePackage(release, ".exe");
 
     setText(`${prefix}-version`, release.tag_name);
     setPackageLink(`${prefix}-deb`, release, deb, "Debian package", channelLabel);
     setChecksumLink(`${prefix}-deb-checksum`, release, deb, "Debian package");
     setPackageLink(`${prefix}-rpm`, release, rpm, "Fedora RPM", channelLabel);
     setChecksumLink(`${prefix}-rpm-checksum`, release, rpm, "Fedora RPM");
+    setPackageLink(`${prefix}-exe`, release, exe, "Windows installer", channelLabel);
+    setChecksumLink(`${prefix}-exe-checksum`, release, exe, "Windows installer");
   }
 
   async function loadReleases() {
@@ -100,11 +104,18 @@
       const beta = published.find(release => release.prerelease);
 
       fillRelease("stable", stable, "stable");
-      fillRelease("beta", beta, "beta");
+      fillRelease("beta", beta, "preview");
+      if (stable) setText("latest-stable-version", stable.tag_name);
+      if (beta) setText("latest-beta-version", beta.tag_name);
 
       const newest = published[0];
       if (newest) setText("latest-version", newest.tag_name);
-      setText("release-status", "GitHub release information loaded. Available package buttons download the files directly.");
+
+      const windowsPreview = choosePackage(beta, ".exe");
+      const status = beta && !windowsPreview
+        ? "GitHub release information loaded. The Windows preview installer has not been published yet; available Linux package buttons download directly."
+        : "GitHub release information loaded. Available package buttons download the files directly.";
+      setText("release-status", status);
     } catch (error) {
       setText("release-status", `Live release lookup is unavailable. Visit ${releasesUrl} for all packages.`);
     }
