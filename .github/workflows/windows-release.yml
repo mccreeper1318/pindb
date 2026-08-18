@@ -49,13 +49,22 @@ jobs:
 
       - name: Build and test Windows installer
         shell: pwsh
-        run: .\gradlew.bat --no-daemon clean test packageWindows -PappVersion="${{ steps.version.outputs.version }}"
+        run: |
+          .\gradlew.bat --no-daemon clean test packageWindows -PappVersion="${{ steps.version.outputs.version }}"
+          if (-not (Test-Path 'build\packages')) {
+            throw 'packageWindows completed without creating build\packages. The Windows packaging task was skipped or did not run.'
+          }
+          $built = @(Get-ChildItem 'build\packages' -Filter '*.exe' -File)
+          if ($built.Count -eq 0) {
+            Get-ChildItem 'build' -Recurse | Select-Object FullName, Length
+            throw 'packageWindows completed without producing an EXE installer.'
+          }
 
       - name: Normalize and verify installer
         id: package
         shell: pwsh
         run: |
-          $packages = @(Get-ChildItem build\packages\*.exe)
+          $packages = @(Get-ChildItem 'build\packages' -Filter '*.exe' -File)
           if ($packages.Count -ne 1) { throw "Expected exactly one Windows EXE installer; found $($packages.Count)." }
           $target = Join-Path $packages[0].DirectoryName "PinDB-${{ steps.version.outputs.version }}-windows-x64.exe"
           Move-Item $packages[0].FullName $target -Force
