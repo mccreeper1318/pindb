@@ -11,10 +11,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipal;
+import java.nio.file.attribute.UserPrincipalLookupService;
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -97,8 +105,7 @@ final class GitHubCredentialStore {
             return "";
         }
         try {
-            // Harden fallback files created by older PinDB versions before reading token data.
-            Files.setPosixFilePermissions(FALLBACK_FILE, OWNER_ONLY_PERMISSIONS);
+            secureOwnerOnly(FALLBACK_FILE);
             return Files.readString(FALLBACK_FILE, StandardCharsets.UTF_8);
         } catch (UnsupportedOperationException | IOException exception) {
             // If owner-only permissions cannot be guaranteed, do not read credentials from this fallback.
@@ -135,8 +142,13 @@ final class GitHubCredentialStore {
 
         Path temporary;
         try {
-            temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp",
-                    PosixFilePermissions.asFileAttribute(OWNER_ONLY_PERMISSIONS));
+            if (isWindows()) {
+                temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp");
+                secureOwnerOnly(temporary);
+            } else {
+                temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp",
+                        PosixFilePermissions.asFileAttribute(OWNER_ONLY_PERMISSIONS));
+            }
         } catch (UnsupportedOperationException exception) {
             throw new IOException("This filesystem cannot create the GitHub credential fallback with owner-only permissions.",
                     exception);
@@ -145,17 +157,40 @@ final class GitHubCredentialStore {
         try {
             Files.writeString(temporary, json, StandardCharsets.UTF_8,
                     StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
-            Files.setPosixFilePermissions(temporary, OWNER_ONLY_PERMISSIONS);
+            secureOwnerOnly(temporary);
             try {
                 Files.move(temporary, destination,
                         StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException exception) {
                 Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
             }
-            Files.setPosixFilePermissions(destination, OWNER_ONLY_PERMISSIONS);
+            secureOwnerOnly(destination);
         } finally {
             Files.deleteIfExists(temporary);
         }
+    }
+
+    private static void secureOwnerOnly(Path path) throws IOException {
+        if (isWindows()) {
+            AclFileAttributeView view = Files.getFileAttributeView(path, AclFileAttributeView.class);
+            if (view == null) {
+                throw new IOException("The filesystem does not expose Windows ACLs for the GitHub credential fallback.");
+            }
+            UserPrincipal owner = Files.getOwner(path);
+            Set<AclEntryPermission> permissions = EnumSet.allOf(AclEntryPermission.class);
+            AclEntry entry = AclEntry.newBuilder()
+                    .setType(AclEntryType.ALLOW)
+                    .setPrincipal(owner)
+                    .setPermissions(permissions)
+                    .build();
+            view.setAcl(List.of(entry));
+            return;
+        }
+        Files.setPosixFilePermissions(path, OWNER_ONLY_PERMISSIONS);
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
     private static long longValue(Object value) {
