@@ -33,7 +33,7 @@
 <h2>1. Install PinDB</h2>
 <p>Choose the package that matches your computer:</p>
 <ul>
-  <li><code>.exe</code> for 64-bit Windows 11, beginning with the 0.3 Beta 1 preview.</li>
+  <li><code>.exe</code> for 64-bit Windows 11 using the current 0.3 Beta 3 preview.</li>
   <li><code>.deb</code> for Linux Mint, Ubuntu, Debian, and related systems.</li>
   <li><code>.rpm</code> for Fedora Workstation, Fedora KDE, and traditional Fedora spins.</li>
 </ul>
@@ -63,6 +63,7 @@
 <h2>7. Update PinDB</h2>
 <p>PinDB checks GitHub Releases for newer versions. Stable releases are selected by default; preview updates can be enabled in Settings.</p>
 <p>PinDB selects the native package for the current operating system and architecture and verifies the matching published SHA-256 checksum before installation.</p>
+<p>Windows preview releases also include hardened installer verification. If in-app bug reporting needs fallback GitHub credential storage, Beta 3 restricts that file to its owner using Windows ACLs or Linux POSIX permissions.</p>
 <table class="status-table">
   <tr><th>System</th><th>Update method</th></tr>
   <tr><td>Windows 11 x64</td><td>Downloads and verifies the matching <code>.exe</code>, then launches the per-user installer after approval.</td></tr>

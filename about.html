@@ -38,14 +38,14 @@
     <h2>Windows and Linux support</h2>
     <p>PinDB provides self-contained native packages for three supported platform families:</p>
     <ul>
-      <li><code>.exe</code> for 64-bit Windows 11, beginning with the 0.3 Beta 1 preview.</li>
+      <li><code>.exe</code> for 64-bit Windows 11 using the current 0.3 Beta 3 preview.</li>
       <li><code>.deb</code> for Linux Mint, Ubuntu, Debian, and related systems.</li>
       <li><code>.rpm</code> for Fedora Workstation, Fedora KDE, and traditional Fedora spins.</li>
     </ul>
     <p>Every official package includes a private Java runtime. Databases use the same portable <code>.pindb</code> format across supported systems.</p>
 
     <h2>Windows preview</h2>
-    <p>The Windows 11 package installs per-user and provides Start Menu integration, optional desktop shortcuts, installation-folder selection, and <code>.pindb</code> file associations. The current installer is unsigned, so Windows may display an unknown-publisher or SmartScreen reputation warning.</p>
+    <p>The Windows 11 package installs per-user and provides Start Menu integration, optional desktop shortcuts, installation-folder selection, and <code>.pindb</code> file associations. Beta 2 hardens installer generation and verification, while Beta 3 fixes Windows test compatibility and protects fallback GitHub credentials with owner-only Windows ACLs. The current installer is unsigned, so Windows may display an unknown-publisher or SmartScreen reputation warning.</p>
 
     <h2>Fedora Atomic desktops</h2>
     <p>Silverblue, Kinoite, and other Atomic desktops can layer the RPM manually with <code>rpm-ostree</code>. PinDB does not attempt to run its normal DNF automatic installer on those immutable systems.</p>

@@ -57,38 +57,61 @@
 </div>
 
 <div class="release-panel" id="beta-downloads">
-  <h2>Latest preview release: <span id="beta-version">0.3-beta.1</span></h2>
-  <p>PinDB 0.3 Beta 1 introduces Windows 11 x64 support. Preview builds are intended for testing and may contain unfinished behavior.</p>
+  <h2>Latest preview release: <span id="beta-version">0.3-beta.3</span></h2>
+  <p>PinDB 0.3 Beta 3 improves Windows 11 x64 compatibility, secures fallback GitHub credentials with owner-only Windows ACLs, and includes Beta 2's installer-packaging and verification fixes. Preview builds are intended for testing and may contain unfinished behavior.</p>
   <div class="package-grid">
     <div class="package-card windows">
       <h3>Windows 11 x64</h3>
       <span class="platform-badge windows">EXE</span>
       <div class="download-links">
-        <a id="beta-exe" class="download-button windows unavailable" aria-disabled="true">Windows installer is temporarily unavailable</a>
-        <a id="beta-exe-checksum" class="small unavailable" aria-disabled="true">Checksum unavailable</a>
+        <a id="beta-exe" class="download-button windows" href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.3">View Windows installer on GitHub</a>
+        <a id="beta-exe-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.3">View Windows SHA-256 checksum</a>
       </div>
-      <p class="small">The Windows release job has not published its installer asset yet. This button will activate automatically when the file is attached to the release.</p>
+      <p class="small">The download button automatically points to the matching Windows installer and checksum whenever those assets are published.</p>
     </div>
     <div class="package-card debian">
       <h3>Debian / Ubuntu / Linux Mint</h3>
       <span class="platform-badge">DEB</span>
       <div class="download-links">
-        <a id="beta-deb" class="download-button" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.1/pindb_0.3-0.beta.1_amd64.deb">Download pindb_0.3-0.beta.1_amd64.deb</a>
-        <a id="beta-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.1/pindb_0.3-0.beta.1_amd64.deb.sha256">Checksum: pindb_0.3-0.beta.1_amd64.deb.sha256</a>
+        <a id="beta-deb" class="download-button" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.3/pindb_0.3-0.beta.3_amd64.deb">Download pindb_0.3-0.beta.3_amd64.deb</a>
+        <a id="beta-deb-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.3/pindb_0.3-0.beta.3_amd64.deb.sha256">Checksum: pindb_0.3-0.beta.3_amd64.deb.sha256</a>
       </div>
     </div>
     <div class="package-card fedora">
       <h3>Fedora Workstation and Spins</h3>
       <span class="platform-badge fedora">RPM</span>
       <div class="download-links">
-        <a id="beta-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.1/pindb-0.3-0.beta.1.x86_64.rpm">Download pindb-0.3-0.beta.1.x86_64.rpm</a>
-        <a id="beta-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.1/pindb-0.3-0.beta.1.x86_64.rpm.sha256">Checksum: pindb-0.3-0.beta.1.x86_64.rpm.sha256</a>
+        <a id="beta-rpm" class="download-button fedora" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.3/pindb-0.3-0.beta.3.x86_64.rpm">Download pindb-0.3-0.beta.3.x86_64.rpm</a>
+        <a id="beta-rpm-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.3/pindb-0.3-0.beta.3.x86_64.rpm.sha256">Checksum: pindb-0.3-0.beta.3.x86_64.rpm.sha256</a>
       </div>
     </div>
   </div>
 </div>
 
 <p id="release-status" class="small">Looking up current release assets...</p>
+
+<h2>What's new in the 0.3 previews</h2>
+<div class="package-grid">
+  <div class="package-card windows">
+    <h3>0.3 Beta 3: Windows compatibility and credential safety</h3>
+    <ul>
+      <li>Runs Linux-only privileged updater tests only on Linux.</li>
+      <li>Prevents Linux-path updater assertions from failing Windows builds.</li>
+      <li>Protects fallback GitHub credentials with owner-only Windows ACLs.</li>
+      <li>Tests secure credential storage on both Windows and Linux.</li>
+    </ul>
+    <p><a href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.3">Read the Beta 3 release notes.</a></p>
+  </div>
+  <div class="package-card fedora">
+    <h3>0.3 Beta 2: Windows installer packaging</h3>
+    <ul>
+      <li>Fixes the Windows installer packaging task.</li>
+      <li>Verifies that packaging actually creates a nonempty Windows installer.</li>
+      <li>Hardens Windows release-build validation before upload.</li>
+    </ul>
+    <p><a href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.2">Read the Beta 2 release notes.</a></p>
+  </div>
+</div>
 
 <h2 id="install-guides">Complete installation guides</h2>
 <div class="package-grid">
@@ -116,7 +139,7 @@
   <li>Run the installer and choose the installation folder and shortcut options.</li>
   <li>Launch <b>PinDB</b> from the Start Menu or open a <code>.pindb</code> file from File Explorer.</li>
 </ol>
-<p class="note"><b>Unsigned installer:</b> The 0.3 Beta 1 Windows installer is not code-signed. Windows may show an unknown-publisher or Microsoft Defender SmartScreen reputation warning. Only use the installer downloaded from the official PinDB GitHub Release, verify its SHA-256 checksum, and review the warning before choosing <b>More info → Run anyway</b>.</p>
+<p class="note"><b>Unsigned installer:</b> The Windows preview installer is not code-signed. Windows may show an unknown-publisher or Microsoft Defender SmartScreen reputation warning. Only use the installer downloaded from the official PinDB GitHub Release, verify its SHA-256 checksum, and review the warning before choosing <b>More info → Run anyway</b>.</p>
 <p><a class="download-button windows" href="windows.html">READ THE COMPLETE WINDOWS GUIDE</a></p>
 
 <h2 id="debian-downloads">Install on Debian, Ubuntu, or Linux Mint</h2>
@@ -158,8 +181,8 @@
 <h2>Verify a download</h2>
 <p>Download the checksum file that matches the package and compare it before installation.</p>
 <p>Windows PowerShell:</p>
-<pre>Get-FileHash .\PinDB-0.3-beta.1-windows-x64.exe -Algorithm SHA256
-Get-Content .\PinDB-0.3-beta.1-windows-x64.exe.sha256</pre>
+<pre>Get-FileHash .\PinDB-0.3-beta.3-windows-x64.exe -Algorithm SHA256
+Get-Content .\PinDB-0.3-beta.3-windows-x64.exe.sha256</pre>
 <p>The hexadecimal values should match. Linux:</p>
 <pre>sha256sum -c downloaded-package.deb.sha256
 sha256sum -c downloaded-package.rpm.sha256</pre>
@@ -168,14 +191,14 @@ sha256sum -c downloaded-package.rpm.sha256</pre>
 <h2>Source archives</h2>
 <p>
   <a class="download-button primary" href="https://github.com/mccreeper1318/pindb/archive/refs/tags/0.2.1.zip">0.2.1 stable source ZIP</a>
-  <a class="download-button windows" href="https://github.com/mccreeper1318/pindb/archive/refs/tags/0.3-beta.1.zip">0.3 Beta 1 source ZIP</a>
+  <a class="download-button windows" href="https://github.com/mccreeper1318/pindb/archive/refs/tags/0.3-beta.3.zip">0.3 Beta 3 source ZIP</a>
   <a class="download-button" href="https://github.com/mccreeper1318/pindb">Browse repository</a>
 </p>
 
 <h2>Platform status</h2>
 <table class="status-table">
   <tr><th>Platform</th><th>Status</th></tr>
-  <tr><td>Windows 11 x64</td><td>Preview support beginning with 0.3 Beta 1; unsigned <code>.exe</code> installer pending publication.</td></tr>
+  <tr><td>Windows 11 x64</td><td>0.3 Beta 3 preview with an unsigned <code>.exe</code> installer, hardened package verification, and owner-only credential ACLs.</td></tr>
   <tr><td>Linux Mint / Ubuntu / Debian x86-64</td><td>Official stable <code>.deb</code> package.</td></tr>
   <tr><td>Fedora Workstation / Fedora KDE / traditional Fedora spins x86-64</td><td>Official stable <code>.rpm</code> package.</td></tr>
   <tr><td>Fedora Silverblue / Kinoite / Atomic desktops</td><td>RPM can be layered manually with <code>rpm-ostree</code>.</td></tr>

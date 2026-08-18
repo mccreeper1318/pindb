@@ -63,21 +63,22 @@ git switch --detach 0.2.1</pre>
 
 <h2>Run from source</h2>
 <p>Linux:</p>
-<pre>./gradlew run -PappVersion=0.3-beta.1</pre>
+<pre>./gradlew run -PappVersion=0.3-beta.3</pre>
 <p>Windows PowerShell:</p>
-<pre>.\gradlew.bat run -PappVersion=0.3-beta.1</pre>
+<pre>.\gradlew.bat run -PappVersion=0.3-beta.3</pre>
 
 <h2>Build the Windows installer</h2>
 <p>On Windows x64 with WiX installed:</p>
-<pre>.\gradlew.bat clean test packageWindows -PappVersion=0.3-beta.1</pre>
+<pre>.\gradlew.bat clean test packageWindows -PappVersion=0.3-beta.3</pre>
+<p>Beginning with 0.3 Beta 2, the release workflow verifies that this task creates exactly one nonempty Windows installer. Beta 3 keeps Linux-only updater tests and Linux path assertions from breaking Windows builds.</p>
 
 <h2>Build the Debian package</h2>
-<pre>./gradlew clean test packageDeb -PappVersion=0.3-beta.1</pre>
+<pre>./gradlew clean test packageDeb -PappVersion=0.3-beta.3</pre>
 
 <h2>Build the Fedora RPM</h2>
 <p>On Fedora, install the native RPM packaging tools first:</p>
 <pre>sudo dnf install rpm-build desktop-file-utils cpio
-./gradlew clean test packageRpm -PappVersion=0.3-beta.1</pre>
+./gradlew clean test packageRpm -PappVersion=0.3-beta.3</pre>
 
 <p>Every package task writes its self-contained installer to:</p>
 <pre>build/packages/</pre>
@@ -91,6 +92,8 @@ rpm -qpl build/packages/*.rpm</pre>
 <p>The GitHub Actions workflows test and package each native format independently:</p>
 <ul>
   <li>The Windows x64 <code>.exe</code> is built on Windows with Java 25 and WiX.</li>
+  <li>Windows packaging must produce exactly one nonempty installer before it is uploaded.</li>
+  <li>Linux-only updater tests run only on Linux; credential-security tests verify native Windows ACLs or Linux POSIX permissions.</li>
   <li>The Debian package is built on Ubuntu with Java 25.</li>
   <li>The RPM is built inside Fedora with Temurin Java 25.</li>
   <li>Package metadata, launchers, icons, and file associations are checked before release.</li>

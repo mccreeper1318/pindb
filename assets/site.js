@@ -113,7 +113,7 @@
 
       const windowsPreview = choosePackage(beta, ".exe");
       const status = beta && !windowsPreview
-        ? "GitHub release information loaded. The Windows preview installer has not been published yet; available Linux package buttons download directly."
+        ? "GitHub release information loaded. The latest preview does not currently include a Windows installer; available Linux package buttons download directly."
         : "GitHub release information loaded. Available package buttons download the files directly.";
       setText("release-status", status);
     } catch (error) {

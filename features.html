@@ -72,7 +72,7 @@
 <div class="package-grid">
   <div class="package-card windows">
     <h3>Windows 11</h3>
-    <p>Self-contained, per-user <code>.exe</code> installer for Windows 11 x64 beginning with 0.3 Beta 1.</p>
+    <p>Self-contained, per-user <code>.exe</code> installer for Windows 11 x64, with packaging and verification improvements in 0.3 Beta 2 and Beta 3.</p>
     <p>Includes Start Menu integration, optional desktop shortcuts, install-directory selection, and <code>.pindb</code> file associations.</p>
   </div>
   <div class="package-card debian">
@@ -88,10 +88,14 @@
 </div>
 <p>Every official package includes a private Java runtime, an application launcher, the PinDB icon, and a <code>.pindb</code> file association.</p>
 
+<h2>GitHub authorization and credential privacy</h2>
+<p>The in-app bug reporter can store GitHub authorization securely when a system credential service is unavailable. PinDB 0.3 Beta 3 protects fallback credential files with owner-only Windows access-control lists on Windows and owner-only POSIX permissions on Linux.</p>
+
 <h2>Update safety</h2>
 <ul>
   <li>Selects the native package type and architecture that match the current system.</li>
   <li>Requires a matching published SHA-256 checksum before automatic installation.</li>
+  <li>Verifies that Windows release packaging creates a valid installer before it can be uploaded.</li>
   <li>On Windows, launches the verified per-user installer only after approval.</li>
   <li>On traditional Linux systems, passes a securely staged package to the fixed privileged helper.</li>
   <li>Restarts PinDB and preserves release notes after a successful Linux update.</li>
