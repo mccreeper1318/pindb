@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3-beta.2
+
+### Fixed
+- Fix for windows installer package task
+- Harden windows installer verification
+
 ## 0.3-beta.1
 
 ### Added
