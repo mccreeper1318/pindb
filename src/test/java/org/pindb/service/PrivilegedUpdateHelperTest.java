@@ -1,6 +1,8 @@
 package org.pindb.service;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import org.pindb.platform.LinuxPackageType;
 
@@ -17,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@EnabledOnOs(OS.LINUX)
 class PrivilegedUpdateHelperTest {
     @TempDir
     Path temporaryDirectory;
