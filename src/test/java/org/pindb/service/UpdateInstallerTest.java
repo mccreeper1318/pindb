@@ -1,6 +1,8 @@
 package org.pindb.service;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.pindb.platform.LinuxDistribution;
 import org.pindb.platform.LinuxPackageType;
 
@@ -43,12 +45,14 @@ class UpdateInstallerTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void includesActualJpackageLauncherLocation() {
         assertTrue(UpdateInstaller.installedLauncherCandidates().stream()
                 .anyMatch(path -> path.toString().equals("/opt/pindb/pindb/bin/PinDB")));
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void includesPackagedRootOwnedUpdateHelperLocation() {
         assertTrue(UpdateInstaller.installedUpdateHelperCandidates().stream()
                 .anyMatch(path -> path.toString().equals(
@@ -56,6 +60,7 @@ class UpdateInstallerTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void privilegedCommandExecutesOnlyPackagedHelper() {
         List<String> command = UpdateInstaller.privilegedInstallCommand(
                 Path.of("/usr/bin/pkexec"),
@@ -73,12 +78,14 @@ class UpdateInstallerTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void includesDnf5AndDnfCandidatesForRpmUpdates() {
         assertEquals(List.of(Path.of("/usr/bin/dnf5"), Path.of("/usr/bin/dnf")),
                 UpdateInstaller.packageManagerCandidates(LinuxPackageType.RPM));
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void buildsFedoraManualInstallCommand() {
         LinuxDistribution fedora = LinuxDistribution.detect("Linux", "ID=fedora\nID_LIKE=\"rhel fedora\"\n");
         assertTrue(UpdateInstaller.manualInstallCommand(
@@ -87,6 +94,7 @@ class UpdateInstallerTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void buildsRestartCommandWithoutLosingPrereleaseTagOrNotesPath() {
         assertEquals(List.of(
                         "/opt/pindb/pindb/bin/PinDB",
