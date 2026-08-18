@@ -110,11 +110,15 @@ tasks.register('packageRpm', org.gradle.api.tasks.Exec) {
 tasks.register('packageWindows', org.gradle.api.tasks.Exec) {
     group = 'distribution'; description = 'Builds a self-contained per-user Windows EXE installer with jpackage.'
     dependsOn tasks.installDist
-    onlyIf { osName.contains('windows') }
     def packagesDir = layout.buildDirectory.dir('packages').get().asFile
     def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
     def associations = file('packaging/pindb-file-associations.properties')
-    doFirst { preparePackageDirectory(packagesDir, '.exe') }
+    doFirst {
+        if (!osName.contains('windows')) {
+            throw new GradleException("packageWindows must run on Windows; detected os.name=${System.getProperty('os.name')}")
+        }
+        preparePackageDirectory(packagesDir, '.exe')
+    }
     commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', packageAppVersion, '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--win-menu', '--win-menu-group', 'PinDB', '--win-dir-chooser', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
 }
 
