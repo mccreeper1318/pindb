@@ -72,7 +72,7 @@
 <div class="package-grid">
   <div class="package-card windows">
     <h3>Windows 11</h3>
-    <p>Self-contained, per-user <code>.exe</code> installer for Windows 11 x64, with packaging and verification improvements in 0.3 Beta 2 and Beta 3.</p>
+    <p>Self-contained, per-user <code>.exe</code> installer for Windows 11 x64, with packaging, verification, and credential-security improvements through 0.3 Beta 4.</p>
     <p>Includes Start Menu integration, optional desktop shortcuts, install-directory selection, and <code>.pindb</code> file associations.</p>
   </div>
   <div class="package-card debian">
@@ -89,7 +89,7 @@
 <p>Every official package includes a private Java runtime, an application launcher, the PinDB icon, and a <code>.pindb</code> file association.</p>
 
 <h2>GitHub authorization and credential privacy</h2>
-<p>The in-app bug reporter can store GitHub authorization securely when a system credential service is unavailable. PinDB 0.3 Beta 3 protects fallback credential files with owner-only Windows access-control lists on Windows and owner-only POSIX permissions on Linux.</p>
+<p>The in-app bug reporter can store GitHub authorization securely when a system credential service is unavailable. Beta 3 added owner-only Windows access-control lists for fallback credentials, and Beta 4 hardens temporary credential staging so inherited ACL access is removed before credential data is written.</p>
 
 <h2>Update safety</h2>
 <ul>
