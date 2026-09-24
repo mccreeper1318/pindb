@@ -15,6 +15,7 @@ import java.nio.file.attribute.AclEntry;
 import java.nio.file.attribute.AclEntryPermission;
 import java.nio.file.attribute.AclEntryType;
 import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.UserPrincipal;
@@ -142,13 +143,7 @@ final class GitHubCredentialStore {
 
         Path temporary;
         try {
-            if (isWindows()) {
-                temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp");
-                secureOwnerOnly(temporary);
-            } else {
-                temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp",
-                        PosixFilePermissions.asFileAttribute(OWNER_ONLY_PERMISSIONS));
-            }
+            temporary = createSecureTemporaryFile(parent);
         } catch (UnsupportedOperationException exception) {
             throw new IOException("This filesystem cannot create the GitHub credential fallback with owner-only permissions.",
                     exception);
@@ -170,23 +165,51 @@ final class GitHubCredentialStore {
         }
     }
 
+    static Path createSecureTemporaryFile(Path parent) throws IOException {
+        if (isWindows()) {
+            UserPrincipalLookupService lookupService = parent.getFileSystem().getUserPrincipalLookupService();
+            String userName = System.getProperty("user.name", "");
+            if (userName.isBlank()) {
+                throw new IOException("The current Windows user could not be identified for credential-file ACLs.");
+            }
+            UserPrincipal owner = lookupService.lookupPrincipalByName(userName);
+            List<AclEntry> acl = ownerOnlyAcl(owner);
+            FileAttribute<List<AclEntry>> aclAttribute = new FileAttribute<>() {
+                @Override
+                public String name() {
+                    return "acl:acl";
+                }
+
+                @Override
+                public List<AclEntry> value() {
+                    return acl;
+                }
+            };
+            return Files.createTempFile(parent, ".github-authorization-", ".tmp", aclAttribute);
+        }
+        return Files.createTempFile(parent, ".github-authorization-", ".tmp",
+                PosixFilePermissions.asFileAttribute(OWNER_ONLY_PERMISSIONS));
+    }
+
     private static void secureOwnerOnly(Path path) throws IOException {
         if (isWindows()) {
             AclFileAttributeView view = Files.getFileAttributeView(path, AclFileAttributeView.class);
             if (view == null) {
                 throw new IOException("The filesystem does not expose Windows ACLs for the GitHub credential fallback.");
             }
-            UserPrincipal owner = Files.getOwner(path);
-            Set<AclEntryPermission> permissions = EnumSet.allOf(AclEntryPermission.class);
-            AclEntry entry = AclEntry.newBuilder()
-                    .setType(AclEntryType.ALLOW)
-                    .setPrincipal(owner)
-                    .setPermissions(permissions)
-                    .build();
-            view.setAcl(List.of(entry));
+            view.setAcl(ownerOnlyAcl(Files.getOwner(path)));
             return;
         }
         Files.setPosixFilePermissions(path, OWNER_ONLY_PERMISSIONS);
+    }
+
+    private static List<AclEntry> ownerOnlyAcl(UserPrincipal owner) {
+        AclEntry entry = AclEntry.newBuilder()
+                .setType(AclEntryType.ALLOW)
+                .setPrincipal(owner)
+                .setPermissions(EnumSet.allOf(AclEntryPermission.class))
+                .build();
+        return List.of(entry);
     }
 
     private static boolean isWindows() {
