@@ -31,15 +31,15 @@
 <div data-release-page></div>
 <h1>Windows 11 Installation Guide</h1>
 
-<p class="welcome">PinDB 0.3 Beta 3 is the current preview for 64-bit Windows 11.</p>
+<p class="welcome">PinDB 0.3 Beta 4 is the current preview for 64-bit Windows 11.</p>
 
 <h2>Download status</h2>
 <div class="package-card windows">
-  <h3>PinDB 0.3 Beta 3 for Windows 11 x64</h3>
+  <h3>PinDB 0.3 Beta 4 for Windows 11 x64</h3>
   <span class="platform-badge windows">EXE</span>
   <div class="download-links">
-    <a id="beta-exe" class="download-button windows" href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.3">View Windows installer on GitHub</a>
-    <a id="beta-exe-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.3">View Windows SHA-256 checksum</a>
+    <a id="beta-exe" class="download-button windows" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.4/PinDB-0.3-beta.4-windows-x64.exe">Download PinDB-0.3-beta.4-windows-x64.exe</a>
+    <a id="beta-exe-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases/download/0.3-beta.4/PinDB-0.3-beta.4-windows-x64.exe.sha256">Checksum: PinDB-0.3-beta.4-windows-x64.exe.sha256</a>
   </div>
   <p id="release-status" class="small">Checking the GitHub Release for the Windows installer...</p>
 </div>
@@ -54,17 +54,17 @@
 <h2>Before running the installer</h2>
 <p class="note"><b>The Windows installer is currently unsigned.</b> Windows cannot verify a named software publisher and may show an unknown-publisher or Microsoft Defender SmartScreen reputation warning. This does not by itself mean the file is malicious, but it removes the identity assurance supplied by a code-signing certificate.</p>
 <ol>
-  <li>Download the <code>.exe</code> and matching <code>.sha256</code> file only from the official <a href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.3">PinDB 0.3 Beta 3 GitHub Release</a>.</li>
+  <li>Download the <code>.exe</code> and matching <code>.sha256</code> file only from the official <a href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.4">PinDB 0.3 Beta 4 GitHub Release</a>.</li>
   <li>Open PowerShell in the download folder.</li>
   <li>Run both commands below and confirm that the hexadecimal hashes match.</li>
 </ol>
-<pre>Get-FileHash .\PinDB-0.3-beta.3-windows-x64.exe -Algorithm SHA256
-Get-Content .\PinDB-0.3-beta.3-windows-x64.exe.sha256</pre>
+<pre>Get-FileHash .\PinDB-0.3-beta.4-windows-x64.exe -Algorithm SHA256
+Get-Content .\PinDB-0.3-beta.4-windows-x64.exe.sha256</pre>
 <p>If SmartScreen blocks the verified installer, review the file name and source, select <b>More info</b>, and choose <b>Run anyway</b> only if you are comfortable proceeding.</p>
 
 <h2>Install PinDB</h2>
 <ol>
-  <li>Run the verified <code>PinDB-0.3-beta.3-windows-x64.exe</code> installer.</li>
+  <li>Run the verified <code>PinDB-0.3-beta.4-windows-x64.exe</code> installer.</li>
   <li>Choose the installation folder and whether to create a desktop shortcut.</li>
   <li>Complete the per-user installation.</li>
   <li>Open PinDB from the Start Menu.</li>
@@ -75,7 +75,7 @@ Get-Content .\PinDB-0.3-beta.3-windows-x64.exe.sha256</pre>
 <p>PinDB follows Windows application-data conventions. Configuration is kept under the user's roaming application-data location referenced by <code>%APPDATA%</code>. State, caches, and downloaded update files use the local application-data location referenced by <code>%LOCALAPPDATA%</code>. Your database files remain wherever you choose to save them.</p>
 
 <h2>GitHub authorization and credential security</h2>
-<p>PinDB's in-app bug reporter can authorize a GitHub account. Beginning with 0.3 Beta 3, the fallback credential file uses Windows access-control lists that grant access only to its owner, instead of relying on Linux-only POSIX file permissions. Linux builds continue to enforce owner-only POSIX permissions.</p>
+<p>PinDB's in-app bug reporter can authorize a GitHub account. Beta 3 introduced owner-only Windows access-control lists for the fallback credential file. Beta 4 further hardens that path by creating credential temp files inside an owner-only staging directory with inherited ACL access removed before any credential data is written.</p>
 
 <h2>Updates on Windows</h2>
 <p>When Windows preview updates are enabled, PinDB can find the matching Windows x64 <code>.exe</code>, download it to the local application cache, require and verify its published SHA-256 checksum, and launch the verified installer after approval. Windows updates do not use the Linux privileged-update helper.</p>
