@@ -15,6 +15,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class GitHubCredentialStoreTest {
     @TempDir
@@ -35,17 +36,29 @@ class GitHubCredentialStoreTest {
         Path parent = tempDirectory.resolve("config");
         Files.createDirectories(parent);
 
-        Path temporary = GitHubCredentialStore.createSecureTemporaryFile(parent);
-        try {
-            assertOwnerOnly(temporary);
-        } finally {
-            Files.deleteIfExists(temporary);
+        Path temporaryPath;
+        Path stagingDirectory;
+        try (GitHubCredentialStore.SecureTemporaryFile temporary =
+                     GitHubCredentialStore.createSecureTemporaryFile(parent)) {
+            temporaryPath = temporary.path();
+            stagingDirectory = temporary.directory();
+            assertOwnerOnly(temporaryPath);
+            if (isWindows()) {
+                assertNotNull(stagingDirectory);
+                assertOwnerOnly(stagingDirectory);
+            }
+        }
+
+        assertFalse(Files.exists(temporaryPath));
+        if (isWindows()) {
+            assertFalse(Files.exists(stagingDirectory));
         }
     }
 
     private static void assertOwnerOnly(Path path) throws IOException {
         if (isWindows()) {
             AclFileAttributeView view = Files.getFileAttributeView(path, AclFileAttributeView.class);
+            assertNotNull(view);
             assertFalse(view.getAcl().isEmpty());
             for (AclEntry entry : view.getAcl()) {
                 assertEquals(Files.getOwner(path), entry.principal());
