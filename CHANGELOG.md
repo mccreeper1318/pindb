@@ -6,7 +6,8 @@
 - Fixed the Windows build test suite failing on Linux-only privileged updater tests by restricting those tests to Linux runners.
 - Fixed Linux-path assertions in updater regression tests running on Windows.
 - Added Windows ACL support for the fallback GitHub credential file so owner-only credential storage works on Windows instead of failing on POSIX permission APIs (Issue #65).
-- Updated credential fallback regression coverage to verify POSIX permissions on Linux and owner-only ACLs on Windows.
+- Fixed Issue #68 by creating Windows credential temporary files inside an owner-only staging directory with ACL inheritance disabled before any credential data is written, preventing inherited ACEs from creating a transient credential exposure window.
+- Updated credential fallback regression coverage to verify POSIX permissions on Linux and owner-only Windows ACLs for both the staging directory and temporary credential file.
 
 ## 0.3-beta.2
 
