@@ -3,6 +3,7 @@ package org.pindb.service;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.AclEntry;
@@ -25,17 +26,34 @@ class GitHubCredentialStoreTest {
 
         GitHubCredentialStore.saveToFallbackFile(destination, "{\"accessToken\":\"secret\"}");
 
+        assertOwnerOnly(destination);
+        assertEquals("{\"accessToken\":\"secret\"}", Files.readString(destination));
+    }
+
+    @Test
+    void temporaryCredentialFileStartsOwnerOnly() throws Exception {
+        Path parent = tempDirectory.resolve("config");
+        Files.createDirectories(parent);
+
+        Path temporary = GitHubCredentialStore.createSecureTemporaryFile(parent);
+        try {
+            assertOwnerOnly(temporary);
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    private static void assertOwnerOnly(Path path) throws IOException {
         if (isWindows()) {
-            AclFileAttributeView view = Files.getFileAttributeView(destination, AclFileAttributeView.class);
+            AclFileAttributeView view = Files.getFileAttributeView(path, AclFileAttributeView.class);
             assertFalse(view.getAcl().isEmpty());
             for (AclEntry entry : view.getAcl()) {
-                assertEquals(Files.getOwner(destination), entry.principal());
+                assertEquals(Files.getOwner(path), entry.principal());
             }
         } else {
-            Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(destination);
+            Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(path);
             assertEquals(EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE), permissions);
         }
-        assertEquals("{\"accessToken\":\"secret\"}", Files.readString(destination));
     }
 
     private static boolean isWindows() {
