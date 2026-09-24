@@ -20,6 +20,7 @@
 - Fixed fallback GitHub credential storage on Windows by using owner-only ACLs (Issue #65).
 - Fixed Windows credential staging so inherited ACL entries cannot expose token data before permissions are restricted (Issue #68).
 - Expanded credential fallback tests for Linux permissions, Windows ACLs, protected staging, and cleanup.
+- Fixed dark-mode styling for Settings, Help, Bug Report, and update-status popups (Issue #70).
 
 ## 0.2.1
 
