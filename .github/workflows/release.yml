@@ -73,7 +73,23 @@ jobs:
           )"
 
           if [[ "$TAG_IS_PRERELEASE" != "$RELEASE_IS_PRERELEASE" ]]; then
-            echo "The tag and GitHub release type do not match."
+            echo "Correcting GitHub release type to match tag: $RAW_TAG"
+            if [[ "$TAG_IS_PRERELEASE" == "true" ]]; then
+              gh release edit "$RAW_TAG" --repo "$GITHUB_REPOSITORY" --prerelease
+            else
+              gh release edit "$RAW_TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false
+            fi
+
+            RELEASE_IS_PRERELEASE="$(
+              gh release view "$RAW_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json isPrerelease \
+                --jq '.isPrerelease'
+            )"
+          fi
+
+          if [[ "$TAG_IS_PRERELEASE" != "$RELEASE_IS_PRERELEASE" ]]; then
+            echo "The tag and GitHub release type still do not match after correction."
             echo "Tag: $RAW_TAG"
             echo "Tag indicates prerelease: $TAG_IS_PRERELEASE"
             echo "GitHub release is prerelease: $RELEASE_IS_PRERELEASE"
