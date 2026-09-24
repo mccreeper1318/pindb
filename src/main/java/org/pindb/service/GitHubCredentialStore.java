@@ -12,13 +12,14 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryFlag;
 import java.nio.file.attribute.AclEntryPermission;
 import java.nio.file.attribute.AclEntryType;
 import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.UserPrincipal;
-import java.nio.file.attribute.UserPrincipalLookupService;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
@@ -140,33 +141,91 @@ final class GitHubCredentialStore {
             Files.createDirectories(parent);
         }
 
-        Path temporary;
+        SecureTemporaryFile temporary;
         try {
-            if (isWindows()) {
-                temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp");
-                secureOwnerOnly(temporary);
-            } else {
-                temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp",
-                        PosixFilePermissions.asFileAttribute(OWNER_ONLY_PERMISSIONS));
-            }
+            temporary = createSecureTemporaryFile(parent);
         } catch (UnsupportedOperationException exception) {
             throw new IOException("This filesystem cannot create the GitHub credential fallback with owner-only permissions.",
                     exception);
         }
 
-        try {
-            Files.writeString(temporary, json, StandardCharsets.UTF_8,
+        try (temporary) {
+            Path temporaryPath = temporary.path();
+            Files.writeString(temporaryPath, json, StandardCharsets.UTF_8,
                     StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
-            secureOwnerOnly(temporary);
+            secureOwnerOnly(temporaryPath);
             try {
-                Files.move(temporary, destination,
+                Files.move(temporaryPath, destination,
                         StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException exception) {
-                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temporaryPath, destination, StandardCopyOption.REPLACE_EXISTING);
             }
             secureOwnerOnly(destination);
-        } finally {
-            Files.deleteIfExists(temporary);
+        }
+    }
+
+    static SecureTemporaryFile createSecureTemporaryFile(Path parent) throws IOException {
+        if (!isWindows()) {
+            Path temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp",
+                    PosixFilePermissions.asFileAttribute(OWNER_ONLY_PERMISSIONS));
+            return new SecureTemporaryFile(temporary, null);
+        }
+
+        Path secureDirectory = Files.createTempDirectory(parent, ".github-authorization-");
+        try {
+            disableWindowsAclInheritance(secureDirectory);
+            UserPrincipal owner = Files.getOwner(secureDirectory);
+            AclFileAttributeView directoryView = Files.getFileAttributeView(secureDirectory, AclFileAttributeView.class);
+            if (directoryView == null) {
+                throw new IOException("The filesystem does not expose Windows ACLs for the GitHub credential staging directory.");
+            }
+            directoryView.setAcl(ownerOnlyAcl(owner, true));
+
+            List<AclEntry> acl = ownerOnlyAcl(owner, false);
+            FileAttribute<List<AclEntry>> aclAttribute = new FileAttribute<>() {
+                @Override
+                public String name() {
+                    return "acl:acl";
+                }
+
+                @Override
+                public List<AclEntry> value() {
+                    return acl;
+                }
+            };
+            Path temporary = Files.createTempFile(secureDirectory, "credential-", ".tmp", aclAttribute);
+            return new SecureTemporaryFile(temporary, secureDirectory);
+        } catch (IOException | RuntimeException exception) {
+            try {
+                Files.deleteIfExists(secureDirectory);
+            } catch (IOException cleanupException) {
+                exception.addSuppressed(cleanupException);
+            }
+            throw exception;
+        }
+    }
+
+    private static void disableWindowsAclInheritance(Path directory) throws IOException {
+        Process process;
+        try {
+            process = new ProcessBuilder("icacls.exe", directory.toString(), "/inheritance:r")
+                    .redirectErrorStream(true)
+                    .start();
+        } catch (IOException exception) {
+            throw new IOException("Could not start Windows ACL protection for the GitHub credential staging directory.",
+                    exception);
+        }
+
+        try {
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                throw new IOException("Could not disable inherited Windows ACLs for the GitHub credential staging directory"
+                        + (output.isBlank() ? "." : ": " + output));
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while protecting the GitHub credential staging directory.", exception);
         }
     }
 
@@ -176,17 +235,21 @@ final class GitHubCredentialStore {
             if (view == null) {
                 throw new IOException("The filesystem does not expose Windows ACLs for the GitHub credential fallback.");
             }
-            UserPrincipal owner = Files.getOwner(path);
-            Set<AclEntryPermission> permissions = EnumSet.allOf(AclEntryPermission.class);
-            AclEntry entry = AclEntry.newBuilder()
-                    .setType(AclEntryType.ALLOW)
-                    .setPrincipal(owner)
-                    .setPermissions(permissions)
-                    .build();
-            view.setAcl(List.of(entry));
+            view.setAcl(ownerOnlyAcl(Files.getOwner(path), false));
             return;
         }
         Files.setPosixFilePermissions(path, OWNER_ONLY_PERMISSIONS);
+    }
+
+    private static List<AclEntry> ownerOnlyAcl(UserPrincipal owner, boolean inheritable) {
+        AclEntry.Builder builder = AclEntry.newBuilder()
+                .setType(AclEntryType.ALLOW)
+                .setPrincipal(owner)
+                .setPermissions(EnumSet.allOf(AclEntryPermission.class));
+        if (inheritable) {
+            builder.setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT);
+        }
+        return List.of(builder.build());
     }
 
     private static boolean isWindows() {
@@ -198,6 +261,32 @@ final class GitHubCredentialStore {
             return Long.parseLong(MiniJson.string(value));
         } catch (NumberFormatException exception) {
             return 0L;
+        }
+    }
+
+    record SecureTemporaryFile(Path path, Path directory) implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            IOException failure = null;
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException exception) {
+                failure = exception;
+            }
+            if (directory != null) {
+                try {
+                    Files.deleteIfExists(directory);
+                } catch (IOException exception) {
+                    if (failure == null) {
+                        failure = exception;
+                    } else {
+                        failure.addSuppressed(exception);
+                    }
+                }
+            }
+            if (failure != null) {
+                throw failure;
+            }
         }
     }
 }
