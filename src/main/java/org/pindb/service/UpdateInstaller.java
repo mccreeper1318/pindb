@@ -126,6 +126,18 @@ public final class UpdateInstaller {
             }
             return;
         }
+        if (update.releasePackage().type() == NativePackageType.MACOS_PKG) {
+            try {
+                status.setText("Opening the macOS Installer…");
+                launchMacInstaller(update.packageFile());
+                installing.set(false); dialog.close(); Platform.exit();
+            } catch (IOException exception) {
+                installing.set(false); dialog.close();
+                Path log = writeFailureLog(update.packageFile(), exception, "install");
+                showFailureAlert(owner, update.packageFile(), update.releasePackage().type(), update.distribution(), exception, log);
+            }
+            return;
+        }
         Task<Void> task = new Task<>() {
             @Override protected Void call() throws Exception {
                 installPrivileged(update.packageFile(), update.digest(), update.releasePackage().type(), this::updateMessage); return null;
@@ -158,15 +170,12 @@ public final class UpdateInstaller {
             UiUtil.warning(owner, "Automatic Update Unavailable", "The Windows installer can only run on Windows."); return false;
         }
         if (releasePackage.type() == NativePackageType.MACOS_PKG) {
-            UiUtil.warning(owner, "Automatic Update Unavailable",
-                    operatingSystem == OperatingSystem.MACOS
-                            ? "Automatic macOS package installation is not enabled yet."
-                            : "The macOS installer can only run on macOS.");
-            return false;
+            if (operatingSystem == OperatingSystem.MACOS) return true;
+            UiUtil.warning(owner, "Automatic Update Unavailable", "The macOS installer can only run on macOS."); return false;
         }
-        if (!distribution.isLinux()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic package installation is available only on supported Linux distributions and Windows 11."); return false; }
+        if (!distribution.isLinux()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic package installation is available only on supported Linux distributions, macOS, and Windows 11."); return false; }
         Optional<NativePackageType> expected = distribution.packageType();
-        if (expected.isEmpty()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic installation currently supports Debian-family and Fedora-family Linux systems and Windows 11."); return false; }
+        if (expected.isEmpty()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic installation currently supports Debian-family and Fedora-family Linux systems, macOS, and Windows 11."); return false; }
         if (expected.get() != releasePackage.type()) { UiUtil.warning(owner, "Automatic Update Unavailable", "The release does not contain the correct package type for " + distribution.prettyName() + "."); return false; }
         if (distribution.immutable()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Fedora Atomic desktops must install the RPM with rpm-ostree and reboot into the new deployment."); return false; }
         return true;
@@ -176,6 +185,18 @@ public final class UpdateInstaller {
         Path installer = packageFile.toAbsolutePath().normalize();
         if (!Files.isRegularFile(installer) || !installer.toString().toLowerCase(Locale.ROOT).endsWith(".exe")) throw new IOException("The downloaded Windows installer is unavailable.");
         new ProcessBuilder(installer.toString()).directory(installer.getParent().toFile()).start();
+    }
+
+    private static void launchMacInstaller(Path packageFile) throws IOException {
+        Path installer = packageFile.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(installer) || !installer.toString().toLowerCase(Locale.ROOT).endsWith(".pkg")) throw new IOException("The downloaded macOS installer is unavailable.");
+        Path open = Path.of("/usr/bin/open");
+        if (!Files.isExecutable(open)) throw new IOException("The macOS open utility is unavailable at /usr/bin/open.");
+        new ProcessBuilder(macInstallerCommand(installer)).directory(installer.getParent().toFile()).start();
+    }
+
+    static List<String> macInstallerCommand(Path packageFile) {
+        return List.of("/usr/bin/open", packageFile.toAbsolutePath().normalize().toString());
     }
 
     private static String safeAssetName(ReleasePackage releasePackage) {
@@ -235,6 +256,7 @@ public final class UpdateInstaller {
     }
 
     private static void installPrivileged(Path packageFile, String digest, NativePackageType type, MessageReporter message) throws Exception {
+        if (type != NativePackageType.DEB && type != NativePackageType.RPM) throw new IOException("The privileged updater only accepts Linux DEB and RPM packages.");
         Path pkexec = Path.of("/usr/bin/pkexec"); if (!Files.isExecutable(pkexec)) throw new IOException("The pkexec administrator tool is not installed at /usr/bin/pkexec.");
         packageManagerCandidates(type).stream().filter(Files::isExecutable).findFirst().orElseThrow(() -> new IOException(type == NativePackageType.DEB ? "The apt-get package installer is unavailable." : "Neither dnf5 nor dnf is available under /usr/bin."));
         Path helper = installedUpdateHelper(); if (helper == null) throw new IOException("The secure PinDB update helper is unavailable. Reinstall PinDB from a native package.");
@@ -245,7 +267,10 @@ public final class UpdateInstaller {
     }
 
     static List<Path> packageManagerCandidates(NativePackageType type) { return PrivilegedUpdateHelper.packageManagerCandidates(type); }
-    static List<String> privilegedInstallCommand(Path pkexec, Path helper, Path packageFile, String digest, NativePackageType type) { return List.of(pkexec.toString(), helper.toString(), "install", type.scriptValue(), digest, packageFile.toAbsolutePath().normalize().toString()); }
+    static List<String> privilegedInstallCommand(Path pkexec, Path helper, Path packageFile, String digest, NativePackageType type) {
+        if (type != NativePackageType.DEB && type != NativePackageType.RPM) throw new IllegalArgumentException("Privileged install commands are only valid for Linux DEB and RPM packages.");
+        return List.of(pkexec.toString(), helper.toString(), "install", type.scriptValue(), digest, packageFile.toAbsolutePath().normalize().toString());
+    }
     static List<Path> installedUpdateHelperCandidates() { return List.of(Path.of("/opt/pindb/pindb/bin/pindb-update-helper"), Path.of("/opt/pindb/bin/pindb-update-helper")); }
     private static Path installedUpdateHelper() { return installedUpdateHelperCandidates().stream().filter(UpdateInstaller::isSecureRootOwnedExecutable).findFirst().orElse(null); }
 
@@ -273,7 +298,7 @@ public final class UpdateInstaller {
     static String manualInstallCommand(Path packageFile, NativePackageType type, LinuxDistribution distribution) {
         String quoted = "\"" + packageFile.toAbsolutePath().normalize() + "\"";
         if (type == NativePackageType.WINDOWS_EXE) return quoted;
-        if (type == NativePackageType.MACOS_PKG) return "open " + quoted;
+        if (type == NativePackageType.MACOS_PKG) return "/usr/bin/open " + quoted;
         String command = distribution.manualInstallCommand(packageFile); if (!command.isBlank()) return command;
         return type == NativePackageType.DEB ? "sudo apt install " + quoted : "sudo dnf install " + quoted;
     }
