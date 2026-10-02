@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 
 public final class AppPaths {
     private AppPaths() {
@@ -35,6 +36,13 @@ public final class AppPaths {
                 System.getenv("XDG_CACHE_HOME")));
     }
 
+    public static Optional<Path> legacyMacConfigDirectory() {
+        if (OperatingSystem.current() != OperatingSystem.MACOS) {
+            return Optional.empty();
+        }
+        return Optional.of(legacyMacConfigDirectory(homeDirectory(), System.getenv("XDG_CONFIG_HOME")));
+    }
+
     static Path configDirectory(OperatingSystem operatingSystem, Path home, String appData, String xdgConfigHome) {
         return switch (operatingSystem) {
             case WINDOWS -> windowsRoamingBase(home, appData).resolve("PinDB");
@@ -57,6 +65,10 @@ public final class AppPaths {
             case MACOS -> home.resolve("Library").resolve("Caches").resolve("PinDB");
             case LINUX, OTHER -> xdgBase(home.resolve(".cache"), xdgCacheHome).resolve("pindb");
         };
+    }
+
+    static Path legacyMacConfigDirectory(Path home, String xdgConfigHome) {
+        return xdgBase(home.resolve(".config"), xdgConfigHome).resolve("pindb");
     }
 
     private static Path homeDirectory() {
