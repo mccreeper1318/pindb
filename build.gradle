@@ -28,6 +28,10 @@ def osArch = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
 def javafxPlatform = osName.contains('linux') ? (osArch.contains('aarch64') || osArch.contains('arm64') ? 'linux-aarch64' : 'linux') : osName.contains('mac') ? (osArch.contains('aarch64') || osArch.contains('arm64') ? 'mac-aarch64' : 'mac') : 'win'
 def macReleaseArchitecture = (osArch == 'aarch64' || osArch == 'arm64') ? 'arm64' : (osArch == 'x86_64' || osArch == 'amd64' || osArch == 'x64') ? 'x64' : null
 def macPackageIdentifier = 'org.pindb.PinDB'
+def macSourceIcon = file('src/main/resources/org/pindb/app/icon.png')
+def macResourceScript = file('packaging/macos/prepare-resources.sh')
+def macIconFile = layout.buildDirectory.file('jpackage/macos/PinDB.icns')
+def macAssociationsFile = layout.buildDirectory.file('jpackage/macos/pindb-file-associations.properties')
 def macPackageAppVersion = {
     def numericParts = packageAppVersion.tokenize('.')
     if (numericParts.isEmpty() || numericParts.size() > 3 || numericParts.any { !(it ==~ /\d+/) }) {
@@ -132,12 +136,28 @@ tasks.register('packageWindows', org.gradle.api.tasks.Exec) {
     commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', packageAppVersion, '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--win-menu', '--win-menu-group', 'PinDB', '--win-dir-chooser', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
 }
 
+tasks.register('prepareMacResources', org.gradle.api.tasks.Exec) {
+    group = 'distribution'; description = 'Generates the native macOS ICNS icon and document-association metadata.'
+    onlyIf { osName.contains('mac') }
+    inputs.file(macSourceIcon)
+    inputs.file(macResourceScript)
+    outputs.file(macIconFile)
+    outputs.file(macAssociationsFile)
+    doFirst {
+        File outputDirectory = macIconFile.get().asFile.parentFile
+        if (!outputDirectory.mkdirs() && !outputDirectory.isDirectory()) {
+            throw new GradleException("Unable to create macOS resource directory: ${outputDirectory}")
+        }
+    }
+    commandLine 'bash', macResourceScript.absolutePath, macSourceIcon.absolutePath,
+            macIconFile.get().asFile.absolutePath, macAssociationsFile.get().asFile.absolutePath
+}
+
 tasks.register('packageMacPkg', org.gradle.api.tasks.Exec) {
     group = 'distribution'; description = 'Builds a self-contained unsigned macOS PKG installer with jpackage.'
-    dependsOn tasks.installDist
+    dependsOn tasks.installDist, tasks.prepareMacResources
     def packagesDir = layout.buildDirectory.dir('packages').get().asFile
     def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
-    def associations = file('packaging/pindb-file-associations.properties')
     def normalizedName = { "PinDB-${semanticVersion}-macos-${macReleaseArchitecture}.pkg" }
 
     doFirst {
@@ -146,6 +166,9 @@ tasks.register('packageMacPkg', org.gradle.api.tasks.Exec) {
         }
         if (macReleaseArchitecture == null) {
             throw new GradleException("Unsupported macOS architecture for packaging: ${System.getProperty('os.arch')}")
+        }
+        if (!macIconFile.get().asFile.isFile() || !macAssociationsFile.get().asFile.isFile()) {
+            throw new GradleException('macOS resources were not generated before packaging.')
         }
         preparePackageDirectory(packagesDir, '.pkg')
         commandLine 'jpackage',
@@ -161,7 +184,8 @@ tasks.register('packageMacPkg', org.gradle.api.tasks.Exec) {
                 '--mac-package-identifier', macPackageIdentifier,
                 '--mac-package-name', 'PinDB',
                 '--mac-app-category', 'productivity',
-                '--file-associations', associations.absolutePath,
+                '--icon', macIconFile.get().asFile.absolutePath,
+                '--file-associations', macAssociationsFile.get().asFile.absolutePath,
                 '--java-options', '-Dfile.encoding=UTF-8',
                 '--java-options', '-Dprism.order=es2,sw'
     }
