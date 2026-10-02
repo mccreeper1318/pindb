@@ -1,0 +1,74 @@
+name: Issue 75 macOS resources smoke test
+
+on:
+  push:
+    branches:
+      - 75-add-macos-app-resources-and-pindb-file-associations
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Verify macOS resources (${{ matrix.release_arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            release_arch: arm64
+          - runner: macos-15-intel
+            release_arch: x64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Build and test unsigned PKG
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test packageMacPkg -PappVersion=0.3-beta.999
+
+      - name: Verify native icon and document metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE="build/packages/PinDB-0.3-beta.999-macos-${{ matrix.release_arch }}.pkg"
+          test -s "$PACKAGE"
+          test -s build/jpackage/macos/PinDB.icns
+          test -s build/jpackage/macos/pindb-file-associations.properties
+          grep -Fq 'extension=pindb' build/jpackage/macos/pindb-file-associations.properties
+          grep -Fq 'mime-type=application/x-pindb' build/jpackage/macos/pindb-file-associations.properties
+          grep -Fq 'icon=' build/jpackage/macos/pindb-file-associations.properties
+
+          rm -rf generated-icon.iconset expanded-pkg
+          iconutil -c iconset build/jpackage/macos/PinDB.icns -o generated-icon.iconset
+          test -s generated-icon.iconset/icon_16x16.png
+          test -s generated-icon.iconset/icon_512x512@2x.png
+
+          pkgutil --expand-full "$PACKAGE" expanded-pkg
+          INFO_PLIST="$(find expanded-pkg -path '*/PinDB.app/Contents/Info.plist' -print -quit)"
+          test -n "$INFO_PLIST"
+          APP_DIR="${INFO_PLIST%/Contents/Info.plist}"
+          ICON_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$INFO_PLIST")"
+          test -n "$ICON_NAME"
+          case "$ICON_NAME" in
+            *.icns) ;;
+            *) ICON_NAME="$ICON_NAME.icns" ;;
+          esac
+          test -s "$APP_DIR/Contents/Resources/$ICON_NAME"
+
+          plutil -convert xml1 -o info.xml "$INFO_PLIST"
+          grep -Fq '<string>pindb</string>' info.xml
+          grep -Fq '<string>application/x-pindb</string>' info.xml
+
+          echo "Verified icon: $ICON_NAME"
+          echo 'Verified .pindb Finder association metadata.'
