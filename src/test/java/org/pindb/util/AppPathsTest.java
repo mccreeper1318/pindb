@@ -33,6 +33,17 @@ class AppPathsTest {
     }
 
     @Test
+    void legacyMacConfigPathMatchesFormerXdgBehavior() {
+        Path home = temporaryDirectory.resolve("home");
+        Path configured = temporaryDirectory.resolve("xdg-config");
+
+        assertEquals(home.resolve(".config").resolve("pindb"),
+                AppPaths.legacyMacConfigDirectory(home, null));
+        assertEquals(configured.resolve("pindb"),
+                AppPaths.legacyMacConfigDirectory(home, configured.toString()));
+    }
+
+    @Test
     void windowsPathsRemainAppDataBased() {
         Path home = temporaryDirectory.resolve("home");
         Path roaming = temporaryDirectory.resolve("Roaming");
