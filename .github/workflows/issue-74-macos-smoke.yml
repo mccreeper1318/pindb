@@ -62,18 +62,12 @@ jobs:
           cat signature.txt
           grep -qi "no signature" signature.txt
 
-          echo "Package payload paths:"
-          pkgutil --payload-files "$PACKAGE" | sed -n '1,80p'
-
           rm -rf expanded-pkg
           pkgutil --expand-full "$PACKAGE" expanded-pkg
-          echo "Expanded Info.plist files:"
-          find expanded-pkg -name Info.plist -print
-
-          INFO_PLIST="$(find expanded-pkg -name Info.plist -path '*/Contents/Info.plist' -print -quit)"
+          INFO_PLIST="$(find expanded-pkg -path '*/PinDB.app/Contents/Info.plist' -print -quit)"
           if [ -z "$INFO_PLIST" ]; then
-            echo "Could not locate application Info.plist in expanded package."
-            find expanded-pkg -maxdepth 8 -print
+            echo "Could not locate PinDB application Info.plist in expanded package."
+            find expanded-pkg -name Info.plist -print
             exit 1
           fi
           APP_DIR="${INFO_PLIST%/Contents/Info.plist}"
@@ -109,6 +103,18 @@ jobs:
           echo "Embedded PinDB version:"
           unzip -p "$MAIN_JAR" org/pindb/app/version.properties
           unzip -p "$MAIN_JAR" org/pindb/app/version.properties | grep -Fx 'version=0.3-beta.999'
+
+          "$LAUNCHER" > pindb-launch.log 2>&1 &
+          PID=$!
+          sleep 8
+          if ! kill -0 "$PID" 2>/dev/null; then
+            cat pindb-launch.log
+            echo "Packaged PinDB launcher exited during the smoke-test window."
+            exit 1
+          fi
+          kill "$PID"
+          wait "$PID" || true
+          cat pindb-launch.log
 
       - name: Upload smoke-test PKG
         uses: actions/upload-artifact@v4
