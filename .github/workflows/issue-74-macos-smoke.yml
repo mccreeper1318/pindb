@@ -1,0 +1,95 @@
+name: Issue 74 macOS package smoke test
+
+on:
+  push:
+    branches:
+      - 74-add-unsigned-macos-pkg-packaging
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package macOS (${{ matrix.release_arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            release_arch: arm64
+            binary_arch: arm64
+          - runner: macos-15-intel
+            release_arch: x64
+            binary_arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Verify runner architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Runner architecture: $(uname -m)"
+          test "$(uname -m)" = "${{ matrix.binary_arch }}"
+
+      - name: Build tests and unsigned PKG
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test packageMacPkg -PappVersion="0.3-beta.999"
+
+      - name: Verify PKG contents and metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE="build/packages/PinDB-0.3-beta.999-macos-${{ matrix.release_arch }}.pkg"
+          test -s "$PACKAGE"
+
+          if pkgutil --check-signature "$PACKAGE" > signature.txt 2>&1; then
+            cat signature.txt
+            echo "Expected an unsigned package, but pkgutil reported a valid signature."
+            exit 1
+          fi
+          cat signature.txt
+          grep -qi "no signature" signature.txt
+
+          rm -rf expanded-pkg
+          pkgutil --expand-full "$PACKAGE" expanded-pkg
+          INFO_PLIST="$(find expanded-pkg -path '*/PinDB.app/Contents/Info.plist' -print -quit)"
+          test -n "$INFO_PLIST"
+          APP_DIR="${INFO_PLIST%/Contents/Info.plist}"
+
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")" = "org.pindb.PinDB"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")" = "0.3"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSApplicationCategoryType' "$INFO_PLIST")" = "public.app-category.productivity"
+
+          EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$INFO_PLIST")"
+          LAUNCHER="$APP_DIR/Contents/MacOS/$EXECUTABLE"
+          test -x "$LAUNCHER"
+          lipo -archs "$LAUNCHER" | tr ' ' '\n' | grep -Fx "${{ matrix.binary_arch }}"
+
+          JAVA_BIN="$(find "$APP_DIR/Contents/runtime" -type f -path '*/bin/java' -print -quit)"
+          test -n "$JAVA_BIN"
+          test -x "$JAVA_BIN"
+          "$JAVA_BIN" -version
+          lipo -archs "$JAVA_BIN" | tr ' ' '\n' | grep -Fx "${{ matrix.binary_arch }}"
+
+          MAIN_JAR="$(find "$APP_DIR/Contents/app" -maxdepth 1 -type f -name 'pindb-*.jar' -print -quit)"
+          test -n "$MAIN_JAR"
+          unzip -p "$MAIN_JAR" org/pindb/app/version.properties | grep -Fx 'version=0.3-beta.999'
+
+      - name: Upload smoke-test PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-74-macos-${{ matrix.release_arch }}
+          path: build/packages/PinDB-0.3-beta.999-macos-${{ matrix.release_arch }}.pkg
+          if-no-files-found: error
