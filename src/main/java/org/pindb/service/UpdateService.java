@@ -114,7 +114,15 @@ public final class UpdateService {
         if (downloadUrl.isBlank()) return Optional.empty();
         URI checksumUri = findChecksum(allAssets, name, packageType).map(checksum -> MiniJson.string(checksum.get("browser_download_url")))
                 .filter(url -> !url.isBlank()).map(URI::create).orElse(null);
-        return Optional.of(new ReleasePackage(packageType, SystemArchitecture.fromAssetName(name), name, URI.create(downloadUrl), checksumUri));
+        return Optional.of(new ReleasePackage(packageType, packageArchitecture(name, packageType), name, URI.create(downloadUrl), checksumUri));
+    }
+
+    static SystemArchitecture packageArchitecture(String packageName, NativePackageType packageType) {
+        if (packageType != NativePackageType.MACOS_PKG) return SystemArchitecture.fromAssetName(packageName);
+        String lowerName = packageName == null ? "" : packageName.toLowerCase(Locale.ROOT);
+        if (lowerName.endsWith("-macos-arm64.pkg")) return SystemArchitecture.AARCH64;
+        if (lowerName.endsWith("-macos-x64.pkg")) return SystemArchitecture.X86_64;
+        return SystemArchitecture.UNKNOWN;
     }
 
     private static Optional<Map<String, Object>> findChecksum(List<Map<String, Object>> assets, String packageName,
