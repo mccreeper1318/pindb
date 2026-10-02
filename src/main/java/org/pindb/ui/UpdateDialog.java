@@ -51,8 +51,9 @@ public final class UpdateDialog extends Dialog<UpdateDialog.Action> {
         }
         String packageName = packageType.extension();
         if (packageType == NativePackageType.MACOS_PKG) {
-            return "PinDB will open the verified " + packageName
-                    + " package in macOS Installer, then close. Complete the installation in Installer and reopen PinDB when it finishes.";
+            return "PinDB will securely stage the checksum-verified " + packageName
+                    + " package with administrator approval, open it in macOS Installer, then close. "
+                    + "Complete the installation in Installer and reopen PinDB when it finishes.";
         }
         return "PinDB will install the matching " + packageName
                 + " package after administrator approval, then close and reopen.";
