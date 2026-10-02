@@ -8,7 +8,7 @@
 - Added Windows-aware configuration and state paths using `%APPDATA%` and `%LOCALAPPDATA%`.
 - Added Windows release discovery, x64 matching, checksum verification, and verified installer launching.
 - Added Windows release automation with WiX plus Windows-specific CI and regression coverage.
-- Added native macOS configuration, state, and cache paths under the user Library directories (Issue #73).
+- Added native macOS configuration, state, and cache paths while migrating legacy fallback GitHub credentials from the former XDG config path (Issue #73).
 
 ### Changed
 - Extended native package handling across Debian, Fedora, and Windows packages.
