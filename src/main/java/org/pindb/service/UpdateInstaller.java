@@ -127,15 +127,28 @@ public final class UpdateInstaller {
             return;
         }
         if (update.releasePackage().type() == NativePackageType.MACOS_PKG) {
-            try {
-                status.setText("Opening the macOS Installer…");
-                launchMacInstaller(update.packageFile());
-                installing.set(false); dialog.close(); Platform.exit();
-            } catch (IOException exception) {
-                installing.set(false); dialog.close();
-                Path log = writeFailureLog(update.packageFile(), exception, "install");
-                showFailureAlert(owner, update.packageFile(), update.releasePackage().type(), update.distribution(), exception, log);
-            }
+            status.setText("Opening the macOS Installer…");
+            Task<Void> macInstallerTask = new Task<>() {
+                @Override protected Void call() throws Exception {
+                    launchMacInstaller(update.packageFile());
+                    return null;
+                }
+            };
+            macInstallerTask.setOnSucceeded(event -> {
+                installing.set(false);
+                dialog.close();
+                Platform.exit();
+            });
+            macInstallerTask.setOnFailed(event -> {
+                installing.set(false);
+                dialog.close();
+                Throwable failure = macInstallerTask.getException();
+                Path log = writeFailureLog(update.packageFile(), failure, "install");
+                showFailureAlert(owner, update.packageFile(), update.releasePackage().type(), update.distribution(), failure, log);
+            });
+            Thread thread = new Thread(macInstallerTask, "pindb-macos-installer-open");
+            thread.setDaemon(true);
+            thread.start();
             return;
         }
         Task<Void> task = new Task<>() {
@@ -317,7 +330,6 @@ public final class UpdateInstaller {
         new ProcessBuilder(restartCommand(launcher, notes, tag)).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
     }
     static List<String> restartCommand(Path launcher, Path notes, String tag) { return List.of(launcher.toString(), "--updated-tag=" + tag, "--updated-notes=" + notes); }
-
     static String manualInstallCommand(Path packageFile, NativePackageType type, LinuxDistribution distribution) {
         String quoted = "\"" + packageFile.toAbsolutePath().normalize() + "\"";
         if (type == NativePackageType.WINDOWS_EXE) return quoted;
