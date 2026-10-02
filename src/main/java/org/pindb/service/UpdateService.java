@@ -88,17 +88,21 @@ public final class UpdateService {
                                                       LinuxDistribution distribution) {
         return switch (operatingSystem == null ? OperatingSystem.OTHER : operatingSystem) {
             case WINDOWS -> Optional.of(NativePackageType.WINDOWS_EXE);
+            case MACOS -> Optional.of(NativePackageType.MACOS_PKG);
             case LINUX -> distribution == null ? Optional.empty() : distribution.packageType();
-            case MACOS, OTHER -> Optional.empty();
+            case OTHER -> Optional.empty();
         };
     }
 
     static Optional<ReleasePackage> selectPackage(List<Map<String, Object>> assets, NativePackageType packageType,
                                                    SystemArchitecture architecture) {
         List<ReleasePackage> candidates = assets.stream().map(asset -> toPackage(asset, assets, packageType)).flatMap(Optional::stream).toList();
-        if (architecture == SystemArchitecture.UNKNOWN) return candidates.stream().findFirst();
+        if (architecture == SystemArchitecture.UNKNOWN) {
+            return packageType == NativePackageType.MACOS_PKG ? Optional.empty() : candidates.stream().findFirst();
+        }
         Optional<ReleasePackage> exact = candidates.stream().filter(candidate -> candidate.architecture() == architecture).findFirst();
-        return exact.isPresent() ? exact : candidates.stream().filter(candidate -> candidate.architecture() == SystemArchitecture.UNKNOWN).findFirst();
+        if (exact.isPresent() || packageType == NativePackageType.MACOS_PKG) return exact;
+        return candidates.stream().filter(candidate -> candidate.architecture() == SystemArchitecture.UNKNOWN).findFirst();
     }
 
     private static Optional<ReleasePackage> toPackage(Map<String, Object> asset, List<Map<String, Object>> allAssets,
@@ -119,7 +123,8 @@ public final class UpdateService {
         if (exact.isPresent()) return exact;
         return assets.stream().filter(asset -> {
             String name = MiniJson.string(asset.get("name")).toLowerCase(Locale.ROOT);
-            return name.equals("checksums.sha256") || name.equals("checksums-linux.sha256") || name.equals("checksums-windows.sha256");
+            return name.equals("checksums.sha256") || name.equals("checksums-linux.sha256")
+                    || name.equals("checksums-windows.sha256") || name.equals("checksums-macos.sha256");
         }).findFirst();
     }
 
