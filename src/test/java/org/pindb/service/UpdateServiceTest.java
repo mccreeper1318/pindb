@@ -64,6 +64,48 @@ class UpdateServiceTest {
         assertTrue(selected.checksumUri().toString().endsWith("checksums-macos.sha256"));
     }
 
+    @Test void macChecksumSelectionPrefersMacAggregateWhenOtherPlatformsComeFirst() {
+        List<Map<String, Object>> assets = List.of(
+                asset("PinDB-0.3-macos-arm64.pkg"),
+                asset("checksums-linux.sha256"),
+                asset("checksums-windows.sha256"),
+                asset("checksums-macos.sha256"),
+                asset("checksums.sha256"));
+        ReleasePackage selected = UpdateService.selectPackage(assets, NativePackageType.MACOS_PKG, SystemArchitecture.AARCH64).orElseThrow();
+        assertTrue(selected.checksumUri().toString().endsWith("checksums-macos.sha256"));
+    }
+
+    @Test void windowsChecksumSelectionPrefersWindowsAggregate() {
+        List<Map<String, Object>> assets = List.of(
+                asset("PinDB-0.3-windows-x64.exe"),
+                asset("checksums-linux.sha256"),
+                asset("checksums-macos.sha256"),
+                asset("checksums-windows.sha256"),
+                asset("checksums.sha256"));
+        ReleasePackage selected = UpdateService.selectPackage(assets, NativePackageType.WINDOWS_EXE, SystemArchitecture.X86_64).orElseThrow();
+        assertTrue(selected.checksumUri().toString().endsWith("checksums-windows.sha256"));
+    }
+
+    @Test void linuxChecksumSelectionPrefersLinuxAggregate() {
+        List<Map<String, Object>> assets = List.of(
+                asset("pindb-0.3-1.x86_64.rpm"),
+                asset("checksums-windows.sha256"),
+                asset("checksums-macos.sha256"),
+                asset("checksums-linux.sha256"),
+                asset("checksums.sha256"));
+        ReleasePackage selected = UpdateService.selectPackage(assets, NativePackageType.RPM, SystemArchitecture.X86_64).orElseThrow();
+        assertTrue(selected.checksumUri().toString().endsWith("checksums-linux.sha256"));
+    }
+
+    @Test void genericChecksumRemainsFallbackWhenPlatformAggregateIsAbsent() {
+        List<Map<String, Object>> assets = List.of(
+                asset("PinDB-0.3-macos-arm64.pkg"),
+                asset("checksums-linux.sha256"),
+                asset("checksums.sha256"));
+        ReleasePackage selected = UpdateService.selectPackage(assets, NativePackageType.MACOS_PKG, SystemArchitecture.AARCH64).orElseThrow();
+        assertTrue(selected.checksumUri().toString().endsWith("checksums.sha256"));
+    }
+
     @Test void macUpdateSelectionRejectsWrongArchitecture() {
         assertTrue(UpdateService.selectPackage(
                 List.of(asset("PinDB-0.3-macos-arm64.pkg")),
