@@ -11,7 +11,8 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import org.pindb.platform.LinuxDistribution;
-import org.pindb.platform.LinuxPackageType;
+import org.pindb.platform.NativePackageType;
+import org.pindb.platform.OperatingSystem;
 import org.pindb.ui.UiUtil;
 import org.pindb.util.AppPaths;
 
@@ -113,7 +114,7 @@ public final class UpdateInstaller {
     }
 
     private void install(Window owner, Dialog<Void> dialog, Label status, AtomicBoolean installing, DownloadedUpdate update, String tag) {
-        if (update.releasePackage().type() == LinuxPackageType.WINDOWS_EXE) {
+        if (update.releasePackage().type() == NativePackageType.WINDOWS_EXE) {
             try {
                 status.setText("Starting the Windows installer…");
                 launchWindowsInstaller(update.packageFile());
@@ -151,19 +152,25 @@ public final class UpdateInstaller {
     }
 
     private static boolean installationSupported(Window owner, LinuxDistribution distribution, ReleasePackage releasePackage) {
-        if (releasePackage.type() == LinuxPackageType.WINDOWS_EXE) {
-            if (isWindows()) return true;
+        OperatingSystem operatingSystem = OperatingSystem.current();
+        if (releasePackage.type() == NativePackageType.WINDOWS_EXE) {
+            if (operatingSystem == OperatingSystem.WINDOWS) return true;
             UiUtil.warning(owner, "Automatic Update Unavailable", "The Windows installer can only run on Windows."); return false;
         }
+        if (releasePackage.type() == NativePackageType.MACOS_PKG) {
+            UiUtil.warning(owner, "Automatic Update Unavailable",
+                    operatingSystem == OperatingSystem.MACOS
+                            ? "Automatic macOS package installation is not enabled yet."
+                            : "The macOS installer can only run on macOS.");
+            return false;
+        }
         if (!distribution.isLinux()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic package installation is available only on supported Linux distributions and Windows 11."); return false; }
-        Optional<LinuxPackageType> expected = distribution.packageType();
+        Optional<NativePackageType> expected = distribution.packageType();
         if (expected.isEmpty()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic installation currently supports Debian-family and Fedora-family Linux systems and Windows 11."); return false; }
         if (expected.get() != releasePackage.type()) { UiUtil.warning(owner, "Automatic Update Unavailable", "The release does not contain the correct package type for " + distribution.prettyName() + "."); return false; }
         if (distribution.immutable()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Fedora Atomic desktops must install the RPM with rpm-ostree and reboot into the new deployment."); return false; }
         return true;
     }
-
-    private static boolean isWindows() { return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win"); }
 
     private static void launchWindowsInstaller(Path packageFile) throws IOException {
         Path installer = packageFile.toAbsolutePath().normalize();
@@ -227,9 +234,9 @@ public final class UpdateInstaller {
         return HexFormat.of().formatHex(digest.digest());
     }
 
-    private static void installPrivileged(Path packageFile, String digest, LinuxPackageType type, MessageReporter message) throws Exception {
+    private static void installPrivileged(Path packageFile, String digest, NativePackageType type, MessageReporter message) throws Exception {
         Path pkexec = Path.of("/usr/bin/pkexec"); if (!Files.isExecutable(pkexec)) throw new IOException("The pkexec administrator tool is not installed at /usr/bin/pkexec.");
-        packageManagerCandidates(type).stream().filter(Files::isExecutable).findFirst().orElseThrow(() -> new IOException(type == LinuxPackageType.DEB ? "The apt-get package installer is unavailable." : "Neither dnf5 nor dnf is available under /usr/bin."));
+        packageManagerCandidates(type).stream().filter(Files::isExecutable).findFirst().orElseThrow(() -> new IOException(type == NativePackageType.DEB ? "The apt-get package installer is unavailable." : "Neither dnf5 nor dnf is available under /usr/bin."));
         Path helper = installedUpdateHelper(); if (helper == null) throw new IOException("The secure PinDB update helper is unavailable. Reinstall PinDB from a native package.");
         message.report("Approve the administrator prompt to install the update…");
         Process process = new ProcessBuilder(privilegedInstallCommand(pkexec, helper, packageFile, digest, type)).redirectErrorStream(true).start();
@@ -237,8 +244,8 @@ public final class UpdateInstaller {
         int status = process.waitFor(); if (status != 0) throw new IOException("The administrator installer exited with status " + status + ".\n\n" + (output.isBlank() ? "No additional installer output was provided." : output));
     }
 
-    static List<Path> packageManagerCandidates(LinuxPackageType type) { return PrivilegedUpdateHelper.packageManagerCandidates(type); }
-    static List<String> privilegedInstallCommand(Path pkexec, Path helper, Path packageFile, String digest, LinuxPackageType type) { return List.of(pkexec.toString(), helper.toString(), "install", type.scriptValue(), digest, packageFile.toAbsolutePath().normalize().toString()); }
+    static List<Path> packageManagerCandidates(NativePackageType type) { return PrivilegedUpdateHelper.packageManagerCandidates(type); }
+    static List<String> privilegedInstallCommand(Path pkexec, Path helper, Path packageFile, String digest, NativePackageType type) { return List.of(pkexec.toString(), helper.toString(), "install", type.scriptValue(), digest, packageFile.toAbsolutePath().normalize().toString()); }
     static List<Path> installedUpdateHelperCandidates() { return List.of(Path.of("/opt/pindb/pindb/bin/pindb-update-helper"), Path.of("/opt/pindb/bin/pindb-update-helper")); }
     private static Path installedUpdateHelper() { return installedUpdateHelperCandidates().stream().filter(UpdateInstaller::isSecureRootOwnedExecutable).findFirst().orElse(null); }
 
@@ -263,13 +270,15 @@ public final class UpdateInstaller {
     }
     static List<String> restartCommand(Path launcher, Path notes, String tag) { return List.of(launcher.toString(), "--updated-tag=" + tag, "--updated-notes=" + notes); }
 
-    static String manualInstallCommand(Path packageFile, LinuxPackageType type, LinuxDistribution distribution) {
-        if (type == LinuxPackageType.WINDOWS_EXE) return "\"" + packageFile.toAbsolutePath().normalize() + "\"";
+    static String manualInstallCommand(Path packageFile, NativePackageType type, LinuxDistribution distribution) {
+        String quoted = "\"" + packageFile.toAbsolutePath().normalize() + "\"";
+        if (type == NativePackageType.WINDOWS_EXE) return quoted;
+        if (type == NativePackageType.MACOS_PKG) return "open " + quoted;
         String command = distribution.manualInstallCommand(packageFile); if (!command.isBlank()) return command;
-        String quoted = "\"" + packageFile.toAbsolutePath().normalize() + "\""; return type == LinuxPackageType.DEB ? "sudo apt install " + quoted : "sudo dnf install " + quoted;
+        return type == NativePackageType.DEB ? "sudo apt install " + quoted : "sudo dnf install " + quoted;
     }
 
-    private void showFailureAlert(Window owner, Path packageFile, LinuxPackageType type, LinuxDistribution distribution, Throwable failure, Path log) {
+    private void showFailureAlert(Window owner, Path packageFile, NativePackageType type, LinuxDistribution distribution, Throwable failure, Path log) {
         StringBuilder text = new StringBuilder("The current PinDB installation was preserved.\n\nCause: ").append(failureSummary(failure));
         if (packageFile != null) text.append("\n\nDownloaded package:\n").append(packageFile).append("\n\nManual command:\n").append(manualInstallCommand(packageFile, type, distribution));
         if (log != null) text.append("\n\nDiagnostic log:\n").append(log);
@@ -291,8 +300,7 @@ public final class UpdateInstaller {
     }
 
     public static void showFailedInstallPrompt(Window owner, Path packageFile) {
-        String lower = packageFile.toString().toLowerCase(Locale.ROOT);
-        LinuxPackageType type = lower.endsWith(".exe") ? LinuxPackageType.WINDOWS_EXE : lower.endsWith(".rpm") ? LinuxPackageType.RPM : LinuxPackageType.DEB;
+        NativePackageType type = NativePackageType.fromFileName(packageFile.toString()).orElse(NativePackageType.DEB);
         LinuxDistribution distribution = LinuxDistribution.current(); Alert alert = new Alert(Alert.AlertType.ERROR); if (owner != null && owner.isShowing()) alert.initOwner(owner);
         alert.setTitle("PinDB Update Failed"); alert.setHeaderText("The update could not be installed");
         alert.setContentText("Your previous PinDB installation was preserved. The downloaded package is at:\n" + packageFile + "\n\nInstall it manually with:\n" + manualInstallCommand(packageFile, type, distribution));

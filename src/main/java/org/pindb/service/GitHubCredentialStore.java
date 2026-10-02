@@ -1,5 +1,6 @@
 package org.pindb.service;
 
+import org.pindb.platform.OperatingSystem;
 import org.pindb.util.AppPaths;
 import org.pindb.util.MiniJson;
 
@@ -23,7 +24,6 @@ import java.nio.file.attribute.UserPrincipal;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -165,7 +165,7 @@ final class GitHubCredentialStore {
     }
 
     static SecureTemporaryFile createSecureTemporaryFile(Path parent) throws IOException {
-        if (!isWindows()) {
+        if (OperatingSystem.current() != OperatingSystem.WINDOWS) {
             Path temporary = Files.createTempFile(parent, ".github-authorization-", ".tmp",
                     PosixFilePermissions.asFileAttribute(OWNER_ONLY_PERMISSIONS));
             return new SecureTemporaryFile(temporary, null);
@@ -230,7 +230,7 @@ final class GitHubCredentialStore {
     }
 
     private static void secureOwnerOnly(Path path) throws IOException {
-        if (isWindows()) {
+        if (OperatingSystem.current() == OperatingSystem.WINDOWS) {
             AclFileAttributeView view = Files.getFileAttributeView(path, AclFileAttributeView.class);
             if (view == null) {
                 throw new IOException("The filesystem does not expose Windows ACLs for the GitHub credential fallback.");
@@ -250,10 +250,6 @@ final class GitHubCredentialStore {
             builder.setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT);
         }
         return List.of(builder.build());
-    }
-
-    private static boolean isWindows() {
-        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
     private static long longValue(Object value) {

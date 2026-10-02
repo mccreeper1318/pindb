@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.pindb.platform.LinuxDistribution;
-import org.pindb.platform.LinuxPackageType;
+import org.pindb.platform.NativePackageType;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -45,6 +45,19 @@ class UpdateInstallerTest {
     }
 
     @Test
+    void buildsMacManualInstallCommand() {
+        LinuxDistribution mac = LinuxDistribution.detect("Mac OS X", "");
+        assertEquals("open \"/tmp/PinDB-0.3-macos-arm64.pkg\"",
+                UpdateInstaller.manualInstallCommand(
+                        Path.of("/tmp/PinDB-0.3-macos-arm64.pkg"), NativePackageType.MACOS_PKG, mac));
+    }
+
+    @Test
+    void macPackagesHaveNoLinuxPackageManagerCandidates() {
+        assertTrue(UpdateInstaller.packageManagerCandidates(NativePackageType.MACOS_PKG).isEmpty());
+    }
+
+    @Test
     @EnabledOnOs(OS.LINUX)
     void includesActualJpackageLauncherLocation() {
         assertTrue(UpdateInstaller.installedLauncherCandidates().stream()
@@ -65,7 +78,7 @@ class UpdateInstallerTest {
         List<String> command = UpdateInstaller.privilegedInstallCommand(
                 Path.of("/usr/bin/pkexec"),
                 Path.of("/opt/pindb/pindb/bin/pindb-update-helper"),
-                Path.of("/tmp/pindb.rpm"), HASH, LinuxPackageType.RPM);
+                Path.of("/tmp/pindb.rpm"), HASH, NativePackageType.RPM);
 
         assertEquals(List.of(
                 "/usr/bin/pkexec",
@@ -81,7 +94,7 @@ class UpdateInstallerTest {
     @EnabledOnOs(OS.LINUX)
     void includesDnf5AndDnfCandidatesForRpmUpdates() {
         assertEquals(List.of(Path.of("/usr/bin/dnf5"), Path.of("/usr/bin/dnf")),
-                UpdateInstaller.packageManagerCandidates(LinuxPackageType.RPM));
+                UpdateInstaller.packageManagerCandidates(NativePackageType.RPM));
     }
 
     @Test
@@ -89,7 +102,7 @@ class UpdateInstallerTest {
     void buildsFedoraManualInstallCommand() {
         LinuxDistribution fedora = LinuxDistribution.detect("Linux", "ID=fedora\nID_LIKE=\"rhel fedora\"\n");
         assertTrue(UpdateInstaller.manualInstallCommand(
-                Path.of("/tmp/pindb.rpm"), LinuxPackageType.RPM, fedora)
+                Path.of("/tmp/pindb.rpm"), NativePackageType.RPM, fedora)
                 .startsWith("sudo dnf install"));
     }
 

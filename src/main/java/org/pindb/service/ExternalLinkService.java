@@ -1,11 +1,12 @@
 package org.pindb.service;
 
+import org.pindb.platform.OperatingSystem;
+
 import java.awt.Desktop;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -42,21 +43,16 @@ public final class ExternalLinkService {
     }
 
     static List<List<String>> commandsFor(String operatingSystem, URI uri) {
-        String os = Objects.requireNonNullElse(operatingSystem, "").toLowerCase(Locale.ROOT);
         String target = uri.toString();
-        if (os.contains("linux")) {
-            return List.of(
+        return switch (OperatingSystem.fromOsName(operatingSystem)) {
+            case LINUX -> List.of(
                     List.of("xdg-open", target),
                     List.of("gio", "open", target)
             );
-        }
-        if (os.contains("mac")) {
-            return List.of(List.of("open", target));
-        }
-        if (os.contains("win")) {
-            return List.of(List.of("rundll32", "url.dll,FileProtocolHandler", target));
-        }
-        return List.of();
+            case MACOS -> List.of(List.of("open", target));
+            case WINDOWS -> List.of(List.of("rundll32", "url.dll,FileProtocolHandler", target));
+            case OTHER -> List.of();
+        };
     }
 
     private static void openBlocking(URI uri) throws Exception {

@@ -21,7 +21,7 @@ class LinuxDistributionTest {
                 """);
 
         assertEquals(LinuxDistribution.Family.FEDORA, distribution.family());
-        assertEquals(LinuxPackageType.RPM, distribution.packageType().orElseThrow());
+        assertEquals(NativePackageType.RPM, distribution.packageType().orElseThrow());
         assertFalse(distribution.immutable());
         assertTrue(distribution.automaticInstallationSupported());
         assertTrue(distribution.manualInstallCommand(Path.of("/tmp/pindb.rpm"))
@@ -37,7 +37,7 @@ class LinuxDistributionTest {
                 ID_LIKE="rhel centos fedora"
                 """);
 
-        assertEquals(LinuxPackageType.RPM, distribution.packageType().orElseThrow());
+        assertEquals(NativePackageType.RPM, distribution.packageType().orElseThrow());
         assertTrue(distribution.immutable());
         assertFalse(distribution.automaticInstallationSupported());
         assertTrue(distribution.manualInstallCommand(Path.of("/tmp/pindb.rpm"))
@@ -53,7 +53,15 @@ class LinuxDistributionTest {
                 """);
 
         assertEquals(LinuxDistribution.Family.DEBIAN, distribution.family());
-        assertEquals(LinuxPackageType.DEB, distribution.packageType().orElseThrow());
+        assertEquals(NativePackageType.DEB, distribution.packageType().orElseThrow());
         assertTrue(distribution.automaticInstallationSupported());
+    }
+
+    @Test
+    void keepsNonLinuxSystemsOutsideLinuxPackageDetection() {
+        LinuxDistribution distribution = LinuxDistribution.detect("Mac OS X", "ID=fedora");
+
+        assertEquals(LinuxDistribution.Family.NON_LINUX, distribution.family());
+        assertTrue(distribution.packageType().isEmpty());
     }
 }

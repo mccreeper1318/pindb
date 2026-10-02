@@ -2,7 +2,8 @@ package org.pindb.service;
 
 import org.pindb.AppVersion;
 import org.pindb.platform.LinuxDistribution;
-import org.pindb.platform.LinuxPackageType;
+import org.pindb.platform.NativePackageType;
+import org.pindb.platform.OperatingSystem;
 import org.pindb.platform.SystemArchitecture;
 import org.pindb.util.MiniJson;
 
@@ -27,22 +28,23 @@ public final class UpdateService {
     private final HttpClient client;
     private final LinuxDistribution distribution;
     private final SystemArchitecture architecture;
-    private final String osName;
+    private final OperatingSystem operatingSystem;
 
     public UpdateService() {
         this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NORMAL).build(),
-                LinuxDistribution.current(), SystemArchitecture.current(), System.getProperty("os.name", ""));
+                LinuxDistribution.current(), SystemArchitecture.current(), OperatingSystem.current());
     }
 
     UpdateService(HttpClient client, LinuxDistribution distribution, SystemArchitecture architecture) {
-        this(client, distribution, architecture, System.getProperty("os.name", ""));
+        this(client, distribution, architecture, OperatingSystem.current());
     }
 
-    UpdateService(HttpClient client, LinuxDistribution distribution, SystemArchitecture architecture, String osName) {
+    UpdateService(HttpClient client, LinuxDistribution distribution, SystemArchitecture architecture,
+                  OperatingSystem operatingSystem) {
         this.client = client;
         this.distribution = distribution;
         this.architecture = architecture;
-        this.osName = osName == null ? "" : osName;
+        this.operatingSystem = operatingSystem == null ? OperatingSystem.OTHER : operatingSystem;
     }
 
     public Optional<ReleaseInfo> checkForUpdate(boolean includePrereleases) throws IOException, InterruptedException {
@@ -62,7 +64,7 @@ public final class UpdateService {
 
     private Optional<ReleaseInfo> toRelease(Map<String, Object> release) {
         try {
-            Optional<LinuxPackageType> packageType = currentPackageType();
+            Optional<NativePackageType> packageType = currentPackageType();
             if (packageType.isEmpty()) return Optional.empty();
             String tag = MiniJson.string(release.get("tag_name"));
             Version version = Version.parse(tag);
@@ -78,16 +80,20 @@ public final class UpdateService {
         }
     }
 
-    private Optional<LinuxPackageType> currentPackageType() {
-        if (isWindows(osName)) return Optional.of(LinuxPackageType.WINDOWS_EXE);
-        return distribution.packageType();
+    private Optional<NativePackageType> currentPackageType() {
+        return packageTypeFor(operatingSystem, distribution);
     }
 
-    static boolean isWindows(String osName) {
-        return osName != null && osName.toLowerCase(Locale.ROOT).contains("win");
+    static Optional<NativePackageType> packageTypeFor(OperatingSystem operatingSystem,
+                                                      LinuxDistribution distribution) {
+        return switch (operatingSystem == null ? OperatingSystem.OTHER : operatingSystem) {
+            case WINDOWS -> Optional.of(NativePackageType.WINDOWS_EXE);
+            case LINUX -> distribution == null ? Optional.empty() : distribution.packageType();
+            case MACOS, OTHER -> Optional.empty();
+        };
     }
 
-    static Optional<ReleasePackage> selectPackage(List<Map<String, Object>> assets, LinuxPackageType packageType,
+    static Optional<ReleasePackage> selectPackage(List<Map<String, Object>> assets, NativePackageType packageType,
                                                    SystemArchitecture architecture) {
         List<ReleasePackage> candidates = assets.stream().map(asset -> toPackage(asset, assets, packageType)).flatMap(Optional::stream).toList();
         if (architecture == SystemArchitecture.UNKNOWN) return candidates.stream().findFirst();
@@ -96,7 +102,7 @@ public final class UpdateService {
     }
 
     private static Optional<ReleasePackage> toPackage(Map<String, Object> asset, List<Map<String, Object>> allAssets,
-                                                       LinuxPackageType packageType) {
+                                                       NativePackageType packageType) {
         String name = MiniJson.string(asset.get("name"));
         String lowerName = name.toLowerCase(Locale.ROOT);
         if (!lowerName.contains("pindb") || !packageType.matchesFileName(name)) return Optional.empty();

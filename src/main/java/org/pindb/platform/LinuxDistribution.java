@@ -7,7 +7,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -46,7 +45,7 @@ public final class LinuxDistribution {
 
     public static LinuxDistribution current() {
         String osName = System.getProperty("os.name", "");
-        if (!osName.toLowerCase(Locale.ROOT).contains("linux")) {
+        if (OperatingSystem.fromOsName(osName) != OperatingSystem.LINUX) {
             return detect(osName, "");
         }
         for (Path path : ListHolder.OS_RELEASE_PATHS) {
@@ -62,7 +61,7 @@ public final class LinuxDistribution {
     }
 
     public static LinuxDistribution detect(String osName, String osReleaseText) {
-        if (osName == null || !osName.toLowerCase(Locale.ROOT).contains("linux")) {
+        if (OperatingSystem.fromOsName(osName) != OperatingSystem.LINUX) {
             return new LinuxDistribution("", "", osName == null ? "Unknown operating system" : osName,
                     Set.of(), Family.NON_LINUX, false);
         }
@@ -115,10 +114,10 @@ public final class LinuxDistribution {
         return family != Family.NON_LINUX;
     }
 
-    public Optional<LinuxPackageType> packageType() {
+    public Optional<NativePackageType> packageType() {
         return switch (family) {
-            case DEBIAN -> Optional.of(LinuxPackageType.DEB);
-            case FEDORA -> Optional.of(LinuxPackageType.RPM);
+            case DEBIAN -> Optional.of(NativePackageType.DEB);
+            case FEDORA -> Optional.of(NativePackageType.RPM);
             case OTHER_LINUX, NON_LINUX -> Optional.empty();
         };
     }
@@ -168,7 +167,7 @@ public final class LinuxDistribution {
             return Set.of();
         }
         Set<String> result = new LinkedHashSet<>();
-        Arrays.stream(value.toLowerCase(Locale.ROOT).split("\\s+"))
+        Arrays.stream(value.toLowerCase(java.util.Locale.ROOT).split("\\s+"))
                 .map(String::trim)
                 .filter(token -> !token.isBlank())
                 .forEach(result::add);
@@ -176,7 +175,7 @@ public final class LinuxDistribution {
     }
 
     private static String normalized(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private static String quote(String value) {

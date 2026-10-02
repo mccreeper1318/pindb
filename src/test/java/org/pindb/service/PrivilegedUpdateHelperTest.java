@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
-import org.pindb.platform.LinuxPackageType;
+import org.pindb.platform.NativePackageType;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -34,7 +34,7 @@ class PrivilegedUpdateHelperTest {
         Path stagingRoot = Files.createDirectory(temporaryDirectory.resolve("root-stage"));
 
         try (PrivilegedUpdateHelper.StagedPackage staged = PrivilegedUpdateHelper.stagePackage(
-                source, sha256(trusted), LinuxPackageType.RPM, stagingRoot,
+                source, sha256(trusted), NativePackageType.RPM, stagingRoot,
                 () -> Files.move(replacement, source, java.nio.file.StandardCopyOption.REPLACE_EXISTING))) {
             assertEquals("trusted package bytes", Files.readString(staged.packageFile()));
             assertEquals("untrusted replacement", Files.readString(source));
@@ -54,7 +54,7 @@ class PrivilegedUpdateHelperTest {
         Path stagingRoot = Files.createDirectory(temporaryDirectory.resolve("root-stage"));
 
         IOException failure = assertThrows(IOException.class, () -> PrivilegedUpdateHelper.stagePackage(
-                source, desktopDigest, LinuxPackageType.DEB, stagingRoot, () -> { }));
+                source, desktopDigest, NativePackageType.DEB, stagingRoot, () -> { }));
 
         assertTrue(failure.getMessage().contains("regular file"));
         try (var entries = Files.list(stagingRoot)) {
@@ -73,7 +73,7 @@ class PrivilegedUpdateHelperTest {
         AtomicBoolean installerCalled = new AtomicBoolean();
 
         IOException failure = assertThrows(IOException.class, () ->
-                PrivilegedUpdateHelper.installVerifiedPackage(source, desktopDigest, LinuxPackageType.RPM,
+                PrivilegedUpdateHelper.installVerifiedPackage(source, desktopDigest, NativePackageType.RPM,
                         stagingRoot, (staged, type) -> installerCalled.set(true), () -> { }));
 
         assertTrue(failure.getMessage().contains("SHA-256"));
@@ -91,19 +91,32 @@ class PrivilegedUpdateHelperTest {
         Path stagingRoot = Files.createDirectory(temporaryDirectory.resolve("root-stage"));
         AtomicBoolean installerCalled = new AtomicBoolean();
 
-        PrivilegedUpdateHelper.installVerifiedPackage(source, sha256(trusted), LinuxPackageType.DEB,
+        PrivilegedUpdateHelper.installVerifiedPackage(source, sha256(trusted), NativePackageType.DEB,
                 stagingRoot, (staged, type) -> {
                     installerCalled.set(true);
                     Files.writeString(source, "replacement immediately before install");
                     assertTrue(staged.startsWith(stagingRoot));
                     assertEquals("trusted package bytes", Files.readString(staged));
-                    assertEquals(LinuxPackageType.DEB, type);
+                    assertEquals(NativePackageType.DEB, type);
                 }, () -> { });
 
         assertTrue(installerCalled.get());
         try (var entries = Files.list(stagingRoot)) {
             assertFalse(entries.findAny().isPresent());
         }
+    }
+
+    @Test
+    void privilegedHelperRejectsNonLinuxPackageTypes() throws Exception {
+        Path source = temporaryDirectory.resolve("PinDB.pkg");
+        Files.writeString(source, "mac package bytes");
+        Path stagingRoot = Files.createDirectory(temporaryDirectory.resolve("root-stage"));
+
+        IOException failure = assertThrows(IOException.class, () ->
+                PrivilegedUpdateHelper.stagePackage(source, sha256(Files.readAllBytes(source)),
+                        NativePackageType.MACOS_PKG, stagingRoot, () -> { }));
+
+        assertTrue(failure.getMessage().contains("only accepts Debian and RPM"));
     }
 
     private static String sha256(byte[] content) throws Exception {
