@@ -28,7 +28,7 @@ jobs:
         run: |
           $raw = $env:RELEASE_TAG
           $version = $raw -replace '^v\.?', ''
-          if ($version -notmatch '^\d+\.\d+(\.\d+)*(-[0-9A-Za-z.-]+)?$') { throw "Invalid PinDB release tag: $raw" }
+          if ($version -notmatch '^\d+\.\d+(\.\d+)?(-[0-9A-Za-z.-]+)?$') { throw "Invalid PinDB release tag: $raw" }
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Check out release tag
