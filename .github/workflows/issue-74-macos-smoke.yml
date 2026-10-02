@@ -91,7 +91,7 @@ jobs:
           echo "Launcher architectures: $(lipo -archs "$LAUNCHER")"
           lipo -archs "$LAUNCHER" | tr ' ' '\n' | grep -Fx "${{ matrix.binary_arch }}"
 
-          JAVA_BIN="$(find "$APP_DIR/Contents/runtime" -type f -path '*/bin/java' -print -quit)"
+          JAVA_BIN="$(find "$APP_DIR/Contents/runtime" -path '*/bin/java' -print -quit)"
           test -n "$JAVA_BIN"
           test -x "$JAVA_BIN"
           "$JAVA_BIN" -version
