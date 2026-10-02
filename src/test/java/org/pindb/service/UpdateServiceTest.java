@@ -64,6 +64,22 @@ class UpdateServiceTest {
         assertTrue(selected.checksumUri().toString().endsWith("checksums-macos.sha256"));
     }
 
+    @Test void macArchitectureComesFromPackageSuffixNotVersionToken() {
+        List<Map<String, Object>> assets = List.of(
+                asset("PinDB-0.3-x64.1-macos-arm64.pkg"),
+                asset("PinDB-0.3-arm64.1-macos-x64.pkg"));
+
+        ReleasePackage arm = UpdateService.selectPackage(
+                assets, NativePackageType.MACOS_PKG, SystemArchitecture.AARCH64).orElseThrow();
+        ReleasePackage intel = UpdateService.selectPackage(
+                assets, NativePackageType.MACOS_PKG, SystemArchitecture.X86_64).orElseThrow();
+
+        assertEquals("PinDB-0.3-x64.1-macos-arm64.pkg", arm.fileName());
+        assertEquals(SystemArchitecture.AARCH64, arm.architecture());
+        assertEquals("PinDB-0.3-arm64.1-macos-x64.pkg", intel.fileName());
+        assertEquals(SystemArchitecture.X86_64, intel.architecture());
+    }
+
     @Test void macChecksumSelectionPrefersMacAggregateWhenOtherPlatformsComeFirst() {
         List<Map<String, Object>> assets = List.of(
                 asset("PinDB-0.3-macos-arm64.pkg"),
