@@ -1,0 +1,59 @@
+name: Issue 74 Codex review smoke test
+
+on:
+  push:
+    branches:
+      - 74-add-unsigned-macos-pkg-packaging
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Verify macOS (${{ matrix.release_arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            release_arch: arm64
+          - runner: macos-15-intel
+            release_arch: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Verify release version validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon verifyReleaseTag -PreleaseTag=0.3.1
+          if ./gradlew --no-daemon verifyReleaseTag -PreleaseTag=0.3.1.2; then
+            echo 'Four-component release versions must be rejected.'
+            exit 1
+          fi
+
+      - name: Build unsigned PKG
+        shell: bash
+        run: ./gradlew --no-daemon clean test packageMacPkg -PappVersion=0.3-beta.999
+
+      - name: Verify .pindb file association
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE="build/packages/PinDB-0.3-beta.999-macos-${{ matrix.release_arch }}.pkg"
+          test -s "$PACKAGE"
+          rm -rf expanded-pkg
+          pkgutil --expand-full "$PACKAGE" expanded-pkg
+          INFO_PLIST="$(find expanded-pkg -path '*/PinDB.app/Contents/Info.plist' -print -quit)"
+          test -n "$INFO_PLIST"
+          plutil -convert xml1 -o info.xml "$INFO_PLIST"
+          grep -Fq '<string>pindb</string>' info.xml
+          grep -Fq '<string>application/x-pindb</string>' info.xml
