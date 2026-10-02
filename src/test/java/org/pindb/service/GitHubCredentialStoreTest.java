@@ -16,6 +16,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GitHubCredentialStoreTest {
     @TempDir
@@ -29,6 +30,35 @@ class GitHubCredentialStoreTest {
 
         assertOwnerOnly(destination);
         assertEquals("{\"accessToken\":\"secret\"}", Files.readString(destination));
+    }
+
+    @Test
+    void migratesLegacyFallbackCredentialToNewLocation() throws Exception {
+        Path legacy = tempDirectory.resolve("legacy").resolve("github-authorization.json");
+        Path current = tempDirectory.resolve("current").resolve("github-authorization.json");
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(legacy, "{\"accessToken\":\"legacy-secret\"}");
+
+        String loaded = GitHubCredentialStore.loadFromFallbackFiles(current, legacy);
+
+        assertEquals("{\"accessToken\":\"legacy-secret\"}", loaded);
+        assertTrue(Files.isRegularFile(current));
+        assertEquals(loaded, Files.readString(current));
+        assertOwnerOnly(current);
+        assertFalse(Files.exists(legacy));
+    }
+
+    @Test
+    void currentFallbackTakesPrecedenceOverLegacyCredential() throws Exception {
+        Path legacy = tempDirectory.resolve("legacy").resolve("github-authorization.json");
+        Path current = tempDirectory.resolve("current").resolve("github-authorization.json");
+        GitHubCredentialStore.saveToFallbackFile(current, "{\"accessToken\":\"current\"}");
+        GitHubCredentialStore.saveToFallbackFile(legacy, "{\"accessToken\":\"legacy\"}");
+
+        String loaded = GitHubCredentialStore.loadFromFallbackFiles(current, legacy);
+
+        assertEquals("{\"accessToken\":\"current\"}", loaded);
+        assertTrue(Files.exists(legacy));
     }
 
     @Test

@@ -30,7 +30,11 @@ import java.util.Set;
 
 final class GitHubCredentialStore {
     private static final String SECRET_TOOL = "/usr/bin/secret-tool";
-    private static final Path FALLBACK_FILE = AppPaths.configDirectory().resolve("github-authorization.json");
+    private static final String FALLBACK_FILE_NAME = "github-authorization.json";
+    private static final Path FALLBACK_FILE = AppPaths.configDirectory().resolve(FALLBACK_FILE_NAME);
+    private static final Path LEGACY_MAC_FALLBACK_FILE = AppPaths.legacyMacConfigDirectory()
+            .map(path -> path.resolve(FALLBACK_FILE_NAME))
+            .orElse(null);
     private static final Set<PosixFilePermission> OWNER_ONLY_PERMISSIONS = EnumSet.of(
             PosixFilePermission.OWNER_READ,
             PosixFilePermission.OWNER_WRITE);
@@ -66,10 +70,9 @@ final class GitHubCredentialStore {
     }
 
     void clear() {
-        try {
-            Files.deleteIfExists(FALLBACK_FILE);
-        } catch (IOException ignored) {
-            // Clearing a stale fallback is best effort.
+        deleteFallbackFile(FALLBACK_FILE);
+        if (LEGACY_MAC_FALLBACK_FILE != null && !LEGACY_MAC_FALLBACK_FILE.equals(FALLBACK_FILE)) {
+            deleteFallbackFile(LEGACY_MAC_FALLBACK_FILE);
         }
         if (Files.isExecutable(Path.of(SECRET_TOOL))) {
             try {
@@ -102,15 +105,50 @@ final class GitHubCredentialStore {
     }
 
     private String loadFromFile() {
-        if (!Files.isRegularFile(FALLBACK_FILE)) {
+        return loadFromFallbackFiles(FALLBACK_FILE, LEGACY_MAC_FALLBACK_FILE);
+    }
+
+    static String loadFromFallbackFiles(Path primary, Path legacy) {
+        String current = readFallbackFile(primary);
+        if (!current.isBlank() || legacy == null || legacy.equals(primary)) {
+            return current;
+        }
+
+        String legacyValue = readFallbackFile(legacy);
+        if (legacyValue.isBlank()) {
+            return "";
+        }
+
+        try {
+            saveToFallbackFile(primary, legacyValue);
+            deleteFallbackFile(legacy);
+        } catch (IOException ignored) {
+            // Continue using the secured legacy value if migration cannot be completed yet.
+        }
+        return legacyValue;
+    }
+
+    private static String readFallbackFile(Path path) {
+        if (path == null || !Files.isRegularFile(path)) {
             return "";
         }
         try {
-            secureOwnerOnly(FALLBACK_FILE);
-            return Files.readString(FALLBACK_FILE, StandardCharsets.UTF_8);
+            secureOwnerOnly(path);
+            return Files.readString(path, StandardCharsets.UTF_8);
         } catch (UnsupportedOperationException | IOException exception) {
             // If owner-only permissions cannot be guaranteed, do not read credentials from this fallback.
             return "";
+        }
+    }
+
+    private static void deleteFallbackFile(Path path) {
+        if (path == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ignored) {
+            // Clearing a stale fallback is best effort.
         }
     }
 
