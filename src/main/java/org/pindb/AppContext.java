@@ -70,10 +70,14 @@ public final class AppContext {
         }
     }
 
-    public void closeAll() {
+    void closeDatabaseWindows() {
         for (DatabaseWindow window : databaseWindows.values().toArray(DatabaseWindow[]::new)) {
             window.close();
         }
+    }
+
+    public void closeAll() {
+        closeDatabaseWindows();
         Platform.exit();
     }
 
