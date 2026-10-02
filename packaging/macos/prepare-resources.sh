@@ -10,6 +10,7 @@ SOURCE_ICON="$1"
 OUTPUT_ICON="$2"
 ASSOCIATIONS_FILE="$3"
 OUTPUT_DIR="$(dirname "$OUTPUT_ICON")"
+DOCUMENT_ICON="$OUTPUT_DIR/PinDBDocument.icns"
 ICONSET="$OUTPUT_DIR/PinDB.iconset"
 
 mkdir -p "$OUTPUT_DIR"
@@ -34,14 +35,16 @@ resize_icon 512 icon_512x512.png
 resize_icon 1024 icon_512x512@2x.png
 
 iconutil -c icns "$ICONSET" -o "$OUTPUT_ICON"
+cp "$OUTPUT_ICON" "$DOCUMENT_ICON"
 rm -rf "$ICONSET"
 
 cat > "$ASSOCIATIONS_FILE" <<EOF
 extension=pindb
 mime-type=application/x-pindb
 description=PinDB Database
-icon=$OUTPUT_ICON
+icon=$DOCUMENT_ICON
 EOF
 
 [[ -s "$OUTPUT_ICON" ]]
+[[ -s "$DOCUMENT_ICON" ]]
 [[ -s "$ASSOCIATIONS_FILE" ]]
