@@ -137,6 +137,7 @@ tasks.register('packageMacPkg', org.gradle.api.tasks.Exec) {
     dependsOn tasks.installDist
     def packagesDir = layout.buildDirectory.dir('packages').get().asFile
     def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
+    def associations = file('packaging/pindb-file-associations.properties')
     def normalizedName = { "PinDB-${semanticVersion}-macos-${macReleaseArchitecture}.pkg" }
 
     doFirst {
@@ -160,6 +161,7 @@ tasks.register('packageMacPkg', org.gradle.api.tasks.Exec) {
                 '--mac-package-identifier', macPackageIdentifier,
                 '--mac-package-name', 'PinDB',
                 '--mac-app-category', 'productivity',
+                '--file-associations', associations.absolutePath,
                 '--java-options', '-Dfile.encoding=UTF-8',
                 '--java-options', '-Dprism.order=es2,sw'
     }
@@ -184,6 +186,6 @@ tasks.register('verifyReleaseTag') {
     group = 'verification'; description = 'Validates PinDB release tag formats such as 0.1, v0.1, v.0.1 and 0.2-beta.1.'
     doLast {
         def tag = providers.gradleProperty('releaseTag').orNull
-        if (tag == null || !(tag ==~ /^(?:v\.?)?\d+\.\d+(?:\.\d+)*(?:-[0-9A-Za-z.-]+)?$/)) throw new GradleException("Invalid PinDB release tag: ${tag}")
+        if (tag == null || !(tag ==~ /^(?:v\.?)?\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?$/)) throw new GradleException("Invalid PinDB release tag: ${tag}")
     }
 }
