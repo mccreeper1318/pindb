@@ -192,7 +192,30 @@ public final class UpdateInstaller {
         if (!Files.isRegularFile(installer) || !installer.toString().toLowerCase(Locale.ROOT).endsWith(".pkg")) throw new IOException("The downloaded macOS installer is unavailable.");
         Path open = Path.of("/usr/bin/open");
         if (!Files.isExecutable(open)) throw new IOException("The macOS open utility is unavailable at /usr/bin/open.");
-        new ProcessBuilder(macInstallerCommand(installer)).directory(installer.getParent().toFile()).start();
+        Process process = new ProcessBuilder(macInstallerCommand(installer))
+                .directory(installer.getParent().toFile())
+                .redirectErrorStream(true)
+                .start();
+        String output;
+        try (InputStream input = process.getInputStream()) {
+            output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
+        }
+        int status;
+        try {
+            status = process.waitFor();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for macOS to open the Installer.", exception);
+        }
+        requireSuccessfulMacInstallerLaunch(status, output);
+    }
+
+    static void requireSuccessfulMacInstallerLaunch(int status, String output) throws IOException {
+        if (status == 0) return;
+        String details = output == null || output.isBlank()
+                ? "No additional output was provided by /usr/bin/open."
+                : output.trim();
+        throw new IOException("The macOS open utility exited with status " + status + ".\n\n" + details);
     }
 
     static List<String> macInstallerCommand(Path packageFile) {
