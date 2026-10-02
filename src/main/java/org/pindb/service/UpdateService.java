@@ -112,20 +112,32 @@ public final class UpdateService {
         if (!lowerName.contains("pindb") || !packageType.matchesFileName(name)) return Optional.empty();
         String downloadUrl = MiniJson.string(asset.get("browser_download_url"));
         if (downloadUrl.isBlank()) return Optional.empty();
-        URI checksumUri = findChecksum(allAssets, name).map(checksum -> MiniJson.string(checksum.get("browser_download_url")))
+        URI checksumUri = findChecksum(allAssets, name, packageType).map(checksum -> MiniJson.string(checksum.get("browser_download_url")))
                 .filter(url -> !url.isBlank()).map(URI::create).orElse(null);
         return Optional.of(new ReleasePackage(packageType, SystemArchitecture.fromAssetName(name), name, URI.create(downloadUrl), checksumUri));
     }
 
-    private static Optional<Map<String, Object>> findChecksum(List<Map<String, Object>> assets, String packageName) {
+    private static Optional<Map<String, Object>> findChecksum(List<Map<String, Object>> assets, String packageName,
+                                                               NativePackageType packageType) {
         String expected = (packageName + ".sha256").toLowerCase(Locale.ROOT);
-        Optional<Map<String, Object>> exact = assets.stream().filter(asset -> MiniJson.string(asset.get("name")).toLowerCase(Locale.ROOT).equals(expected)).findFirst();
+        Optional<Map<String, Object>> exact = assets.stream()
+                .filter(asset -> MiniJson.string(asset.get("name")).toLowerCase(Locale.ROOT).equals(expected))
+                .findFirst();
         if (exact.isPresent()) return exact;
-        return assets.stream().filter(asset -> {
-            String name = MiniJson.string(asset.get("name")).toLowerCase(Locale.ROOT);
-            return name.equals("checksums.sha256") || name.equals("checksums-linux.sha256")
-                    || name.equals("checksums-windows.sha256") || name.equals("checksums-macos.sha256");
-        }).findFirst();
+
+        String platformAggregate = switch (packageType) {
+            case DEB, RPM -> "checksums-linux.sha256";
+            case WINDOWS_EXE -> "checksums-windows.sha256";
+            case MACOS_PKG -> "checksums-macos.sha256";
+        };
+        Optional<Map<String, Object>> platformChecksum = assets.stream()
+                .filter(asset -> MiniJson.string(asset.get("name")).equalsIgnoreCase(platformAggregate))
+                .findFirst();
+        if (platformChecksum.isPresent()) return platformChecksum;
+
+        return assets.stream()
+                .filter(asset -> MiniJson.string(asset.get("name")).equalsIgnoreCase("checksums.sha256"))
+                .findFirst();
     }
 
     private static Instant parseInstant(String value) {
