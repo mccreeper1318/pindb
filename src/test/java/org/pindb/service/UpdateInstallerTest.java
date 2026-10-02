@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UpdateInstallerTest {
@@ -45,16 +47,70 @@ class UpdateInstallerTest {
     }
 
     @Test
+    void acceptsMacPkgChecksum() throws IOException {
+        String checksum = HASH + "  PinDB-0.3-beta.1-macos-arm64.pkg\n";
+        assertEquals(HASH, UpdateInstaller.parseExpectedChecksum(
+                checksum, "PinDB-0.3-beta.1-macos-arm64.pkg").orElseThrow());
+    }
+
+    @Test
     void buildsMacManualInstallCommand() {
         LinuxDistribution mac = LinuxDistribution.detect("Mac OS X", "");
-        assertEquals("open \"/tmp/PinDB-0.3-macos-arm64.pkg\"",
+        assertEquals("/usr/bin/open \"/tmp/PinDB-0.3-macos-arm64.pkg\"",
                 UpdateInstaller.manualInstallCommand(
                         Path.of("/tmp/PinDB-0.3-macos-arm64.pkg"), NativePackageType.MACOS_PKG, mac));
     }
 
     @Test
+    void buildsMacInstallerCommandWithoutShellQuoting() {
+        assertEquals(List.of(
+                        "/usr/bin/open",
+                        "/tmp/PinDB update/PinDB-0.3-beta.1-macos-arm64.pkg"),
+                UpdateInstaller.macInstallerCommand(
+                        Path.of("/tmp/PinDB update/PinDB-0.3-beta.1-macos-arm64.pkg")));
+    }
+
+    @Test
+    void macStagingUsesRootOwnedStickyTempLocation() {
+        assertEquals(Path.of("/private/var/tmp/PinDB-verified-update.pkg"),
+                UpdateInstaller.macStagedInstallerPath());
+    }
+
+    @Test
+    void macStagingCommandKeepsUntrustedValuesOutOfElevatedScript() {
+        Path source = Path.of("/tmp/PinDB update/quote's package.pkg");
+        List<String> command = UpdateInstaller.macStagingCommand(source, HASH.toUpperCase());
+
+        assertEquals("/usr/bin/osascript", command.getFirst());
+        assertEquals(source.toAbsolutePath().normalize().toString(), command.get(command.size() - 2));
+        assertEquals(HASH, command.getLast());
+
+        String appleScript = String.join("\n", command.subList(0, command.size() - 2));
+        assertTrue(appleScript.contains("with administrator privileges"));
+        assertTrue(appleScript.contains("/usr/bin/install -o root -g wheel -m 0400"));
+        assertTrue(appleScript.contains("/usr/bin/shasum -a 256"));
+        assertTrue(appleScript.contains("/private/var/tmp/PinDB-verified-update.pkg"));
+        assertFalse(appleScript.contains(source.toString()));
+        assertFalse(appleScript.contains(HASH));
+    }
+
+    @Test
+    void macStagingRejectsInvalidDigestBeforeAuthorization() {
+        assertThrows(IllegalArgumentException.class, () -> UpdateInstaller.macStagingCommand(
+                Path.of("/tmp/PinDB.pkg"), "not-a-sha256"));
+    }
+
+    @Test
     void macPackagesHaveNoLinuxPackageManagerCandidates() {
         assertTrue(UpdateInstaller.packageManagerCandidates(NativePackageType.MACOS_PKG).isEmpty());
+    }
+
+    @Test
+    void macPackagesCannotBuildPrivilegedLinuxInstallCommands() {
+        assertThrows(IllegalArgumentException.class, () -> UpdateInstaller.privilegedInstallCommand(
+                Path.of("/usr/bin/pkexec"),
+                Path.of("/opt/pindb/pindb/bin/pindb-update-helper"),
+                Path.of("/tmp/PinDB-0.3-macos-arm64.pkg"), HASH, NativePackageType.MACOS_PKG));
     }
 
     @Test

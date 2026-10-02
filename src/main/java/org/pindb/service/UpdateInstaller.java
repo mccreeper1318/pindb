@@ -40,8 +40,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class UpdateInstaller {
+    private static final Path MAC_STAGED_INSTALLER = Path.of("/private/var/tmp/PinDB-verified-update.pkg");
+
     private final SettingsService settings;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20))
             .followRedirects(HttpClient.Redirect.NORMAL).build();
@@ -126,6 +129,41 @@ public final class UpdateInstaller {
             }
             return;
         }
+        if (update.releasePackage().type() == NativePackageType.MACOS_PKG) {
+            status.setText("Securing the verified macOS package…");
+            AtomicReference<Path> protectedPackage = new AtomicReference<>();
+            Task<Void> macInstallerTask = new Task<>() {
+                @Override protected Void call() throws Exception {
+                    Path staged = stageMacInstaller(update.packageFile(), update.digest());
+                    protectedPackage.set(staged);
+                    updateMessage("Opening the protected package in macOS Installer…");
+                    launchMacInstaller(staged);
+                    return null;
+                }
+            };
+            taskMessages(macInstallerTask, status);
+            macInstallerTask.setOnSucceeded(event -> {
+                try { Files.deleteIfExists(update.packageFile()); } catch (IOException cleanupFailure) { cleanupFailure.printStackTrace(System.err); }
+                installing.set(false);
+                dialog.close();
+                Platform.exit();
+            });
+            macInstallerTask.setOnFailed(event -> {
+                installing.set(false);
+                dialog.close();
+                Throwable failure = macInstallerTask.getException();
+                Path recoveryPackage = protectedPackage.get();
+                if (recoveryPackage == null) {
+                    try { Files.deleteIfExists(update.packageFile()); } catch (IOException cleanupFailure) { cleanupFailure.printStackTrace(System.err); }
+                }
+                Path log = writeFailureLog(recoveryPackage, failure, "install");
+                showFailureAlert(owner, recoveryPackage, update.releasePackage().type(), update.distribution(), failure, log);
+            });
+            Thread thread = new Thread(macInstallerTask, "pindb-macos-installer-open");
+            thread.setDaemon(true);
+            thread.start();
+            return;
+        }
         Task<Void> task = new Task<>() {
             @Override protected Void call() throws Exception {
                 installPrivileged(update.packageFile(), update.digest(), update.releasePackage().type(), this::updateMessage); return null;
@@ -158,15 +196,12 @@ public final class UpdateInstaller {
             UiUtil.warning(owner, "Automatic Update Unavailable", "The Windows installer can only run on Windows."); return false;
         }
         if (releasePackage.type() == NativePackageType.MACOS_PKG) {
-            UiUtil.warning(owner, "Automatic Update Unavailable",
-                    operatingSystem == OperatingSystem.MACOS
-                            ? "Automatic macOS package installation is not enabled yet."
-                            : "The macOS installer can only run on macOS.");
-            return false;
+            if (operatingSystem == OperatingSystem.MACOS) return true;
+            UiUtil.warning(owner, "Automatic Update Unavailable", "The macOS installer can only run on macOS."); return false;
         }
-        if (!distribution.isLinux()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic package installation is available only on supported Linux distributions and Windows 11."); return false; }
+        if (!distribution.isLinux()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic package installation is available only on supported Linux distributions, macOS, and Windows 11."); return false; }
         Optional<NativePackageType> expected = distribution.packageType();
-        if (expected.isEmpty()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic installation currently supports Debian-family and Fedora-family Linux systems and Windows 11."); return false; }
+        if (expected.isEmpty()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic installation currently supports Debian-family and Fedora-family Linux systems, macOS, and Windows 11."); return false; }
         if (expected.get() != releasePackage.type()) { UiUtil.warning(owner, "Automatic Update Unavailable", "The release does not contain the correct package type for " + distribution.prettyName() + "."); return false; }
         if (distribution.immutable()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Fedora Atomic desktops must install the RPM with rpm-ostree and reboot into the new deployment."); return false; }
         return true;
@@ -176,6 +211,140 @@ public final class UpdateInstaller {
         Path installer = packageFile.toAbsolutePath().normalize();
         if (!Files.isRegularFile(installer) || !installer.toString().toLowerCase(Locale.ROOT).endsWith(".exe")) throw new IOException("The downloaded Windows installer is unavailable.");
         new ProcessBuilder(installer.toString()).directory(installer.getParent().toFile()).start();
+    }
+
+    private static Path stageMacInstaller(Path packageFile, String digest) throws Exception {
+        Path source = packageFile.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(source)
+                || !source.toString().toLowerCase(Locale.ROOT).endsWith(".pkg")) {
+            throw new IOException("The downloaded macOS installer is unavailable.");
+        }
+        if (digest == null || !digest.matches("(?i)[0-9a-f]{64}")) {
+            throw new IOException("The verified macOS package digest is invalid.");
+        }
+        Path osascript = Path.of("/usr/bin/osascript");
+        if (!Files.isExecutable(osascript)) {
+            throw new IOException("The macOS authorization utility is unavailable at /usr/bin/osascript.");
+        }
+        Process process = new ProcessBuilder(macStagingCommand(source, digest))
+                .redirectErrorStream(true)
+                .start();
+        String output;
+        try (InputStream input = process.getInputStream()) {
+            output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
+        }
+        int status;
+        try {
+            status = process.waitFor();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while securing the verified macOS package.", exception);
+        }
+        if (status != 0) {
+            throw new IOException("The protected macOS package staging step exited with status " + status + ".\n\n"
+                    + (output.isBlank() ? "No additional staging output was provided." : output));
+        }
+
+        Path staged = macStagedInstallerPath();
+        if (!isProtectedMacStagedPackage(staged)) {
+            throw new IOException("The protected macOS package was not created with secure ownership and permissions.");
+        }
+        String stagedDigest = sha256(staged);
+        if (!stagedDigest.equalsIgnoreCase(digest)) {
+            throw new IOException("The protected macOS package no longer matches the verified SHA-256 digest.");
+        }
+        return staged;
+    }
+
+    static Path macStagedInstallerPath() {
+        return MAC_STAGED_INSTALLER;
+    }
+
+    static List<String> macStagingCommand(Path packageFile, String digest) {
+        if (digest == null || !digest.matches("(?i)[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("A valid SHA-256 digest is required for macOS staging.");
+        }
+        Path source = packageFile.toAbsolutePath().normalize();
+        String shell = "umask 077; tempPath=/private/var/tmp/.PinDB-verified-update.$$.pkg; "
+                + "trap '/bin/rm -f \"$tempPath\"' EXIT HUP INT TERM; "
+                + "/usr/bin/install -o root -g wheel -m 0400 "
+                + "\"$1\" \"$tempPath\"; "
+                + "actual=$(/usr/bin/shasum -a 256 \"$tempPath\" | /usr/bin/cut -d ' ' -f 1); "
+                + "[ \"$actual\" = \"$2\" ] || exit 65; "
+                + "/bin/chmod 0444 \"$tempPath\"; /usr/sbin/chown root:wheel \"$tempPath\"; "
+                + "/bin/mv -f \"$tempPath\" /private/var/tmp/PinDB-verified-update.pkg; "
+                + "trap - EXIT HUP INT TERM";
+        return List.of(
+                "/usr/bin/osascript",
+                "-e", "on run argv",
+                "-e", "set sourcePath to item 1 of argv",
+                "-e", "set expectedDigest to item 2 of argv",
+                "-e", "set commandText to \"/bin/sh -c \" & quoted form of "
+                        + "\"" + shell.replace("\\", "\\\\").replace("\"", "\\\"") + "\" & \" -- \" & quoted form of sourcePath & \" \" & quoted form of expectedDigest",
+                "-e", "do shell script commandText with administrator privileges",
+                "-e", "return \"/private/var/tmp/PinDB-verified-update.pkg\"",
+                "-e", "end run",
+                source.toString(),
+                digest.toLowerCase(Locale.ROOT));
+    }
+
+    private static boolean isProtectedMacStagedPackage(Path packageFile) {
+        Path absolute = packageFile.toAbsolutePath().normalize();
+        if (!absolute.equals(MAC_STAGED_INSTALLER) || Files.isSymbolicLink(absolute)
+                || !Files.isRegularFile(absolute, LinkOption.NOFOLLOW_LINKS)) {
+            return false;
+        }
+        try {
+            Object uid = Files.getAttribute(absolute, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+            Object mode = Files.getAttribute(absolute, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+            Path parent = absolute.getParent();
+            Object parentUid = Files.getAttribute(parent, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+            Object parentMode = Files.getAttribute(parent, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+            return uid instanceof Number owner && owner.longValue() == 0L
+                    && mode instanceof Number permissions && (permissions.intValue() & 0022) == 0
+                    && parentUid instanceof Number directoryOwner && directoryOwner.longValue() == 0L
+                    && parentMode instanceof Number directoryMode && (directoryMode.intValue() & 01000) != 0
+                    && Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(parent);
+        } catch (IOException | UnsupportedOperationException | SecurityException exception) {
+            return false;
+        }
+    }
+
+    private static void launchMacInstaller(Path packageFile) throws IOException {
+        Path installer = packageFile.toAbsolutePath().normalize();
+        if (!isProtectedMacStagedPackage(installer)) {
+            throw new IOException("The macOS installer must be opened from the protected verified staging location.");
+        }
+        Path open = Path.of("/usr/bin/open");
+        if (!Files.isExecutable(open)) throw new IOException("The macOS open utility is unavailable at /usr/bin/open.");
+        Process process = new ProcessBuilder(macInstallerCommand(installer))
+                .directory(installer.getParent().toFile())
+                .redirectErrorStream(true)
+                .start();
+        String output;
+        try (InputStream input = process.getInputStream()) {
+            output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
+        }
+        int status;
+        try {
+            status = process.waitFor();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for macOS to open the Installer.", exception);
+        }
+        requireSuccessfulMacInstallerLaunch(status, output);
+    }
+
+    static void requireSuccessfulMacInstallerLaunch(int status, String output) throws IOException {
+        if (status == 0) return;
+        String details = output == null || output.isBlank()
+                ? "No additional output was provided by /usr/bin/open."
+                : output.trim();
+        throw new IOException("The macOS open utility exited with status " + status + ".\n\n" + details);
+    }
+
+    static List<String> macInstallerCommand(Path packageFile) {
+        return List.of("/usr/bin/open", packageFile.toAbsolutePath().normalize().toString());
     }
 
     private static String safeAssetName(ReleasePackage releasePackage) {
@@ -235,6 +404,7 @@ public final class UpdateInstaller {
     }
 
     private static void installPrivileged(Path packageFile, String digest, NativePackageType type, MessageReporter message) throws Exception {
+        if (type != NativePackageType.DEB && type != NativePackageType.RPM) throw new IOException("The privileged updater only accepts Linux DEB and RPM packages.");
         Path pkexec = Path.of("/usr/bin/pkexec"); if (!Files.isExecutable(pkexec)) throw new IOException("The pkexec administrator tool is not installed at /usr/bin/pkexec.");
         packageManagerCandidates(type).stream().filter(Files::isExecutable).findFirst().orElseThrow(() -> new IOException(type == NativePackageType.DEB ? "The apt-get package installer is unavailable." : "Neither dnf5 nor dnf is available under /usr/bin."));
         Path helper = installedUpdateHelper(); if (helper == null) throw new IOException("The secure PinDB update helper is unavailable. Reinstall PinDB from a native package.");
@@ -245,7 +415,10 @@ public final class UpdateInstaller {
     }
 
     static List<Path> packageManagerCandidates(NativePackageType type) { return PrivilegedUpdateHelper.packageManagerCandidates(type); }
-    static List<String> privilegedInstallCommand(Path pkexec, Path helper, Path packageFile, String digest, NativePackageType type) { return List.of(pkexec.toString(), helper.toString(), "install", type.scriptValue(), digest, packageFile.toAbsolutePath().normalize().toString()); }
+    static List<String> privilegedInstallCommand(Path pkexec, Path helper, Path packageFile, String digest, NativePackageType type) {
+        if (type != NativePackageType.DEB && type != NativePackageType.RPM) throw new IllegalArgumentException("Privileged install commands are only valid for Linux DEB and RPM packages.");
+        return List.of(pkexec.toString(), helper.toString(), "install", type.scriptValue(), digest, packageFile.toAbsolutePath().normalize().toString());
+    }
     static List<Path> installedUpdateHelperCandidates() { return List.of(Path.of("/opt/pindb/pindb/bin/pindb-update-helper"), Path.of("/opt/pindb/bin/pindb-update-helper")); }
     private static Path installedUpdateHelper() { return installedUpdateHelperCandidates().stream().filter(UpdateInstaller::isSecureRootOwnedExecutable).findFirst().orElse(null); }
 
@@ -269,11 +442,10 @@ public final class UpdateInstaller {
         new ProcessBuilder(restartCommand(launcher, notes, tag)).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
     }
     static List<String> restartCommand(Path launcher, Path notes, String tag) { return List.of(launcher.toString(), "--updated-tag=" + tag, "--updated-notes=" + notes); }
-
     static String manualInstallCommand(Path packageFile, NativePackageType type, LinuxDistribution distribution) {
         String quoted = "\"" + packageFile.toAbsolutePath().normalize() + "\"";
         if (type == NativePackageType.WINDOWS_EXE) return quoted;
-        if (type == NativePackageType.MACOS_PKG) return "open " + quoted;
+        if (type == NativePackageType.MACOS_PKG) return "/usr/bin/open " + quoted;
         String command = distribution.manualInstallCommand(packageFile); if (!command.isBlank()) return command;
         return type == NativePackageType.DEB ? "sudo apt install " + quoted : "sudo dnf install " + quoted;
     }
