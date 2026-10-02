@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,6 +68,36 @@ class UpdateInstallerTest {
                         "/tmp/PinDB update/PinDB-0.3-beta.1-macos-arm64.pkg"),
                 UpdateInstaller.macInstallerCommand(
                         Path.of("/tmp/PinDB update/PinDB-0.3-beta.1-macos-arm64.pkg")));
+    }
+
+    @Test
+    void macStagingUsesRootOwnedStickyTempLocation() {
+        assertEquals(Path.of("/private/var/tmp/PinDB-verified-update.pkg"),
+                UpdateInstaller.macStagedInstallerPath());
+    }
+
+    @Test
+    void macStagingCommandKeepsUntrustedValuesOutOfElevatedScript() {
+        Path source = Path.of("/tmp/PinDB update/quote's package.pkg");
+        List<String> command = UpdateInstaller.macStagingCommand(source, HASH.toUpperCase());
+
+        assertEquals("/usr/bin/osascript", command.getFirst());
+        assertEquals(source.toAbsolutePath().normalize().toString(), command.get(command.size() - 2));
+        assertEquals(HASH, command.getLast());
+
+        String appleScript = String.join("\n", command.subList(0, command.size() - 2));
+        assertTrue(appleScript.contains("with administrator privileges"));
+        assertTrue(appleScript.contains("/usr/bin/install -o root -g wheel -m 0400"));
+        assertTrue(appleScript.contains("/usr/bin/shasum -a 256"));
+        assertTrue(appleScript.contains("/private/var/tmp/PinDB-verified-update.pkg"));
+        assertFalse(appleScript.contains(source.toString()));
+        assertFalse(appleScript.contains(HASH));
+    }
+
+    @Test
+    void macStagingRejectsInvalidDigestBeforeAuthorization() {
+        assertThrows(IllegalArgumentException.class, () -> UpdateInstaller.macStagingCommand(
+                Path.of("/tmp/PinDB.pkg"), "not-a-sha256"));
     }
 
     @Test
