@@ -1,0 +1,48 @@
+name: Issue 76 macOS updater smoke test
+
+on:
+  push:
+    branches:
+      - 76-add-automatic-macos-update-discovery-and-installation
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate macOS updater (${{ matrix.release_arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            release_arch: arm64
+          - runner: macos-15-intel
+            release_arch: x64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Run tests and build native package
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test packageMacPkg -PappVersion=0.3-beta.999
+
+      - name: Verify native Installer handoff prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x /usr/bin/open
+          PACKAGE="build/packages/PinDB-0.3-beta.999-macos-${{ matrix.release_arch }}.pkg"
+          test -s "$PACKAGE"
+          echo "Verified package: $PACKAGE"
+          echo "Verified native opener: /usr/bin/open"
