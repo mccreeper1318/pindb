@@ -1,17 +1,18 @@
 package org.pindb.util;
 
+import org.pindb.platform.OperatingSystem;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Locale;
 
 public final class AppPaths {
     private AppPaths() {
     }
 
     public static Path configDirectory() {
-        if (isWindows()) {
+        if (OperatingSystem.current() == OperatingSystem.WINDOWS) {
             return ensure(windowsRoamingBase().resolve("PinDB"));
         }
         String xdg = System.getenv("XDG_CONFIG_HOME");
@@ -22,7 +23,7 @@ public final class AppPaths {
     }
 
     public static Path stateDirectory() {
-        if (isWindows()) {
+        if (OperatingSystem.current() == OperatingSystem.WINDOWS) {
             return ensure(windowsLocalBase().resolve("PinDB").resolve("State"));
         }
         String xdg = System.getenv("XDG_STATE_HOME");
@@ -33,7 +34,7 @@ public final class AppPaths {
     }
 
     public static Path cacheDirectory() {
-        if (isWindows()) {
+        if (OperatingSystem.current() == OperatingSystem.WINDOWS) {
             return ensure(windowsLocalBase().resolve("PinDB").resolve("Cache"));
         }
         String xdg = System.getenv("XDG_CACHE_HOME");
@@ -41,10 +42,6 @@ public final class AppPaths {
                 ? Paths.get(System.getProperty("user.home"), ".cache")
                 : Paths.get(xdg);
         return ensure(base.resolve("pindb"));
-    }
-
-    private static boolean isWindows() {
-        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
     private static Path windowsRoamingBase() {
