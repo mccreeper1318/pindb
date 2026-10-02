@@ -31,6 +31,7 @@ def macPackageIdentifier = 'org.pindb.PinDB'
 def macSourceIcon = file('src/main/resources/org/pindb/app/icon.png')
 def macResourceScript = file('packaging/macos/prepare-resources.sh')
 def macIconFile = layout.buildDirectory.file('jpackage/macos/PinDB.icns')
+def macDocumentIconFile = layout.buildDirectory.file('jpackage/macos/PinDBDocument.icns')
 def macAssociationsFile = layout.buildDirectory.file('jpackage/macos/pindb-file-associations.properties')
 def macPackageAppVersion = {
     def numericParts = packageAppVersion.tokenize('.')
@@ -137,11 +138,12 @@ tasks.register('packageWindows', org.gradle.api.tasks.Exec) {
 }
 
 tasks.register('prepareMacResources', org.gradle.api.tasks.Exec) {
-    group = 'distribution'; description = 'Generates the native macOS ICNS icon and document-association metadata.'
+    group = 'distribution'; description = 'Generates the native macOS ICNS icons and document-association metadata.'
     onlyIf { osName.contains('mac') }
     inputs.file(macSourceIcon)
     inputs.file(macResourceScript)
     outputs.file(macIconFile)
+    outputs.file(macDocumentIconFile)
     outputs.file(macAssociationsFile)
     doFirst {
         File outputDirectory = macIconFile.get().asFile.parentFile
@@ -167,7 +169,8 @@ tasks.register('packageMacPkg', org.gradle.api.tasks.Exec) {
         if (macReleaseArchitecture == null) {
             throw new GradleException("Unsupported macOS architecture for packaging: ${System.getProperty('os.arch')}")
         }
-        if (!macIconFile.get().asFile.isFile() || !macAssociationsFile.get().asFile.isFile()) {
+        if (!macIconFile.get().asFile.isFile() || !macDocumentIconFile.get().asFile.isFile()
+                || !macAssociationsFile.get().asFile.isFile()) {
             throw new GradleException('macOS resources were not generated before packaging.')
         }
         preparePackageDirectory(packagesDir, '.pkg')
