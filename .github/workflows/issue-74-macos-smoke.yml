@@ -62,29 +62,52 @@ jobs:
           cat signature.txt
           grep -qi "no signature" signature.txt
 
+          echo "Package payload paths:"
+          pkgutil --payload-files "$PACKAGE" | sed -n '1,80p'
+
           rm -rf expanded-pkg
           pkgutil --expand-full "$PACKAGE" expanded-pkg
-          INFO_PLIST="$(find expanded-pkg -path '*/PinDB.app/Contents/Info.plist' -print -quit)"
-          test -n "$INFO_PLIST"
+          echo "Expanded Info.plist files:"
+          find expanded-pkg -name Info.plist -print
+
+          INFO_PLIST="$(find expanded-pkg -name Info.plist -path '*/Contents/Info.plist' -print -quit)"
+          if [ -z "$INFO_PLIST" ]; then
+            echo "Could not locate application Info.plist in expanded package."
+            find expanded-pkg -maxdepth 8 -print
+            exit 1
+          fi
           APP_DIR="${INFO_PLIST%/Contents/Info.plist}"
+          echo "App bundle: $APP_DIR"
 
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")" = "org.pindb.PinDB"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")" = "1.3"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :LSApplicationCategoryType' "$INFO_PLIST")" = "public.app-category.productivity"
-
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")"
+          BUNDLE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
+          CATEGORY="$(/usr/libexec/PlistBuddy -c 'Print :LSApplicationCategoryType' "$INFO_PLIST")"
           EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$INFO_PLIST")"
+          echo "CFBundleIdentifier=$BUNDLE_ID"
+          echo "CFBundleShortVersionString=$BUNDLE_VERSION"
+          echo "LSApplicationCategoryType=$CATEGORY"
+          echo "CFBundleExecutable=$EXECUTABLE"
+
+          test "$BUNDLE_ID" = "org.pindb.PinDB"
+          test "$BUNDLE_VERSION" = "1.3"
+          test "$CATEGORY" = "public.app-category.productivity"
+
           LAUNCHER="$APP_DIR/Contents/MacOS/$EXECUTABLE"
           test -x "$LAUNCHER"
+          echo "Launcher architectures: $(lipo -archs "$LAUNCHER")"
           lipo -archs "$LAUNCHER" | tr ' ' '\n' | grep -Fx "${{ matrix.binary_arch }}"
 
           JAVA_BIN="$(find "$APP_DIR/Contents/runtime" -type f -path '*/bin/java' -print -quit)"
           test -n "$JAVA_BIN"
           test -x "$JAVA_BIN"
           "$JAVA_BIN" -version
+          echo "Bundled Java architectures: $(lipo -archs "$JAVA_BIN")"
           lipo -archs "$JAVA_BIN" | tr ' ' '\n' | grep -Fx "${{ matrix.binary_arch }}"
 
           MAIN_JAR="$(find "$APP_DIR/Contents/app" -maxdepth 1 -type f -name 'pindb-*.jar' -print -quit)"
           test -n "$MAIN_JAR"
+          echo "Embedded PinDB version:"
+          unzip -p "$MAIN_JAR" org/pindb/app/version.properties
           unzip -p "$MAIN_JAR" org/pindb/app/version.properties | grep -Fx 'version=0.3-beta.999'
 
       - name: Upload smoke-test PKG
