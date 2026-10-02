@@ -91,12 +91,13 @@ jobs:
           echo "Launcher architectures: $(lipo -archs "$LAUNCHER")"
           lipo -archs "$LAUNCHER" | tr ' ' '\n' | grep -Fx "${{ matrix.binary_arch }}"
 
-          JAVA_BIN="$(find "$APP_DIR/Contents/runtime" -path '*/bin/java' -print -quit)"
-          test -n "$JAVA_BIN"
-          test -x "$JAVA_BIN"
-          "$JAVA_BIN" -version
-          echo "Bundled Java architectures: $(lipo -archs "$JAVA_BIN")"
-          lipo -archs "$JAVA_BIN" | tr ' ' '\n' | grep -Fx "${{ matrix.binary_arch }}"
+          RUNTIME_HOME="$APP_DIR/Contents/runtime/Contents/Home"
+          test -f "$RUNTIME_HOME/release"
+          grep -q 'JAVA_VERSION="25' "$RUNTIME_HOME/release"
+          LIBJVM="$RUNTIME_HOME/lib/server/libjvm.dylib"
+          test -f "$LIBJVM"
+          echo "Bundled JVM architectures: $(lipo -archs "$LIBJVM")"
+          lipo -archs "$LIBJVM" | tr ' ' '\n' | grep -Fx "${{ matrix.binary_arch }}"
 
           MAIN_JAR="$(find "$APP_DIR/Contents/app" -maxdepth 1 -type f -name 'pindb-*.jar' -print -quit)"
           test -n "$MAIN_JAR"
