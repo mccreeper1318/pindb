@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UpdateInstallerTest {
@@ -45,16 +46,40 @@ class UpdateInstallerTest {
     }
 
     @Test
+    void acceptsMacPkgChecksum() throws IOException {
+        String checksum = HASH + "  PinDB-0.3-beta.1-macos-arm64.pkg\n";
+        assertEquals(HASH, UpdateInstaller.parseExpectedChecksum(
+                checksum, "PinDB-0.3-beta.1-macos-arm64.pkg").orElseThrow());
+    }
+
+    @Test
     void buildsMacManualInstallCommand() {
         LinuxDistribution mac = LinuxDistribution.detect("Mac OS X", "");
-        assertEquals("open \"/tmp/PinDB-0.3-macos-arm64.pkg\"",
+        assertEquals("/usr/bin/open \"/tmp/PinDB-0.3-macos-arm64.pkg\"",
                 UpdateInstaller.manualInstallCommand(
                         Path.of("/tmp/PinDB-0.3-macos-arm64.pkg"), NativePackageType.MACOS_PKG, mac));
     }
 
     @Test
+    void buildsMacInstallerCommandWithoutShellQuoting() {
+        assertEquals(List.of(
+                        "/usr/bin/open",
+                        "/tmp/PinDB update/PinDB-0.3-beta.1-macos-arm64.pkg"),
+                UpdateInstaller.macInstallerCommand(
+                        Path.of("/tmp/PinDB update/PinDB-0.3-beta.1-macos-arm64.pkg")));
+    }
+
+    @Test
     void macPackagesHaveNoLinuxPackageManagerCandidates() {
         assertTrue(UpdateInstaller.packageManagerCandidates(NativePackageType.MACOS_PKG).isEmpty());
+    }
+
+    @Test
+    void macPackagesCannotBuildPrivilegedLinuxInstallCommands() {
+        assertThrows(IllegalArgumentException.class, () -> UpdateInstaller.privilegedInstallCommand(
+                Path.of("/usr/bin/pkexec"),
+                Path.of("/opt/pindb/pindb/bin/pindb-update-helper"),
+                Path.of("/tmp/PinDB-0.3-macos-arm64.pkg"), HASH, NativePackageType.MACOS_PKG));
     }
 
     @Test
