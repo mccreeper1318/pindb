@@ -11,6 +11,7 @@
 
 ### Changed
 - Extended native package handling across Debian, Fedora, and Windows packages.
+- Generalized operating-system and native-package handling to prepare macOS `.pkg` support (Issue #72).
 - Updated architecture detection to recognize Windows `x64` release assets.
 - Updated the main CI workflow to run on direct pushes to `dev`.
 
