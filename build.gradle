@@ -159,7 +159,7 @@ tasks.register('packageMacPkg', org.gradle.api.tasks.Exec) {
                 '--main-class', application.mainClass.get(),
                 '--mac-package-identifier', macPackageIdentifier,
                 '--mac-package-name', 'PinDB',
-                '--mac-app-category', 'public.app-category.productivity',
+                '--mac-app-category', 'productivity',
                 '--java-options', '-Dfile.encoding=UTF-8',
                 '--java-options', '-Dprism.order=es2,sw'
     }
