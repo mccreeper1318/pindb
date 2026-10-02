@@ -9,6 +9,7 @@
 - Added Windows release discovery, x64 matching, checksum verification, and verified installer launching.
 - Added Windows release automation with WiX plus Windows-specific CI and regression coverage.
 - Added native macOS configuration, state, and cache paths while migrating legacy fallback GitHub credentials from the former XDG config path (Issue #73).
+- Added unsigned self-contained macOS PKG packaging for Intel and Apple Silicon with normalized release filenames (Issue #74).
 
 ### Changed
 - Extended native package handling across Debian, Fedora, and Windows packages.
