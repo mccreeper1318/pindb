@@ -53,6 +53,38 @@ class UpdateServiceTest {
         assertTrue(selected.checksumUri().toString().endsWith(".pkg.sha256"));
     }
 
+    @Test void selectsMacX64InstallerAndPlatformChecksumFile() {
+        List<Map<String, Object>> assets = List.of(
+                asset("PinDB-0.3-macos-arm64.pkg"),
+                asset("PinDB-0.3-macos-x64.pkg"),
+                asset("checksums-macos.sha256"));
+        ReleasePackage selected = UpdateService.selectPackage(assets, NativePackageType.MACOS_PKG, SystemArchitecture.X86_64).orElseThrow();
+        assertEquals("PinDB-0.3-macos-x64.pkg", selected.fileName());
+        assertEquals(SystemArchitecture.X86_64, selected.architecture());
+        assertTrue(selected.checksumUri().toString().endsWith("checksums-macos.sha256"));
+    }
+
+    @Test void macUpdateSelectionRejectsWrongArchitecture() {
+        assertTrue(UpdateService.selectPackage(
+                List.of(asset("PinDB-0.3-macos-arm64.pkg")),
+                NativePackageType.MACOS_PKG,
+                SystemArchitecture.X86_64).isEmpty());
+    }
+
+    @Test void macUpdateSelectionRejectsUnknownHostArchitecture() {
+        assertTrue(UpdateService.selectPackage(
+                List.of(asset("PinDB-0.3-macos-arm64.pkg"), asset("PinDB-0.3-macos-x64.pkg")),
+                NativePackageType.MACOS_PKG,
+                SystemArchitecture.UNKNOWN).isEmpty());
+    }
+
+    @Test void macUpdateSelectionRejectsUnmarkedPackageArchitecture() {
+        assertTrue(UpdateService.selectPackage(
+                List.of(asset("PinDB-0.3-macos.pkg")),
+                NativePackageType.MACOS_PKG,
+                SystemArchitecture.AARCH64).isEmpty());
+    }
+
     @Test void preservesCurrentWindowsPackageSelection() {
         LinuxDistribution nonLinux = LinuxDistribution.detect("Windows 11", "");
         assertEquals(NativePackageType.WINDOWS_EXE,
@@ -65,9 +97,10 @@ class UpdateServiceTest {
                 UpdateService.packageTypeFor(OperatingSystem.LINUX, ubuntu).orElseThrow());
     }
 
-    @Test void leavesMacUpdateDiscoveryForMacUpdaterWork() {
+    @Test void selectsMacPkgForMacUpdates() {
         LinuxDistribution nonLinux = LinuxDistribution.detect("Mac OS X", "");
-        assertTrue(UpdateService.packageTypeFor(OperatingSystem.MACOS, nonLinux).isEmpty());
+        assertEquals(NativePackageType.MACOS_PKG,
+                UpdateService.packageTypeFor(OperatingSystem.MACOS, nonLinux).orElseThrow());
     }
 
     private static Map<String, Object> asset(String name) { return Map.of("name", name, "browser_download_url", "https://example.invalid/" + name); }
