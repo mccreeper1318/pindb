@@ -26,6 +26,16 @@ def poiVersion = '5.5.1'
 def osName = System.getProperty('os.name').toLowerCase(Locale.ROOT)
 def osArch = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
 def javafxPlatform = osName.contains('linux') ? (osArch.contains('aarch64') || osArch.contains('arm64') ? 'linux-aarch64' : 'linux') : osName.contains('mac') ? (osArch.contains('aarch64') || osArch.contains('arm64') ? 'mac-aarch64' : 'mac') : 'win'
+def macReleaseArchitecture = (osArch == 'aarch64' || osArch == 'arm64') ? 'arm64' : (osArch == 'x86_64' || osArch == 'amd64' || osArch == 'x64') ? 'x64' : null
+def macPackageIdentifier = 'org.pindb.PinDB'
+def macPackageAppVersion = {
+    def numericParts = packageAppVersion.tokenize('.')
+    if (numericParts.isEmpty() || numericParts.size() > 3 || numericParts.any { !(it ==~ /\d+/) }) {
+        throw new GradleException("macOS package metadata requires one to three numeric version components; got ${packageAppVersion}")
+    }
+    int adjustedMajor = Integer.parseInt(numericParts[0]) + 1
+    return ([adjustedMajor.toString()] + numericParts.drop(1)).join('.')
+}
 
 repositories { mavenCentral() }
 
@@ -122,10 +132,60 @@ tasks.register('packageWindows', org.gradle.api.tasks.Exec) {
     commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', packageAppVersion, '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--win-menu', '--win-menu-group', 'PinDB', '--win-dir-chooser', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
 }
 
+tasks.register('packageMacPkg', org.gradle.api.tasks.Exec) {
+    group = 'distribution'; description = 'Builds a self-contained unsigned macOS PKG installer with jpackage.'
+    dependsOn tasks.installDist
+    def packagesDir = layout.buildDirectory.dir('packages').get().asFile
+    def inputDir = layout.buildDirectory.dir('install/PinDB/lib').get().asFile
+    def associations = file('packaging/pindb-file-associations.properties')
+    def normalizedName = { "PinDB-${semanticVersion}-macos-${macReleaseArchitecture}.pkg" }
+
+    doFirst {
+        if (!osName.contains('mac')) {
+            throw new GradleException("packageMacPkg must run on macOS; detected os.name=${System.getProperty('os.name')}")
+        }
+        if (macReleaseArchitecture == null) {
+            throw new GradleException("Unsupported macOS architecture for packaging: ${System.getProperty('os.arch')}")
+        }
+        preparePackageDirectory(packagesDir, '.pkg')
+        commandLine 'jpackage',
+                '--type', 'pkg',
+                '--dest', packagesDir.absolutePath,
+                '--input', inputDir.absolutePath,
+                '--name', 'PinDB',
+                '--app-version', macPackageAppVersion(),
+                '--vendor', 'PinDB Project',
+                '--description', 'A flexible personal database application.',
+                '--main-jar', packagedMainJar,
+                '--main-class', application.mainClass.get(),
+                '--mac-package-identifier', macPackageIdentifier,
+                '--mac-package-name', 'PinDB',
+                '--mac-app-category', 'productivity',
+                '--file-associations', associations.absolutePath,
+                '--java-options', '-Dfile.encoding=UTF-8',
+                '--java-options', '-Dprism.order=es2,sw'
+    }
+
+    doLast {
+        File[] builtPackages = packagesDir.listFiles()?.findAll { it.isFile() && it.name.endsWith('.pkg') } as File[]
+        if (builtPackages == null || builtPackages.length != 1) {
+            throw new GradleException("Expected exactly one macOS PKG installer; found ${builtPackages == null ? 0 : builtPackages.length}")
+        }
+        File target = new File(packagesDir, normalizedName())
+        if (builtPackages[0].canonicalFile != target.canonicalFile) {
+            java.nio.file.Files.move(builtPackages[0].toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+        if (!target.isFile() || target.length() <= 0) {
+            throw new GradleException("macOS PKG installer is missing or empty: ${target}")
+        }
+        logger.lifecycle("Created unsigned macOS package: ${target}")
+    }
+}
+
 tasks.register('verifyReleaseTag') {
     group = 'verification'; description = 'Validates PinDB release tag formats such as 0.1, v0.1, v.0.1 and 0.2-beta.1.'
     doLast {
         def tag = providers.gradleProperty('releaseTag').orNull
-        if (tag == null || !(tag ==~ /^(?:v\.?)?\d+\.\d+(?:\.\d+)*(?:-[0-9A-Za-z.-]+)?$/)) throw new GradleException("Invalid PinDB release tag: ${tag}")
+        if (tag == null || !(tag ==~ /^(?:v\.?)?\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?$/)) throw new GradleException("Invalid PinDB release tag: ${tag}")
     }
 }
