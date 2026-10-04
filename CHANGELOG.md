@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### Fixed
+- Fixed editing an existing entry from replacing blank dates with today, blank date-times with the current time, blank dropdowns with configured defaults, and blank optional Boolean values with `false` (Issue #37).
+- Added regression coverage to ensure blank editor values remain blank during unrelated edits while configured defaults continue to apply to new entries (Issue #37).
+
 ## 0.3
 
 ### Added
