@@ -3,48 +3,31 @@ layout: default
 title: PinDB User Guide
 ---
 
-<nav class="site-nav">
-  <a href="index.html">Home</a><a href="download.html">Download</a><a href="features.html">Features</a><a href="gallery.html">Gallery</a><a href="manual.html">User Guide</a><a href="build.html">Build</a><a href="about.html">About</a>
-</nav>
-
 <h1>User Guide</h1>
 
-<h2>Install PinDB</h2>
-<p>Use the <a href="download.html">Download page</a> to select the correct package and checksum for your operating system.</p>
+<p>This guide covers PinDB itself. Installation, package verification, application-data paths, and update behavior are documented separately for each supported platform.</p>
 
-<h3>macOS</h3>
-<ul>
-  <li>Apple Silicon: use <code>-macos-arm64.pkg</code>.</li>
-  <li>Intel: use <code>-macos-x64.pkg</code>.</li>
-  <li>Verify the matching <code>.pkg.sha256</code> before opening the installer.</li>
-</ul>
-<div class="warning"><strong>Unsigned/not notarized:</strong> PinDB 0.3 Mac packages are not signed or notarized. Approve only the checksum-verified PKG through normal macOS security controls. Do not turn Gatekeeper off globally.</div>
-
-<h3>Windows 11</h3>
-<p>Use the x64 EXE. The current installer is unsigned and may trigger SmartScreen/unknown-publisher warnings.</p>
-
-<h3>Debian family</h3>
-<pre>sudo apt install ./pindb_*_amd64.deb</pre>
-
-<h3>Fedora</h3>
-<pre>sudo dnf install ./pindb-*.x86_64.rpm</pre>
-<p>Atomic Fedora editions use <code>rpm-ostree</code> instead.</p>
+<div class="platform-grid compact-grid">
+  <div class="platform-card"><h3>Windows</h3><a class="btn" href="windows-guide.html">Windows guide</a></div>
+  <div class="platform-card"><h3>macOS</h3><a class="btn" href="macos-guide.html">macOS guide</a></div>
+  <div class="platform-card"><h3>Debian family</h3><a class="btn" href="debian-guide.html">Debian guide</a></div>
+  <div class="platform-card"><h3>Fedora family</h3><a class="btn" href="fedora-guide.html">Fedora guide</a></div>
+</div>
 
 <h2>Create a database</h2>
 <ol>
   <li>Launch PinDB.</li>
   <li>Select <strong>Create New Database</strong>.</li>
-  <li>Name the database and choose where the <code>.pindb</code> file should live.</li>
+  <li>Name the database and choose where its <code>.pindb</code> file should live.</li>
   <li>Add the fields needed for the information you want to track.</li>
-  <li>Select <strong>Create Database</strong>.</li>
-  <li>Use the <strong>+</strong> button to add entries.</li>
+  <li>Create the database and use the <strong>+</strong> button to add entries.</li>
 </ol>
 
 <h2>Open existing databases</h2>
-<p>Use the PinDB launcher/recent list or open the <code>.pindb</code> file directly from Windows File Explorer, macOS Finder, or a Linux file manager after the native package has registered the association.</p>
+<p>Use the launcher and recent-files list, or open a registered <code>.pindb</code> file from your operating system's file manager.</p>
 
 <h2>Fields</h2>
-<p>PinDB supports text, multiline text, number, currency, date, date/time, yes/no, dropdown, and embedded-document fields. Depending on the field type you can configure requirements, defaults, ranges, uniqueness, text limits, choices, and summaries.</p>
+<p>PinDB supports text, multiline text, number, currency, date, date/time, yes/no, dropdown, and embedded-document fields. Depending on the field type, you can configure requirements, defaults, ranges, uniqueness, text limits, choices, and summaries.</p>
 
 <h2>Organize records</h2>
 <ul>
@@ -52,41 +35,20 @@ title: PinDB User Guide
   <li>Sort table columns.</li>
   <li>Create field-specific filters.</li>
   <li>Switch between table and record views.</li>
-  <li>Recover deleted entries from Recently Deleted before permanent removal.</li>
+  <li>Use <strong>Add &amp; Add Another</strong> for repetitive entry.</li>
+  <li>Recover records from Recently Deleted before permanent removal.</li>
 </ul>
 
 <h2>Embedded documents</h2>
-<p>Document fields store the original file inside the database. PDF, DOCX, common text files, and common images can be previewed. Files can also be saved as copies or opened with the system application.</p>
+<p>Document fields store the original file inside the database. Supported files can be previewed, saved as copies, printed where available, or opened with the system application.</p>
 
 <h2>Backups and transfer</h2>
-<p>PinDB maintains internal logical snapshots, but important databases should also be copied to a separate backup location. For the safest manual transfer, close the database normally before copying its <code>.pindb</code> file.</p>
+<p>PinDB keeps internal logical snapshots for recovery, but important databases should also be backed up separately. Close the database normally before manually copying or moving its <code>.pindb</code> file.</p>
 
 <h2>Updates</h2>
-<p>Stable updates are checked by default; prerelease updates can be enabled in Settings.</p>
-
-<h3>macOS update flow</h3>
-<ol>
-  <li>PinDB selects only the package matching the current Mac architecture.</li>
-  <li>The PKG is downloaded into <code>~/Library/Caches/PinDB/updates</code>.</li>
-  <li>The published SHA-256 checksum is required and verified.</li>
-  <li>With administrator approval PinDB creates a protected root-owned staged copy.</li>
-  <li>The staged package is re-verified and opened in macOS Installer.</li>
-  <li>PinDB exits after a successful Installer handoff.</li>
-  <li>Complete the install, then reopen PinDB manually. Pending release notes appear on the next launch.</li>
-</ol>
-
-<h3>Windows and Linux</h3>
-<p>Windows launches the checksum-verified EXE. Traditional Debian/Fedora systems use the fixed root-owned update helper and the native package manager. Fedora Atomic systems require manual <code>rpm-ostree</code> installation.</p>
-
-<h2>macOS application data</h2>
-<ul>
-  <li>Configuration: <code>~/Library/Application Support/PinDB</code></li>
-  <li>State/diagnostics: <code>~/Library/Application Support/PinDB/State</code></li>
-  <li>Cache: <code>~/Library/Caches/PinDB</code></li>
-</ul>
+<p>PinDB can check GitHub Releases for stable updates, with preview releases available when enabled in Settings. The exact package and installation flow differ by platform, so use the relevant platform guide above.</p>
 
 <h2>Report a bug</h2>
 <p>Use <strong>Report Bug</strong> from the launcher or <strong>Help → Report a Bug…</strong>. GitHub device authorization is used for sign-in. PinDB does not automatically attach database contents, embedded documents, database filenames, or personal file paths.</p>
 
-<h2>Need more detail?</h2>
-<p>The repository contains the technical <a href="https://github.com/mccreeper1318/pindb/blob/dev/docs/update-system.md">update-system design</a>, <a href="https://github.com/mccreeper1318/pindb/blob/dev/docs/release-process.md">release process</a>, and <a href="https://github.com/mccreeper1318/pindb/blob/dev/docs/macos-acceptance-testing.md">macOS acceptance checklist</a>.</p>
+<p class="page-actions"><a class="btn secondary" href="index.html">PinDB home</a> <a class="btn secondary" href="features.html">Features</a></p>

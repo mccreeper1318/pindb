@@ -1,17 +1,40 @@
 ---
 layout: default
-title: PinDB on Debian-family Linux
+title: PinDB for Debian-family Linux
 ---
 
-<nav class="site-nav"><a href="index.html">Home</a><a href="download.html">Download</a><a href="manual.html">User Guide</a><a href="about.html">About</a></nav>
+<div data-release-page></div>
+<script src="assets/site.js" defer></script>
 
-<h1>Debian, Ubuntu, and Linux Mint</h1>
-<p>Download the x86-64 DEB and matching checksum from the <a href="download.html">Download page</a>.</p>
+<h1>PinDB for Debian, Ubuntu, and Linux Mint</h1>
+<p>Download the current x86-64 DEB package for Debian-family Linux systems. Native packages include PinDB's Java runtime.</p>
+
+<div class="release-grid">
+  <div class="release-card download-group">
+    <h3>Stable release — <span id="stable-version">loading…</span></h3>
+    <a id="stable-deb-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View stable DEB releases</a>
+    <a id="stable-deb-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a>
+  </div>
+  <div class="release-card download-group">
+    <h3>Preview release — <span id="preview-version">loading…</span></h3>
+    <a id="preview-deb-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View DEB previews</a>
+    <a id="preview-deb-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a>
+  </div>
+</div>
+
+<p id="release-status" class="small">Looking up current GitHub Release assets…</p>
+
+<div class="platform-links"><a class="btn secondary" href="debian-guide.html">Debian-family user &amp; install guide</a><a class="btn secondary" href="debian-build.html">Build for Debian family</a></div>
+
+<h2>Verify and install</h2>
 <pre>sha256sum -c downloaded-package.deb.sha256
 sudo apt install ./pindb_*_amd64.deb</pre>
-<p>The package is self-contained and includes PinDB's Java runtime.</p>
+
 <h2>Updates</h2>
-<p>PinDB downloads the matching DEB, verifies SHA-256, requests administrator approval, then uses its fixed root-owned update helper to securely stage and re-verify the package before <code>apt-get</code> installs it.</p>
+<p>On supported traditional Debian-family systems, PinDB downloads the matching DEB, verifies its published SHA-256 checksum, requests administrator approval, and uses its packaged update helper with the native package manager.</p>
+
 <h2>Uninstall</h2>
 <pre>sudo apt remove pindb</pre>
-<p>Your separately stored <code>.pindb</code> database files are not part of the application package.</p>
+<p>User-created <code>.pindb</code> database files are separate from the application package.</p>
+
+<p class="page-actions"><a class="btn secondary" href="download.html">All platforms</a><a class="btn secondary" href="index.html">PinDB home</a></p>

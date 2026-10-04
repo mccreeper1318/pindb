@@ -1,19 +1,43 @@
 ---
 layout: default
-title: PinDB on Fedora
+title: PinDB for Fedora-family Linux
 ---
 
-<nav class="site-nav"><a href="index.html">Home</a><a href="download.html">Download</a><a href="manual.html">User Guide</a><a href="about.html">About</a></nav>
+<div data-release-page></div>
+<script src="assets/site.js" defer></script>
 
-<h1>Fedora Workstation and Fedora spins</h1>
-<p>Download the x86-64 RPM and matching checksum from the <a href="download.html">Download page</a>.</p>
+<h1>PinDB for Fedora</h1>
+<p>Download the current x86-64 RPM package for Fedora Workstation, Fedora spins, and related traditional RPM-based systems.</p>
+
+<div class="release-grid">
+  <div class="release-card download-group">
+    <h3>Stable release — <span id="stable-version">loading…</span></h3>
+    <a id="stable-rpm-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View stable RPM releases</a>
+    <a id="stable-rpm-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a>
+  </div>
+  <div class="release-card download-group">
+    <h3>Preview release — <span id="preview-version">loading…</span></h3>
+    <a id="preview-rpm-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View RPM previews</a>
+    <a id="preview-rpm-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a>
+  </div>
+</div>
+
+<p id="release-status" class="small">Looking up current GitHub Release assets…</p>
+
+<div class="platform-links"><a class="btn secondary" href="fedora-guide.html">Fedora user &amp; install guide</a><a class="btn secondary" href="fedora-build.html">Build for Fedora</a></div>
+
+<h2>Traditional Fedora</h2>
 <pre>sha256sum -c downloaded-package.rpm.sha256
 sudo dnf install ./pindb-*.x86_64.rpm</pre>
-<h2>Updates on traditional Fedora</h2>
-<p>PinDB verifies the matching RPM, requests administrator approval, and uses its fixed root-owned helper to securely stage/re-verify the package before installing with <code>dnf5</code> or <code>dnf</code>.</p>
+<p>PinDB verifies the matching RPM and can use the native package manager for supported in-app updates.</p>
+
 <h2>Fedora Atomic</h2>
 <p>Silverblue, Kinoite, and other immutable variants require manual layering and a reboot:</p>
 <pre>sudo rpm-ostree install ./pindb-*.x86_64.rpm</pre>
-<h2>Uninstall</h2>
+<p>Use the Fedora guide below for update and removal details.</p>
+
+<h2>Uninstall on traditional Fedora</h2>
 <pre>sudo dnf remove pindb</pre>
 <p>User-created <code>.pindb</code> files are separate from the application package.</p>
+
+<p class="page-actions"><a class="btn secondary" href="download.html">All platforms</a><a class="btn secondary" href="index.html">PinDB home</a></p>

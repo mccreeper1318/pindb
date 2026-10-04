@@ -1,48 +1,43 @@
 ---
 layout: default
-title: PinDB on macOS
+title: PinDB for macOS
 ---
 
-<nav class="site-nav"><a href="index.html">Home</a><a href="download.html">Download</a><a href="manual.html">User Guide</a><a href="about.html">About</a></nav>
+<div data-release-page></div>
+<script src="assets/site.js" defer></script>
 
-<h1>macOS — Apple Silicon and Intel</h1>
+<h1>PinDB for macOS</h1>
+<p>PinDB publishes separate native packages for Apple Silicon and Intel Macs. Each package includes its own Java runtime.</p>
 
-<p>PinDB 0.3 provides two native PKGs:</p>
-<ul>
-  <li><strong>Apple Silicon:</strong> <code>PinDB-&lt;version&gt;-macos-arm64.pkg</code></li>
-  <li><strong>Intel:</strong> <code>PinDB-&lt;version&gt;-macos-x64.pkg</code></li>
-</ul>
+<h2>Stable release — <span id="stable-version">loading…</span></h2>
+<div class="release-grid">
+  <div class="release-card download-group"><h3>Apple Silicon</h3><p class="small">M-series Macs · ARM64</p><a id="stable-macos-arm64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View stable Apple Silicon releases</a><a id="stable-macos-arm64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a></div>
+  <div class="release-card download-group"><h3>Intel</h3><p class="small">Intel Macs · x86_64</p><a id="stable-macos-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View stable Intel releases</a><a id="stable-macos-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a></div>
+</div>
 
-<div class="warning"><strong>Unsigned and not notarized:</strong> the 0.3 PKGs are not currently signed with an Apple Developer ID or notarized by Apple. Verify the official SHA-256 checksum before opening the package. Approve only that verified package through normal macOS security controls; do not disable Gatekeeper globally.</div>
+<h2>Preview release — <span id="preview-version">loading…</span></h2>
+<div class="release-grid">
+  <div class="release-card download-group"><h3>Apple Silicon</h3><a id="preview-macos-arm64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View Apple Silicon previews</a><a id="preview-macos-arm64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a></div>
+  <div class="release-card download-group"><h3>Intel</h3><a id="preview-macos-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View Intel previews</a><a id="preview-macos-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a></div>
+</div>
 
-<h2>Verify the PKG</h2>
-<p>Download the PKG and matching <code>.pkg.sha256</code> from the same GitHub Release, then run the command for your architecture:</p>
+<p id="release-status" class="small">Looking up current GitHub Release assets…</p>
+
+<div class="platform-links"><a class="btn secondary" href="macos-guide.html">macOS user &amp; install guide</a><a class="btn secondary" href="macos-build.html">Build for macOS</a></div>
+
+<h2>Which package do I need?</h2>
+<table class="status-table"><thead><tr><th>Mac</th><th>Package suffix</th></tr></thead><tbody><tr><td>Apple Silicon</td><td><code>-macos-arm64.pkg</code></td></tr><tr><td>Intel</td><td><code>-macos-x64.pkg</code></td></tr></tbody></table>
+<p>Use <strong>Apple menu → About This Mac</strong> if you are unsure which processor your Mac uses.</p>
+
+<div class="warning"><strong>Package trust:</strong> signing and notarization status can vary by release. Always download the package and checksum from the same official GitHub Release and verify the checksum before approving any macOS security prompt.</div>
+
+<h2>Verify a download</h2>
 <pre>shasum -a 256 -c PinDB-&lt;version&gt;-macos-arm64.pkg.sha256
 # or
 shasum -a 256 -c PinDB-&lt;version&gt;-macos-x64.pkg.sha256</pre>
 <p>The command must report <code>OK</code>.</p>
 
-<h2>Install</h2>
-<ol>
-  <li>Open the verified PKG in Finder.</li>
-  <li>If macOS blocks the package because it is unidentified/unverified, use the normal warning or <strong>System Settings → Privacy &amp; Security</strong> to approve that specific verified package.</li>
-  <li>Complete the installation in macOS Installer.</li>
-  <li>Launch PinDB from Applications/Finder.</li>
-</ol>
-<p>The package registers <code>.pindb</code> files so databases can be opened directly from Finder.</p>
+<h2>Updates</h2>
+<p>PinDB selects only the package matching the current Mac architecture, verifies SHA-256, prepares the verified package for Installer handoff, and opens macOS Installer. Follow the prompts shown by the current release.</p>
 
-<h2>Automatic update flow</h2>
-<p>PinDB rejects wrong-architecture, unknown-architecture, and unmarked Mac packages. For a valid update it downloads the exact architecture match, verifies SHA-256, asks for administrator approval to create a protected root-owned staged copy, re-verifies that copy, and opens it in macOS Installer.</p>
-<p>PinDB exits after the Installer handoff. Finish the install and <strong>reopen PinDB manually</strong>; pending release notes are shown on the next launch.</p>
-
-<h2>Native paths</h2>
-<ul>
-  <li>Configuration: <code>~/Library/Application Support/PinDB</code></li>
-  <li>State/diagnostics: <code>~/Library/Application Support/PinDB/State</code></li>
-  <li>Cache/update downloads: <code>~/Library/Caches/PinDB</code></li>
-</ul>
-
-<h2>Manual recovery</h2>
-<p>If an update reaches protected staging but macOS Installer cannot be opened, PinDB retains the protected package temporarily and reports an <code>/usr/bin/open</code> command for that exact staged path.</p>
-
-<p><a class="btn" href="download.html">Download PinDB for macOS</a></p>
+<p class="page-actions"><a class="btn secondary" href="download.html">All platforms</a><a class="btn secondary" href="index.html">PinDB home</a></p>

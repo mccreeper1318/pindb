@@ -3,164 +3,33 @@ layout: default
 title: Download PinDB
 ---
 
-<nav class="site-nav">
-  <a href="index.html">Home</a>
-  <a href="download.html">Download</a>
-  <a href="features.html">Features</a>
-  <a href="gallery.html">Gallery</a>
-  <a href="manual.html">User Guide</a>
-  <a href="build.html">Build</a>
-  <a href="about.html">About</a>
-</nav>
-
-<div data-release-page></div>
-<script src="assets/site.js" defer></script>
-
 <h1>Download PinDB</h1>
 
-<p>Official installers are published on GitHub Releases. Every native package includes its own Java runtime.</p>
-
-<div class="warning"><strong>Before installing on macOS:</strong> PinDB 0.3 Mac PKGs are unsigned and not notarized. Download the PKG and matching <code>.sha256</code> from the same official release, verify the checksum, and approve only that verified package through the normal macOS security controls. Do not disable Gatekeeper globally.</div>
-
-<h2>Latest stable: <span id="stable-version">loading…</span></h2>
+<p>Choose your operating system. Each platform page shows the newest stable and newest preview release available for that platform, along with its checksum, installation notes, user guide, and source-build instructions.</p>
 
 <div class="platform-grid">
-  <div class="platform-card download-group">
-    <h3>Windows 11 x64</h3>
-    <a id="stable-windows-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View Windows releases</a>
-    <a id="stable-windows-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="windows.html">Windows installation guide</a>
+  <div class="platform-card">
+    <h3>Windows</h3>
+    <p>Native 64-bit Windows installer.</p>
+    <a class="btn" href="windows.html">Windows downloads</a>
   </div>
-  <div class="platform-card download-group">
-    <h3>macOS — Apple Silicon</h3>
-    <p class="small">M-series Macs · ARM64</p>
-    <a id="stable-macos-arm64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View Apple Silicon releases</a>
-    <a id="stable-macos-arm64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="macos.html">macOS installation guide</a>
+  <div class="platform-card">
+    <h3>macOS</h3>
+    <p>Apple Silicon and Intel packages.</p>
+    <a class="btn" href="macos.html">macOS downloads</a>
   </div>
-  <div class="platform-card download-group">
-    <h3>macOS — Intel</h3>
-    <p class="small">Intel Macs · x86_64</p>
-    <a id="stable-macos-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View Intel Mac releases</a>
-    <a id="stable-macos-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="macos.html">macOS installation guide</a>
+  <div class="platform-card">
+    <h3>Debian family</h3>
+    <p>DEB packages for Debian, Ubuntu, Linux Mint, and related distributions.</p>
+    <a class="btn" href="debian.html">Debian-family downloads</a>
   </div>
-  <div class="platform-card download-group">
-    <h3>Debian / Ubuntu / Mint</h3>
-    <a id="stable-deb-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View DEB releases</a>
-    <a id="stable-deb-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="debian.html">Debian-family installation guide</a>
-  </div>
-  <div class="platform-card download-group">
-    <h3>Fedora Workstation / Spins</h3>
-    <a id="stable-rpm-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View RPM releases</a>
-    <a id="stable-rpm-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="fedora.html">Fedora installation guide</a>
+  <div class="platform-card">
+    <h3>Fedora family</h3>
+    <p>RPM packages for Fedora Workstation and related systems.</p>
+    <a class="btn" href="fedora.html">Fedora downloads</a>
   </div>
 </div>
 
-<h2>Latest preview: <span id="preview-version">loading…</span></h2>
+<p class="small">Need an older release or a package not listed on a platform page? <a href="https://github.com/mccreeper1318/pindb/releases">Browse all GitHub Releases</a>.</p>
 
-<p>Preview releases contain newer 0.3 work and may still have unfinished behavior.</p>
-
-<div class="platform-grid">
-  <div class="platform-card download-group">
-    <h3>Windows 11 x64</h3>
-    <a id="preview-windows-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View Windows preview</a>
-    <a id="preview-windows-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="windows.html">Windows installation guide</a>
-  </div>
-  <div class="platform-card download-group">
-    <h3>macOS — Apple Silicon</h3>
-    <a id="preview-macos-arm64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View Apple Silicon preview</a>
-    <a id="preview-macos-arm64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="macos.html">macOS installation guide</a>
-  </div>
-  <div class="platform-card download-group">
-    <h3>macOS — Intel</h3>
-    <a id="preview-macos-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View Intel Mac preview</a>
-    <a id="preview-macos-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="macos.html">macOS installation guide</a>
-  </div>
-  <div class="platform-card download-group">
-    <h3>Debian / Ubuntu / Mint</h3>
-    <a id="preview-deb-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View DEB preview</a>
-    <a id="preview-deb-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="debian.html">Debian-family installation guide</a>
-  </div>
-  <div class="platform-card download-group">
-    <h3>Fedora Workstation / Spins</h3>
-    <a id="preview-rpm-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View RPM preview</a>
-    <a id="preview-rpm-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksums</a><br>
-    <a class="small guide-link" href="fedora.html">Fedora installation guide</a>
-  </div>
-</div>
-
-<p id="release-status" class="small">Looking up current GitHub Release assets…</p>
-
-<h2>Which Mac download do I need?</h2>
-
-<table class="status-table">
-  <thead><tr><th>Mac</th><th>Package suffix</th></tr></thead>
-  <tbody>
-    <tr><td>Apple Silicon (M1/M2/M3/M4 and newer M-series)</td><td><code>-macos-arm64.pkg</code></td></tr>
-    <tr><td>Intel</td><td><code>-macos-x64.pkg</code></td></tr>
-  </tbody>
-</table>
-
-<p>On macOS choose <strong>Apple menu → About This Mac</strong> if you are unsure which processor your Mac uses.</p>
-
-<h2>Verify the download</h2>
-
-<h3>macOS</h3>
-<pre>shasum -a 256 -c PinDB-&lt;version&gt;-macos-arm64.pkg.sha256
-# or
-shasum -a 256 -c PinDB-&lt;version&gt;-macos-x64.pkg.sha256</pre>
-<p>The command must report <code>OK</code>.</p>
-
-<h3>Windows PowerShell</h3>
-<pre>Get-FileHash .\PinDB-&lt;version&gt;-windows-x64.exe -Algorithm SHA256
-Get-Content .\PinDB-&lt;version&gt;-windows-x64.exe.sha256</pre>
-<p>The hexadecimal values must match.</p>
-
-<h3>Linux</h3>
-<pre>sha256sum -c downloaded-package.sha256</pre>
-
-<h2>Installation summary</h2>
-
-<h3>macOS</h3>
-<ol>
-  <li>Verify the PKG checksum.</li>
-  <li>Open the verified PKG in Finder.</li>
-  <li>If macOS blocks the unsigned package, approve that specific package through the normal warning or <strong>System Settings → Privacy & Security</strong>.</li>
-  <li>Complete installation in macOS Installer.</li>
-  <li>Launch PinDB from Applications/Finder. <code>.pindb</code> files can then be opened directly from Finder.</li>
-</ol>
-
-<h3>Windows 11</h3>
-<p>Verify the checksum, run the x64 EXE, and follow the installer. The current EXE is unsigned and can trigger an unknown-publisher/SmartScreen warning.</p>
-
-<h3>Debian family</h3>
-<pre>sudo apt install ./pindb_*_amd64.deb</pre>
-
-<h3>Fedora traditional</h3>
-<pre>sudo dnf install ./pindb-*.x86_64.rpm</pre>
-
-<h3>Fedora Atomic</h3>
-<pre>sudo rpm-ostree install ./pindb-*.x86_64.rpm</pre>
-<p>Reboot into the new deployment after installation/update.</p>
-
-<h2>Update behavior</h2>
-
-<table class="status-table">
-  <thead><tr><th>Platform</th><th>In-app update behavior</th></tr></thead>
-  <tbody>
-    <tr><td>Windows 11 x64</td><td>Downloads and verifies the matching EXE, launches it, then exits.</td></tr>
-    <tr><td>macOS Apple Silicon / Intel</td><td>Selects only the matching PKG, verifies SHA-256, stages a protected root-owned copy with administrator approval, opens macOS Installer, then exits. Reopen PinDB manually after Installer finishes.</td></tr>
-    <tr><td>Debian family</td><td>Verifies and installs the DEB through PinDB's fixed privileged helper and apt-get.</td></tr>
-    <tr><td>Fedora traditional</td><td>Verifies and installs the RPM through the fixed helper and dnf5/dnf.</td></tr>
-    <tr><td>Fedora Atomic</td><td>Manual rpm-ostree update and reboot required.</td></tr>
-  </tbody>
-</table>
-
-<p><a class="btn" href="manual.html">Read the user/install guide</a> <a class="btn" href="https://github.com/mccreeper1318/pindb/releases">Open all GitHub Releases</a></p>
+<p><a class="btn secondary" href="index.html">PinDB home</a></p>
