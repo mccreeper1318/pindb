@@ -71,9 +71,30 @@ class UpdateInstallerTest {
     }
 
     @Test
-    void macStagingUsesRootOwnedStickyTempLocation() {
-        assertEquals(Path.of("/private/var/tmp/PinDB-verified-update.pkg"),
-                UpdateInstaller.macStagedInstallerPath());
+    void macStagingAcceptsDistinctUniqueProtectedPaths() {
+        Path first = Path.of("/private/var/tmp/PinDB-verified-update.Ab12Cd34/PinDB-verified-update.pkg");
+        Path second = Path.of("/private/var/tmp/PinDB-verified-update.Z9y8X7w6/PinDB-verified-update.pkg");
+
+        assertEquals(first, UpdateInstaller.parseMacStagedInstallerPath(first.toString()).orElseThrow());
+        assertEquals(second, UpdateInstaller.parseMacStagedInstallerPath(second.toString()).orElseThrow());
+        assertFalse(first.equals(second));
+        assertTrue(UpdateInstaller.isExpectedMacStagedInstallerPath(first));
+        assertTrue(UpdateInstaller.isExpectedMacStagedInstallerPath(second));
+    }
+
+    @Test
+    void macStagingRejectsSharedOrMalformedProtectedPaths() {
+        assertTrue(UpdateInstaller.parseMacStagedInstallerPath(
+                "/private/var/tmp/PinDB-verified-update.pkg").isEmpty());
+        assertTrue(UpdateInstaller.parseMacStagedInstallerPath(
+                "/private/var/tmp/PinDB-verified-update.Ab12Cd34/not-the-installer.pkg").isEmpty());
+        assertTrue(UpdateInstaller.parseMacStagedInstallerPath(
+                "/tmp/PinDB-verified-update.Ab12Cd34/PinDB-verified-update.pkg").isEmpty());
+        assertTrue(UpdateInstaller.parseMacStagedInstallerPath(
+                "/private/var/tmp/PinDB-verified-update.bad_suffix/PinDB-verified-update.pkg").isEmpty());
+        assertTrue(UpdateInstaller.parseMacStagedInstallerPath(
+                "/private/var/tmp/PinDB-verified-update.Ab12Cd34/PinDB-verified-update.pkg\n"
+                        + "/private/var/tmp/PinDB-verified-update.Z9y8X7w6/PinDB-verified-update.pkg").isEmpty());
     }
 
     @Test
@@ -87,9 +108,11 @@ class UpdateInstallerTest {
 
         String appleScript = String.join("\n", command.subList(0, command.size() - 2));
         assertTrue(appleScript.contains("with administrator privileges"));
+        assertTrue(appleScript.contains("/usr/bin/mktemp -d /private/var/tmp/PinDB-verified-update.XXXXXXXX"));
         assertTrue(appleScript.contains("/usr/bin/install -o root -g wheel -m 0400"));
         assertTrue(appleScript.contains("/usr/bin/shasum -a 256"));
-        assertTrue(appleScript.contains("/private/var/tmp/PinDB-verified-update.pkg"));
+        assertTrue(appleScript.contains("PinDB-verified-update.pkg"));
+        assertFalse(appleScript.contains("/private/var/tmp/PinDB-verified-update.pkg"));
         assertFalse(appleScript.contains(source.toString()));
         assertFalse(appleScript.contains(HASH));
     }
