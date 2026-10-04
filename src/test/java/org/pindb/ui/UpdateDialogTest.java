@@ -18,11 +18,21 @@ class UpdateDialogTest {
     }
 
     @Test
-    void nonMacUpdateGuidanceKeepsAutomaticRestartMessage() {
+    void windowsUpdateGuidanceExplainsInstallerHandoffAndManualReopen() {
         LinuxDistribution windows = LinuxDistribution.detect("Windows 11", "");
 
         assertEquals(
-                "PinDB will install the matching .exe package after administrator approval, then close and reopen.",
+                "PinDB will download and verify the matching .exe installer, launch it, then close. "
+                        + "Complete the installation and reopen PinDB when it finishes.",
                 UpdateDialog.updateMessage(NativePackageType.WINDOWS_EXE, windows));
+    }
+
+    @Test
+    void linuxUpdateGuidanceKeepsAutomaticRestartMessage() {
+        LinuxDistribution debian = LinuxDistribution.detect("Linux", "ID=debian\n");
+
+        assertEquals(
+                "PinDB will install the matching .deb package after administrator approval, then close and reopen.",
+                UpdateDialog.updateMessage(NativePackageType.DEB, debian));
     }
 }
