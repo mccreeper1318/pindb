@@ -56,7 +56,7 @@ fi
 APP="$(cat "$APP_LIST")"
 INFO_PLIST="$APP/Contents/Info.plist"
 LAUNCHER="$APP/Contents/MacOS/PinDB"
-RUNTIME_JAVA="$APP/Contents/runtime/Contents/Home/bin/java"
+RUNTIME_HOME="$APP/Contents/runtime/Contents/Home"
 
 if [[ ! -f "$INFO_PLIST" ]]; then
   echo "PinDB.app is missing Contents/Info.plist." >&2
@@ -66,13 +66,28 @@ if [[ ! -x "$LAUNCHER" ]]; then
   echo "PinDB.app is missing its executable launcher." >&2
   exit 1
 fi
-if [[ ! -x "$RUNTIME_JAVA" ]]; then
-  echo "PinDB.app is missing the bundled Java runtime." >&2
+if [[ ! -d "$RUNTIME_HOME" ]]; then
+  echo "PinDB.app is missing its bundled Java runtime image." >&2
+  exit 1
+fi
+
+RUNTIME_BINARY=""
+for candidate in \
+  "$RUNTIME_HOME/lib/libjli.dylib" \
+  "$RUNTIME_HOME/lib/server/libjvm.dylib"; do
+  if [[ -f "$candidate" ]]; then
+    RUNTIME_BINARY="$candidate"
+    break
+  fi
+done
+if [[ -z "$RUNTIME_BINARY" ]]; then
+  echo "PinDB.app runtime image does not contain libjli.dylib or libjvm.dylib." >&2
+  find "$RUNTIME_HOME" -maxdepth 3 -type f -print >&2 || true
   exit 1
 fi
 
 LAUNCHER_INFO="$(file "$LAUNCHER")"
-RUNTIME_INFO="$(file "$RUNTIME_JAVA")"
+RUNTIME_INFO="$(file "$RUNTIME_BINARY")"
 echo "$LAUNCHER_INFO"
 echo "$RUNTIME_INFO"
 if ! grep -Fq "$EXPECTED_MACHINE" <<< "$LAUNCHER_INFO"; then
@@ -127,7 +142,7 @@ if not icon_name:
     raise SystemExit("PinDB.app does not declare a CFBundleIconFile")
 
 print(f"Verified bundle identifier: {bundle_identifier}")
-print(f"Verified .pindb association with MIME type application/x-pindb")
+print("Verified .pindb association with MIME type application/x-pindb")
 print(f"Verified application icon metadata: {icon_name}")
 PY
 
@@ -142,4 +157,5 @@ fi
 
 echo "Verified macOS PKG: $PKG"
 echo "Verified architecture: $EXPECTED_MACHINE"
+echo "Verified bundled runtime binary: $RUNTIME_BINARY"
 echo "Verified package and bundle identifier: $EXPECTED_IDENTIFIER"
