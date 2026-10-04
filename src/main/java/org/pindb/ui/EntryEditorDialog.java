@@ -69,7 +69,7 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             String labelText = field.name() + (field.required() ? " *" : "");
             Label label = new Label(labelText + ":");
             label.setWrapText(true);
-            String value = existing == null ? UiUtil.resolvedDefault(field) : existing.value(field.id());
+            String value = initialValue(field, existing);
             ValueEditor editor = createEditor(field, value);
             editors.put(field.id(), editor);
             grid.add(label, 0, row);
@@ -119,6 +119,39 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             }
         });
         setOnShown(event -> hidePlatformButtonBar(hiddenCancelType));
+    }
+
+    static String initialValue(FieldDefinition field, RecordData existing) {
+        return existing == null ? UiUtil.resolvedDefault(field) : existing.value(field.id());
+    }
+
+    static LocalDateTime parseDateTime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(value);
+        } catch (DateTimeParseException exception) {
+            return null;
+        }
+    }
+
+    static Boolean parseBoolean(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return Boolean.parseBoolean(value);
+    }
+
+    static String serializeBoolean(boolean indeterminate, boolean selected) {
+        return indeterminate ? "" : Boolean.toString(selected);
+    }
+
+    static String initialDropdownValue(FieldDefinition field, String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value;
     }
 
     private void hidePlatformButtonBar(ButtonType hiddenCancelType) {
@@ -201,16 +234,9 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
     }
 
     private ValueEditor dateTimeEditor(String value) {
-        LocalDateTime parsed;
-        try {
-            parsed = value == null || value.isBlank()
-                    ? LocalDateTime.now().withSecond(0).withNano(0)
-                    : LocalDateTime.parse(value);
-        } catch (DateTimeParseException exception) {
-            parsed = LocalDateTime.now().withSecond(0).withNano(0);
-        }
-        DatePicker date = new DatePicker(parsed.toLocalDate());
-        TextField time = new TextField(TIME_FORMAT.format(parsed.toLocalTime()));
+        LocalDateTime parsed = parseDateTime(value);
+        DatePicker date = new DatePicker(parsed == null ? null : parsed.toLocalDate());
+        TextField time = new TextField(parsed == null ? "" : TIME_FORMAT.format(parsed.toLocalTime()));
         time.setPromptText("14:30");
         time.setPrefColumnCount(7);
         HBox box = new HBox(8, date, time);
@@ -243,21 +269,28 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
 
     private ValueEditor booleanEditor(String value) {
         CheckBox check = new CheckBox("Yes");
-        check.setSelected(Boolean.parseBoolean(value));
-        return new ValueEditor(check, () -> Boolean.toString(check.isSelected()), () -> "");
+        check.setAllowIndeterminate(true);
+        Boolean parsed = parseBoolean(value);
+        if (parsed == null) {
+            check.setIndeterminate(true);
+        } else {
+            check.setSelected(parsed);
+        }
+        return new ValueEditor(check,
+                () -> serializeBoolean(check.isIndeterminate(), check.isSelected()),
+                () -> "");
     }
 
     private ValueEditor dropdownEditor(FieldDefinition field, String value) {
         ComboBox<String> combo = new ComboBox<>(FXCollections.observableArrayList(field.dropdownOptions()));
         combo.setEditable(false);
         combo.setMaxWidth(Double.MAX_VALUE);
-        if (field.dropdownOptions().contains(value)) {
-            combo.setValue(value);
-        } else if (!value.isBlank()) {
-            combo.getItems().add(value);
-            combo.setValue(value);
-        } else if (!field.defaultValue().isBlank() && field.dropdownOptions().contains(field.defaultValue())) {
-            combo.setValue(field.defaultValue());
+        String initial = initialDropdownValue(field, value);
+        if (initial != null) {
+            if (!combo.getItems().contains(initial)) {
+                combo.getItems().add(initial);
+            }
+            combo.setValue(initial);
         }
         return new ValueEditor(combo, () -> combo.getValue() == null ? "" : combo.getValue(), () -> "");
     }

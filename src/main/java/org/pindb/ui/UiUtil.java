@@ -143,10 +143,13 @@ public final class UiUtil {
     }
 
     public static LocalDate parseDate(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
         try {
-            return value == null || value.isBlank() ? LocalDate.now() : LocalDate.parse(value);
+            return LocalDate.parse(value);
         } catch (DateTimeParseException exception) {
-            return LocalDate.now();
+            return null;
         }
     }
 
