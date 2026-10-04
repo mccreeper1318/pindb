@@ -3,45 +3,35 @@ layout: default
 title: About PinDB
 ---
 
-<nav class="site-nav">
-  <a href="index.html">Home</a><a href="download.html">Download</a><a href="features.html">Features</a><a href="gallery.html">Gallery</a><a href="manual.html">User Guide</a><a href="build.html">Build</a><a href="about.html">About</a>
-</nav>
-
 <h1>About PinDB</h1>
 
-<p>PinDB is an open-source desktop personal database focused on portable files, approachable data entry, embedded documents, and native desktop packaging without requiring a separate database server.</p>
+<p>PinDB is an open-source desktop personal database focused on portability, approachable data entry, local ownership, and native desktop use. It is intended for people who need more structure than a spreadsheet but do not want to run or administer a separate database server.</p>
 
-<h2>Current release lines</h2>
-<table class="status-table">
-  <thead><tr><th>Line</th><th>Purpose</th></tr></thead>
-  <tbody>
-    <tr><td>0.2.1</td><td>Current stable Linux-focused release line.</td></tr>
-    <tr><td>0.3</td><td>Cross-platform development line adding Windows 11 and first-class macOS support alongside Linux.</td></tr>
-  </tbody>
-</table>
-
-<h2>0.3 platform status</h2>
+<h2>Project principles</h2>
 <ul>
-  <li><strong>Windows 11 x64:</strong> self-contained EXE, file association, native paths, checksummed updates, and Windows CI/release automation.</li>
-  <li><strong>macOS Apple Silicon and Intel:</strong> self-contained PKGs, Finder association, native paths, architecture-matched protected updates, two-architecture CI, and automatic release assets.</li>
-  <li><strong>Debian family:</strong> self-contained DEB with secure privileged updater.</li>
-  <li><strong>Fedora traditional:</strong> self-contained RPM with DNF update support.</li>
-  <li><strong>Fedora Atomic:</strong> manual rpm-ostree installation/update.</li>
+  <li><strong>Local-first:</strong> databases are files you choose and control.</li>
+  <li><strong>Portable:</strong> a closed <code>.pindb</code> file can be copied, backed up, and moved like an ordinary file.</li>
+  <li><strong>Approachable:</strong> common database tasks are exposed through a desktop interface instead of SQL.</li>
+  <li><strong>Cross-platform:</strong> native packaging is provided for supported Windows, macOS, Debian-family, and Fedora-family systems.</li>
+  <li><strong>Open source:</strong> development, issues, releases, and source code are public on GitHub.</li>
 </ul>
 
-<div class="warning"><strong>Signing status:</strong> PinDB 0.3 macOS PKGs are currently unsigned and not notarized. Windows installers are also currently unsigned. Verify published SHA-256 checksums before installation.</div>
-
 <h2>Privacy and local data</h2>
-<p>Databases are local files chosen by the user. PinDB does not require a hosted database service. The in-app bug reporter is designed not to automatically include database contents, embedded files, database filenames, document filenames, or personal file paths.</p>
+<p>PinDB does not require a hosted database service. User databases remain local unless the user chooses to copy or sync them elsewhere. The in-app bug reporter is designed not to automatically include database contents, embedded files, database filenames, document filenames, or personal file paths.</p>
 
-<h2>Limitations</h2>
+<h2>What belongs in a platform page</h2>
+<p>Installation requirements, package formats, signing status, update behavior, and current release downloads can differ by operating system. Those details are intentionally kept on the platform-specific download and guide pages so this page remains useful across release lines.</p>
+
+<h2>Current limitations</h2>
 <ul>
-  <li>Database encryption is not yet included.</li>
-  <li>Mac packages are not yet signed/notarized.</li>
-  <li>Windows packages are not yet code-signed.</li>
-  <li>Fedora Atomic updates require manual rpm-ostree handling.</li>
+  <li>Database encryption is not yet built in.</li>
+  <li>Package signing and operating-system trust prompts may vary by platform and release.</li>
+  <li>Some immutable Linux distributions require manual package-management steps.</li>
   <li>Embedded previews are intended for convenient inspection rather than full office-suite fidelity.</li>
 </ul>
 
-<h2>Project links</h2>
-<p><a class="btn" href="https://github.com/mccreeper1318/pindb">Repository</a> <a class="btn" href="https://github.com/mccreeper1318/pindb/releases">Releases</a> <a class="btn" href="https://github.com/mccreeper1318/pindb/issues">Issues</a></p>
+<div class="page-actions">
+  <a class="btn" href="index.html">PinDB home</a>
+  <a class="btn secondary" href="https://github.com/mccreeper1318/pindb">Repository</a>
+  <a class="btn secondary" href="https://github.com/mccreeper1318/pindb/issues">Issues</a>
+</div>

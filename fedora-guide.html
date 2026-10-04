@@ -1,0 +1,35 @@
+---
+layout: default
+title: Fedora Guide · PinDB
+---
+
+<h1>Fedora user &amp; install guide</h1>
+
+<p>This page covers Fedora Workstation, Fedora spins, and Fedora Atomic variants. For normal application use, see the <a href="manual.html">main PinDB User Guide</a>.</p>
+
+<h2>Traditional Fedora</h2>
+<ol>
+  <li>Download the RPM and checksum from <a href="fedora.html">PinDB for Fedora</a>.</li>
+  <li>Verify the checksum.</li>
+  <li>Install with DNF.</li>
+</ol>
+<pre>sha256sum -c downloaded-package.rpm.sha256
+sudo dnf install ./pindb-*.x86_64.rpm</pre>
+
+<h2>Updates on traditional Fedora</h2>
+<p>PinDB verifies the matching RPM before requesting administrator approval and handing installation to the packaged update helper and <code>dnf5</code> or <code>dnf</code>.</p>
+
+<h2>Fedora Atomic</h2>
+<p>Silverblue, Kinoite, and other immutable variants require manual package layering:</p>
+<pre>sudo rpm-ostree install ./pindb-*.x86_64.rpm</pre>
+<p>Reboot into the new deployment after installation or update.</p>
+
+<h2>Uninstall</h2>
+<p>Traditional Fedora:</p>
+<pre>sudo dnf remove pindb</pre>
+<p>For an Atomic system, use the matching <code>rpm-ostree</code> removal workflow and reboot into the resulting deployment.</p>
+
+<h2>Your databases</h2>
+<p>Removing PinDB does not remove separately stored <code>.pindb</code> database files. Keep external backups of important data.</p>
+
+<p class="page-actions"><a class="btn" href="fedora.html">Fedora downloads</a><a class="btn secondary" href="manual.html">General user guide</a></p>

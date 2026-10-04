@@ -1,0 +1,44 @@
+---
+layout: default
+title: macOS Guide · PinDB
+---
+
+<h1>macOS user &amp; install guide</h1>
+
+<p>This page covers macOS-specific setup. For creating databases, fields, records, backups, documents, printing, and general use, see the <a href="manual.html">main PinDB User Guide</a>.</p>
+
+<h2>Choose the correct package</h2>
+<ul>
+  <li><strong>Apple Silicon:</strong> use the <code>-macos-arm64.pkg</code> package.</li>
+  <li><strong>Intel:</strong> use the <code>-macos-x64.pkg</code> package.</li>
+</ul>
+
+<h2>Install</h2>
+<ol>
+  <li>Download the matching PKG and checksum from <a href="macos.html">PinDB for macOS</a>.</li>
+  <li>Verify the SHA-256 checksum.</li>
+  <li>Open the verified PKG in Finder and complete installation in macOS Installer.</li>
+  <li>If macOS displays a trust warning, approve only the verified official package through the normal system controls.</li>
+  <li>Launch PinDB from Applications or open a registered <code>.pindb</code> file.</li>
+</ol>
+
+<h2>Verify the PKG</h2>
+<pre>shasum -a 256 -c PinDB-&lt;version&gt;-macos-arm64.pkg.sha256
+# or
+shasum -a 256 -c PinDB-&lt;version&gt;-macos-x64.pkg.sha256</pre>
+<p>The command must report <code>OK</code>.</p>
+
+<h2>Application data</h2>
+<ul>
+  <li>Configuration: <code>~/Library/Application Support/PinDB</code></li>
+  <li>State and diagnostics: <code>~/Library/Application Support/PinDB/State</code></li>
+  <li>Cache and update downloads: <code>~/Library/Caches/PinDB</code></li>
+</ul>
+
+<h2>Updates</h2>
+<p>PinDB selects the package for the current Mac architecture and verifies the published checksum before handing the package to macOS Installer. Follow the update instructions shown for the release you are installing.</p>
+
+<h2>Your databases</h2>
+<p><code>.pindb</code> files are ordinary user documents. Keep separate external backups of important databases.</p>
+
+<p class="page-actions"><a class="btn" href="macos.html">macOS downloads</a><a class="btn secondary" href="manual.html">General user guide</a></p>

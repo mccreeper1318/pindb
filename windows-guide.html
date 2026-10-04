@@ -1,0 +1,36 @@
+---
+layout: default
+title: Windows Guide · PinDB
+---
+
+<h1>Windows user &amp; install guide</h1>
+
+<p>This page covers Windows-specific setup. For creating databases, fields, records, backups, documents, printing, and general use, see the <a href="manual.html">main PinDB User Guide</a>.</p>
+
+<h2>Install</h2>
+<ol>
+  <li>Download the stable or preview x64 EXE and its checksum from <a href="windows.html">PinDB for Windows</a>.</li>
+  <li>Compare the installer SHA-256 value with the published checksum.</li>
+  <li>Run the installer and follow the prompts.</li>
+  <li>Launch PinDB from the Start Menu or open a registered <code>.pindb</code> file.</li>
+</ol>
+
+<h2>Verify with PowerShell</h2>
+<pre>Get-FileHash .\PinDB-&lt;version&gt;-windows-x64.exe -Algorithm SHA256
+Get-Content .\PinDB-&lt;version&gt;-windows-x64.exe.sha256</pre>
+
+<div class="warning"><strong>Security prompts:</strong> signing status can vary by release. If Windows shows an unknown-publisher or SmartScreen warning, verify the checksum first and proceed only with the official GitHub Release asset you intended to download.</div>
+
+<h2>Application data</h2>
+<ul>
+  <li>Configuration: <code>%APPDATA%\PinDB</code></li>
+  <li>State and cache: <code>%LOCALAPPDATA%\PinDB</code></li>
+</ul>
+
+<h2>Updates</h2>
+<p>PinDB can download the matching x64 installer and verify its checksum before handing off to the Windows installer. Complete the installer normally when prompted.</p>
+
+<h2>Your databases</h2>
+<p><code>.pindb</code> files are user documents, not part of the application installation. Keep external backups of important databases.</p>
+
+<p class="page-actions"><a class="btn" href="windows.html">Windows downloads</a><a class="btn secondary" href="manual.html">General user guide</a></p>

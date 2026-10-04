@@ -3,18 +3,14 @@ layout: default
 title: PinDB Features
 ---
 
-<nav class="site-nav">
-  <a href="index.html">Home</a><a href="download.html">Download</a><a href="features.html">Features</a><a href="gallery.html">Gallery</a><a href="manual.html">User Guide</a><a href="build.html">Build</a><a href="about.html">About</a>
-</nav>
-
 <h1>Features</h1>
 
 <h2>Portable personal databases</h2>
 <ul>
   <li>One portable <code>.pindb</code> file stores fields, entries, preferences, trash, internal backups, and embedded documents.</li>
   <li>Open multiple databases in separate windows.</li>
-  <li>Automatic saving and WAL checkpointing during normal shutdown.</li>
-  <li>Pre-migration safety copies and diagnostics for damaged or unsupported databases.</li>
+  <li>Automatic saving and clean database shutdown behavior.</li>
+  <li>Safety copies and diagnostics for damaged or unsupported databases.</li>
 </ul>
 
 <h2>Custom fields and validation</h2>
@@ -25,12 +21,12 @@ title: PinDB Features
   <li>Add, edit, delete, restore, and permanently remove records.</li>
   <li>Search across visible field values.</li>
   <li>Sort columns and build field-specific filters.</li>
-  <li>Switch between spreadsheet-style table view and record cards.</li>
+  <li>Switch between table and record views.</li>
   <li>Use <strong>Add &amp; Add Another</strong> for repetitive entry.</li>
 </ul>
 
 <h2>Embedded documents</h2>
-<p>Original files are stored inside the database rather than as external paths. PinDB can preview PDF, DOCX, common text files, and images, and can save a copy, print supported previews, or open a file in its system application.</p>
+<p>Original files are stored inside the database rather than as external paths. Supported documents and images can be previewed, saved as copies, printed where available, or opened with the system application.</p>
 
 <h2>Summaries, CSV, and printing</h2>
 <ul>
@@ -38,16 +34,16 @@ title: PinDB Features
   <li>CSV import and export.</li>
   <li>Column or record print layouts with portrait/landscape options.</li>
   <li>Optional headings, database names, dates, page numbers, and summaries.</li>
-  <li>Print only the currently searched/filtered rows.</li>
+  <li>Print only the currently searched or filtered rows.</li>
 </ul>
 
 <h2>Backups and recovery</h2>
-<p>PinDB keeps timestamped logical backups inside each database, including embedded documents. Recently Deleted allows record recovery before permanent removal. External backups are still recommended for important data.</p>
+<p>PinDB keeps timestamped logical backups inside each database, including embedded documents. Recently Deleted allows record recovery before permanent removal. Separate external backups are still recommended for important data.</p>
 
-<h2>Cross-platform updates</h2>
-<p>PinDB checks GitHub Releases, selects the correct native installer, and requires a published SHA-256 checksum. Windows uses the x64 EXE; Debian/Fedora use native package managers through a fixed privileged helper; macOS uses architecture-specific Apple Silicon or Intel PKGs with protected root-owned staging before handing the verified package to macOS Installer.</p>
+<h2>Native desktop releases</h2>
+<p>PinDB publishes native packages for supported Windows, macOS, Debian-family, and Fedora-family systems. Package verification, installation, and update behavior are described on each platform's download page.</p>
 
 <h2>Bug reporting</h2>
 <p>GitHub device authorization lets users submit bug reports from PinDB. Diagnostics are designed not to automatically include database contents, embedded documents, database filenames, or personal paths.</p>
 
-<p><a class="btn" href="download.html">Download PinDB</a></p>
+<p class="page-actions"><a class="btn" href="download.html">Choose a download</a> <a class="btn secondary" href="index.html">PinDB home</a></p>

@@ -3,64 +3,31 @@ layout: default
 title: Build PinDB from Source
 ---
 
-<nav class="site-nav">
-  <a href="index.html">Home</a><a href="download.html">Download</a><a href="features.html">Features</a><a href="gallery.html">Gallery</a><a href="manual.html">User Guide</a><a href="build.html">Build</a><a href="about.html">About</a>
-</nav>
-
 <h1>Build from source</h1>
 
-<h2>Requirements</h2>
+<p>PinDB uses the Gradle wrapper and Java 25. Choose the build page for the operating system where you plan to compile or package the application.</p>
+
+<div class="platform-grid">
+  <div class="platform-card"><h3>Windows</h3><p>Run and package PinDB on supported 64-bit Windows systems.</p><a class="btn" href="windows-build.html">Windows source build</a></div>
+  <div class="platform-card"><h3>macOS</h3><p>Build native Apple Silicon or Intel packages on matching Mac hardware.</p><a class="btn" href="macos-build.html">macOS source build</a></div>
+  <div class="platform-card"><h3>Debian family</h3><p>Build and package DEB releases on Debian-family Linux.</p><a class="btn" href="debian-build.html">Debian source build</a></div>
+  <div class="platform-card"><h3>Fedora family</h3><p>Build and package RPM releases on Fedora-family Linux.</p><a class="btn" href="fedora-build.html">Fedora source build</a></div>
+</div>
+
+<h2>Shared requirements</h2>
 <ul>
   <li>Git</li>
-  <li>JDK 25 including <code>jpackage</code></li>
-  <li>Platform-native packaging tools where required</li>
+  <li>JDK 25, including <code>jpackage</code> for native packaging</li>
+  <li>Platform-native packaging tools when creating installers</li>
 </ul>
-<p>PinDB includes the Gradle wrapper; a system Gradle installation is not required.</p>
 
-<h2>Clone and test</h2>
+<p>The Gradle wrapper is included in the repository, so a separate Gradle installation is not required.</p>
+
+<h2>Repository</h2>
 <pre>git clone https://github.com/mccreeper1318/pindb.git
 cd pindb
-git switch dev
-chmod +x gradlew
-./gradlew clean test</pre>
-<p>On Windows use <code>gradlew.bat</code>.</p>
+git switch dev</pre>
 
-<h2>Run from source</h2>
-<pre>./gradlew run -PappVersion=0.3</pre>
+<p>Use the platform page above for the appropriate test, run, and package commands.</p>
 
-<h2>Native package tasks</h2>
-
-<h3>Windows x64</h3>
-<pre>.\gradlew.bat clean test packageWindows -PappVersion=0.3</pre>
-<p>WiX is required by <code>jpackage</code> for the Windows EXE.</p>
-
-<h3>macOS</h3>
-<pre>./gradlew clean test packageMacPkg -PappVersion=0.3</pre>
-<p>Build the ARM64 package on Apple Silicon and the x64 package on Intel. The release workflow uses native runners for each architecture.</p>
-
-<h3>Debian family</h3>
-<pre>./gradlew clean test packageDeb -PappVersion=0.3</pre>
-
-<h3>Fedora/RPM</h3>
-<pre>./gradlew clean test packageRpm -PappVersion=0.3</pre>
-
-<p>Native packages are written under <code>build/packages/</code> and include a private Java runtime.</p>
-
-<h2>0.3 release assets</h2>
-<p>A complete native 0.3 release contains Windows EXE, Debian DEB, Fedora RPM, Apple Silicon PKG, and Intel PKG packages, each with its own <code>.sha256</code> file.</p>
-
-<pre>PinDB-&lt;version&gt;-windows-x64.exe
-PinDB-&lt;version&gt;-windows-x64.exe.sha256
-PinDB-&lt;version&gt;-macos-arm64.pkg
-PinDB-&lt;version&gt;-macos-arm64.pkg.sha256
-PinDB-&lt;version&gt;-macos-x64.pkg
-PinDB-&lt;version&gt;-macos-x64.pkg.sha256
-pindb_&lt;version&gt;_amd64.deb
-pindb_&lt;version&gt;_amd64.deb.sha256
-pindb-&lt;version&gt;.x86_64.rpm
-pindb-&lt;version&gt;.x86_64.rpm.sha256</pre>
-
-<h2>Release automation</h2>
-<p>Publishing a GitHub Release triggers independent Windows, Linux, and macOS release workflows. The Mac workflow tests and packages on native Apple Silicon and Intel runners, verifies the bundle/runtime architecture and metadata, generates SHA-256 files, and publishes the two PKG/checksum pairs only after both builds succeed.</p>
-
-<p>See the repository <a href="https://github.com/mccreeper1318/pindb/blob/dev/docs/release-process.md">release process</a> for the complete checklist.</p>
+<p class="page-actions"><a class="btn secondary" href="index.html">PinDB home</a> <a class="btn secondary" href="https://github.com/mccreeper1318/pindb">Source repository</a></p>

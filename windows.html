@@ -1,17 +1,45 @@
 ---
 layout: default
-title: PinDB on Windows 11
+title: PinDB for Windows
 ---
 
-<nav class="site-nav"><a href="index.html">Home</a><a href="download.html">Download</a><a href="manual.html">User Guide</a><a href="about.html">About</a></nav>
+<div data-release-page></div>
+<script src="assets/site.js" defer></script>
 
-<h1>Windows 11 x64</h1>
-<p>Download the <code>PinDB-&lt;version&gt;-windows-x64.exe</code> and matching checksum from the <a href="download.html">Download page</a>.</p>
-<div class="warning"><strong>Unsigned installer:</strong> Windows may show an unknown-publisher or SmartScreen warning. Verify the SHA-256 digest before running the installer.</div>
+<h1>PinDB for Windows</h1>
+<p>Download the current 64-bit Windows installer. PinDB's native installer includes its own Java runtime.</p>
+
+<div class="release-grid">
+  <div class="release-card download-group">
+    <h3>Stable release — <span id="stable-version">loading…</span></h3>
+    <a id="stable-windows-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View stable Windows releases</a>
+    <a id="stable-windows-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a>
+  </div>
+  <div class="release-card download-group">
+    <h3>Preview release — <span id="preview-version">loading…</span></h3>
+    <a id="preview-windows-x64" class="btn" href="https://github.com/mccreeper1318/pindb/releases">View Windows previews</a>
+    <a id="preview-windows-x64-checksum" class="small" href="https://github.com/mccreeper1318/pindb/releases">View checksum</a>
+  </div>
+</div>
+
+<p id="release-status" class="small">Looking up current GitHub Release assets…</p>
+
+<div class="platform-links">
+  <a class="btn secondary" href="windows-guide.html">Windows user &amp; install guide</a>
+  <a class="btn secondary" href="windows-build.html">Build for Windows</a>
+</div>
+
+<h2>Package information</h2>
+<p>The Windows package is an x64 <code>.exe</code> installer. It installs PinDB per-user, integrates with the Start Menu, can create a desktop shortcut, and registers <code>.pindb</code> files.</p>
+
+<div class="warning"><strong>Installer trust:</strong> if Windows reports an unknown publisher or SmartScreen warning, verify the SHA-256 checksum from the same GitHub Release before running the installer. Signing status can vary by release.</div>
+
+<h2>Verify a download</h2>
 <pre>Get-FileHash .\PinDB-&lt;version&gt;-windows-x64.exe -Algorithm SHA256
 Get-Content .\PinDB-&lt;version&gt;-windows-x64.exe.sha256</pre>
-<p>The installer is self-contained, installs per-user, provides Start Menu integration, can create a desktop shortcut, and registers <code>.pindb</code> files.</p>
+<p>The hexadecimal values must match.</p>
+
 <h2>Updates</h2>
-<p>PinDB downloads and checksum-verifies the matching x64 EXE, launches the verified installer, then exits so the installer can replace the application.</p>
-<h2>Application data</h2>
-<ul><li>Configuration: <code>%APPDATA%\PinDB</code></li><li>State/cache: <code>%LOCALAPPDATA%\PinDB</code></li></ul>
+<p>PinDB selects the matching Windows installer, verifies its published SHA-256 checksum, launches the verified installer, and exits so the installed application can be replaced.</p>
+
+<p class="page-actions"><a class="btn secondary" href="download.html">All platforms</a> <a class="btn secondary" href="index.html">PinDB home</a></p>

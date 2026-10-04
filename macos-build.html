@@ -1,0 +1,35 @@
+---
+layout: default
+title: Build PinDB on macOS
+---
+
+<h1>Build PinDB on macOS</h1>
+
+<h2>Requirements</h2>
+<ul>
+  <li>macOS development environment</li>
+  <li>Git</li>
+  <li>JDK 25 with <code>jpackage</code></li>
+  <li>Native hardware matching the package architecture you want to create</li>
+</ul>
+
+<h2>Clone and test</h2>
+<pre>git clone https://github.com/mccreeper1318/pindb.git
+cd pindb
+git switch dev
+chmod +x gradlew
+./gradlew clean test</pre>
+
+<h2>Run from source</h2>
+<pre>./gradlew run</pre>
+
+<h2>Create a native PKG</h2>
+<p>Replace <code>&lt;version&gt;</code> with the version you are building.</p>
+<pre>./gradlew clean test packageMacPkg -PappVersion=&lt;version&gt;</pre>
+
+<p>Build the ARM64 package on Apple Silicon and the x64 package on Intel hardware. Native package output is written under <code>build/packages/</code> and includes a private Java runtime.</p>
+
+<h2>Official release builds</h2>
+<p>The project uses native Apple Silicon and Intel runners so official release packages are built and checked on the architecture they target.</p>
+
+<p class="page-actions"><a class="btn" href="macos.html">macOS downloads</a><a class="btn secondary" href="build.html">All build guides</a><a class="btn secondary" href="https://github.com/mccreeper1318/pindb/blob/dev/docs/release-process.md">Release process</a></p>

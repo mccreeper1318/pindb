@@ -1,0 +1,34 @@
+---
+layout: default
+title: Build PinDB on Debian-family Linux
+---
+
+<h1>Build PinDB on Debian-family Linux</h1>
+
+<h2>Requirements</h2>
+<ul>
+  <li>Git</li>
+  <li>JDK 25 with <code>jpackage</code></li>
+  <li>Debian packaging tools required by <code>jpackage</code></li>
+</ul>
+
+<h2>Clone and test</h2>
+<pre>git clone https://github.com/mccreeper1318/pindb.git
+cd pindb
+git switch dev
+chmod +x gradlew
+./gradlew clean test</pre>
+
+<h2>Run from source</h2>
+<pre>./gradlew run</pre>
+
+<h2>Create the DEB package</h2>
+<p>Replace <code>&lt;version&gt;</code> with the version you are building.</p>
+<pre>./gradlew clean test packageDeb -PappVersion=&lt;version&gt;</pre>
+
+<p>The package is written under <code>build/packages/</code> and includes a private Java runtime.</p>
+
+<h2>Development branch</h2>
+<p>The website build instructions use the project's <code>dev</code> branch so contributors test current development code. Use a tagged release instead when reproducing a specific published version.</p>
+
+<p class="page-actions"><a class="btn" href="debian.html">Debian-family downloads</a><a class="btn secondary" href="build.html">All build guides</a><a class="btn secondary" href="https://github.com/mccreeper1318/pindb/blob/dev/docs/release-process.md">Release process</a></p>

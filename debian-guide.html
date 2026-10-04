@@ -1,0 +1,31 @@
+---
+layout: default
+title: Debian-family Guide · PinDB
+---
+
+<h1>Debian-family user &amp; install guide</h1>
+
+<p>This page covers Debian, Ubuntu, Linux Mint, and related Debian-family systems. For normal application use, see the <a href="manual.html">main PinDB User Guide</a>.</p>
+
+<h2>Install</h2>
+<ol>
+  <li>Download the DEB and its checksum from <a href="debian.html">PinDB for Debian-family Linux</a>.</li>
+  <li>Verify the checksum.</li>
+  <li>Install the package with APT.</li>
+</ol>
+<pre>sha256sum -c downloaded-package.deb.sha256
+sudo apt install ./pindb_*_amd64.deb</pre>
+
+<p>The native package is self-contained and includes PinDB's Java runtime.</p>
+
+<h2>Updates</h2>
+<p>On supported traditional Debian-family systems, PinDB verifies the matching DEB before requesting administrator approval and handing installation to the packaged update helper and native package manager.</p>
+
+<h2>Uninstall</h2>
+<pre>sudo apt remove pindb</pre>
+<p>Removing the application package does not remove separately stored <code>.pindb</code> database files.</p>
+
+<h2>Your databases</h2>
+<p>Close a database normally before manually copying it. Keep external backups of important databases in addition to PinDB's internal snapshots.</p>
+
+<p class="page-actions"><a class="btn" href="debian.html">Debian-family downloads</a><a class="btn secondary" href="manual.html">General user guide</a></p>
