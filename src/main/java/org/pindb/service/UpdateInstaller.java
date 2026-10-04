@@ -46,6 +46,7 @@ public final class UpdateInstaller {
     private static final Path MAC_STAGING_ROOT = Path.of("/private/var/tmp");
     private static final String MAC_STAGING_DIRECTORY_PREFIX = "PinDB-verified-update.";
     private static final String MAC_STAGED_INSTALLER_NAME = "PinDB-verified-update.pkg";
+    private static final long MAC_STAGED_INSTALLER_RETENTION_SECONDS = 24L * 60L * 60L;
 
     private final SettingsService settings;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20))
@@ -298,6 +299,10 @@ public final class UpdateInstaller {
                 + "[ \"$actual\" = \"$2\" ] || exit 65; "
                 + "/usr/sbin/chown root:wheel \"$stageDir\" \"$packagePath\"; "
                 + "/bin/chmod 0755 \"$stageDir\"; /bin/chmod 0444 \"$packagePath\"; "
+                + "[ -x /usr/bin/nohup ] && [ -x /bin/sleep ] || exit 69; "
+                + "/usr/bin/nohup /bin/sh -c '/bin/sleep \"$1\"; /bin/rm -rf \"$2\"' pindb-cleanup "
+                + MAC_STAGED_INSTALLER_RETENTION_SECONDS + " \"$stageDir\" >/dev/null 2>&1 </dev/null & "
+                + "cleanupPid=$!; [ -n \"$cleanupPid\" ] || exit 69; "
                 + "/usr/bin/printf '%s\\n' \"$packagePath\"; trap - EXIT HUP INT TERM";
         return List.of(
                 "/usr/bin/osascript",
