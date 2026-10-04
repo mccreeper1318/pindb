@@ -122,34 +122,48 @@ bundle_name = plist.get("CFBundleName") or plist.get("CFBundleDisplayName")
 if bundle_name != "PinDB":
     raise SystemExit(f"Unexpected PinDB bundle name: {bundle_name!r}")
 
-extensions = set()
-mime_types = set()
 
-def add_values(target, value):
+def values(value):
     if value is None:
-        return
+        return set()
     if isinstance(value, (list, tuple)):
-        for item in value:
-            target.add(str(item).lower())
-    else:
-        target.add(str(value).lower())
+        return {str(item).lower() for item in value}
+    return {str(value).lower()}
 
-for document_type in plist.get("CFBundleDocumentTypes", []):
-    add_values(extensions, document_type.get("CFBundleTypeExtensions"))
-    add_values(mime_types, document_type.get("CFBundleTypeMIMETypes"))
 
+declarations = {}
 for declaration_key in ("UTExportedTypeDeclarations", "UTImportedTypeDeclarations"):
     for declaration in plist.get(declaration_key, []):
-        tags = declaration.get("UTTypeTagSpecification", {})
-        add_values(extensions, tags.get("public.filename-extension"))
-        add_values(mime_types, tags.get("public.mime-type"))
+        identifier = declaration.get("UTTypeIdentifier")
+        if identifier:
+            declarations[str(identifier)] = declaration.get("UTTypeTagSpecification", {})
 
-if "pindb" not in extensions:
-    raise SystemExit(f"PinDB.app does not advertise the .pindb extension: {sorted(extensions)!r}")
-if "application/x-pindb" not in mime_types:
+association_found = False
+association_details = []
+for document_type in plist.get("CFBundleDocumentTypes", []):
+    direct_extensions = values(document_type.get("CFBundleTypeExtensions"))
+    direct_mime_types = values(document_type.get("CFBundleTypeMIMETypes"))
+    if "pindb" in direct_extensions and "application/x-pindb" in direct_mime_types:
+        association_found = True
+        association_details.append("legacy CFBundleDocumentTypes tags")
+
+    for uti in values(document_type.get("LSItemContentTypes")):
+        tags = declarations.get(uti, {})
+        linked_extensions = values(tags.get("public.filename-extension"))
+        linked_mime_types = values(tags.get("public.mime-type"))
+        if "pindb" in linked_extensions and "application/x-pindb" in linked_mime_types:
+            association_found = True
+            association_details.append(f"referenced UTI {uti}")
+
+if not association_found:
+    referenced = sorted({
+        uti
+        for document_type in plist.get("CFBundleDocumentTypes", [])
+        for uti in values(document_type.get("LSItemContentTypes"))
+    })
     raise SystemExit(
-        "PinDB.app does not advertise the application/x-pindb MIME type: "
-        f"{sorted(mime_types)!r}"
+        "PinDB.app does not link a document type to both the .pindb extension and "
+        "application/x-pindb MIME type; referenced UTIs: " + repr(referenced)
     )
 
 icon_name = plist.get("CFBundleIconFile")
@@ -157,7 +171,7 @@ if not icon_name:
     raise SystemExit("PinDB.app does not declare a CFBundleIconFile")
 
 print(f"Verified bundle identifier: {bundle_identifier}")
-print("Verified .pindb association with MIME type application/x-pindb")
+print("Verified .pindb association through " + ", ".join(association_details))
 print(f"Verified application icon metadata: {icon_name}")
 PY
 
