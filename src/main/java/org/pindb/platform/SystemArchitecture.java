@@ -7,9 +7,7 @@ public enum SystemArchitecture {
     AARCH64,
     UNKNOWN;
 
-    public static SystemArchitecture current() {
-        return fromOsArch(System.getProperty("os.arch", ""));
-    }
+    public static SystemArchitecture current() { return fromOsArch(System.getProperty("os.arch", "")); }
 
     public static SystemArchitecture fromOsArch(String value) {
         String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
@@ -22,12 +20,8 @@ public enum SystemArchitecture {
 
     public static SystemArchitecture fromAssetName(String fileName) {
         String normalized = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);
-        if (normalized.contains("x86_64") || normalized.contains("amd64")) {
-            return X86_64;
-        }
-        if (normalized.contains("aarch64") || normalized.contains("arm64")) {
-            return AARCH64;
-        }
+        if (normalized.contains("x86_64") || normalized.contains("amd64") || normalized.contains("x64")) return X86_64;
+        if (normalized.contains("aarch64") || normalized.contains("arm64")) return AARCH64;
         return UNKNOWN;
     }
 }

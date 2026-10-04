@@ -1,6 +1,6 @@
 package org.pindb.service;
 
-import org.pindb.platform.LinuxPackageType;
+import org.pindb.platform.NativePackageType;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,9 +65,9 @@ public final class PrivilegedUpdateHelper {
         if (arguments.length != 4 || !"install".equals(arguments[0])) {
             throw new IOException("Usage: pindb-update-helper install <deb|rpm> <sha256> <absolute-package-path>");
         }
-        LinuxPackageType type = switch (arguments[1]) {
-            case "deb" -> LinuxPackageType.DEB;
-            case "rpm" -> LinuxPackageType.RPM;
+        NativePackageType type = switch (arguments[1]) {
+            case "deb" -> NativePackageType.DEB;
+            case "rpm" -> NativePackageType.RPM;
             default -> throw new IOException("Unsupported PinDB package type: " + arguments[1]);
         };
         String digest = normalizeDigest(arguments[2]);
@@ -95,17 +95,19 @@ public final class PrivilegedUpdateHelper {
         }
     }
 
-    static void installVerifiedPackage(Path packageFile, String expectedDigest, LinuxPackageType type,
+    static void installVerifiedPackage(Path packageFile, String expectedDigest, NativePackageType type,
                                        Path stagingRoot, PackageInstaller installer,
                                        IoAction afterSourceOpen) throws Exception {
+        requireLinuxPackageType(type);
         try (StagedPackage staged = stagePackage(packageFile, expectedDigest, type, stagingRoot,
                 afterSourceOpen)) {
             installer.install(staged.packageFile(), type);
         }
     }
 
-    static StagedPackage stagePackage(Path packageFile, String expectedDigest, LinuxPackageType type,
+    static StagedPackage stagePackage(Path packageFile, String expectedDigest, NativePackageType type,
                                       Path stagingRoot, IoAction afterSourceOpen) throws Exception {
+        requireLinuxPackageType(type);
         String digest = normalizeDigest(expectedDigest);
         Path absolutePackage = packageFile.toAbsolutePath().normalize();
         Path parent = absolutePackage.getParent();
@@ -175,15 +177,18 @@ public final class PrivilegedUpdateHelper {
         return digest;
     }
 
-    static List<Path> packageManagerCandidates(LinuxPackageType type) {
-        return type == LinuxPackageType.DEB
-                ? List.of(Path.of("/usr/bin/apt-get"))
-                : List.of(Path.of("/usr/bin/dnf5"), Path.of("/usr/bin/dnf"));
+    static List<Path> packageManagerCandidates(NativePackageType type) {
+        return switch (type) {
+            case DEB -> List.of(Path.of("/usr/bin/apt-get"));
+            case RPM -> List.of(Path.of("/usr/bin/dnf5"), Path.of("/usr/bin/dnf"));
+            case WINDOWS_EXE, MACOS_PKG -> List.of();
+        };
     }
 
-    private static void installStagedPackage(Path stagedPackage, LinuxPackageType type) throws Exception {
+    private static void installStagedPackage(Path stagedPackage, NativePackageType type) throws Exception {
+        requireLinuxPackageType(type);
         Path manager = packageManagerCandidates(type).stream().filter(Files::isExecutable).findFirst()
-                .orElseThrow(() -> new IOException(type == LinuxPackageType.DEB
+                .orElseThrow(() -> new IOException(type == NativePackageType.DEB
                         ? "The apt-get package installer is unavailable."
                         : "Neither dnf5 nor dnf is available under /usr/bin."));
         Path backupDirectory = null;
@@ -202,7 +207,7 @@ public final class PrivilegedUpdateHelper {
 
         try {
             List<String> command = List.of(manager.toString(), "install", "-y", stagedPackage.toString());
-            ProcessResult installation = runCommand(command, type == LinuxPackageType.DEB);
+            ProcessResult installation = runCommand(command, type == NativePackageType.DEB);
             if (installation.status() == 0) {
                 if (!installation.output().isBlank()) {
                     System.out.println(installation.output());
@@ -218,6 +223,12 @@ public final class PrivilegedUpdateHelper {
                     ? "No additional installer output was provided." : installation.output()));
         } finally {
             deleteTree(backupDirectory);
+        }
+    }
+
+    private static void requireLinuxPackageType(NativePackageType type) throws IOException {
+        if (type != NativePackageType.DEB && type != NativePackageType.RPM) {
+            throw new IOException("The privileged PinDB update helper only accepts Debian and RPM packages.");
         }
     }
 
@@ -258,7 +269,7 @@ public final class PrivilegedUpdateHelper {
 
     @FunctionalInterface
     interface PackageInstaller {
-        void install(Path stagedPackage, LinuxPackageType type) throws Exception;
+        void install(Path stagedPackage, NativePackageType type) throws Exception;
     }
 
     @FunctionalInterface
@@ -273,7 +284,7 @@ public final class PrivilegedUpdateHelper {
         }
     }
 
-    private record ParsedArguments(Path packageFile, String digest, LinuxPackageType type) {
+    private record ParsedArguments(Path packageFile, String digest, NativePackageType type) {
     }
 
     private record ProcessResult(int status, String output) {

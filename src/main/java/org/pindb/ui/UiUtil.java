@@ -87,7 +87,23 @@ public final class UiUtil {
         alert.setHeaderText(title);
         alert.setContentText(message);
         alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+        alert.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                inheritStyles(newScene, owner);
+            }
+        });
+        Scene scene = alert.getDialogPane().getScene();
+        if (scene != null) {
+            inheritStyles(scene, owner);
+        }
         return alert;
+    }
+
+    private static void inheritStyles(Scene scene, Window owner) {
+        if (owner == null || owner.getScene() == null) {
+            return;
+        }
+        scene.getStylesheets().setAll(owner.getScene().getStylesheets());
     }
 
     public static String formatValue(FieldDefinition field, String value) {

@@ -11,7 +11,8 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import org.pindb.platform.LinuxDistribution;
-import org.pindb.platform.LinuxPackageType;
+import org.pindb.platform.NativePackageType;
+import org.pindb.platform.OperatingSystem;
 import org.pindb.ui.UiUtil;
 import org.pindb.util.AppPaths;
 
@@ -39,24 +40,24 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class UpdateInstaller {
-    private final SettingsService settings;
-    private final HttpClient client = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(20))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
+    private static final Path MAC_STAGING_ROOT = Path.of("/private/var/tmp");
+    private static final String MAC_STAGING_DIRECTORY_PREFIX = "PinDB-verified-update.";
+    private static final String MAC_STAGED_INSTALLER_NAME = "PinDB-verified-update.pkg";
+    private static final long MAC_STAGED_INSTALLER_RETENTION_SECONDS = 24L * 60L * 60L;
 
-    public UpdateInstaller(SettingsService settings) {
-        this.settings = settings;
-    }
+    private final SettingsService settings;
+    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20))
+            .followRedirects(HttpClient.Redirect.NORMAL).build();
+
+    public UpdateInstaller(SettingsService settings) { this.settings = settings; }
 
     public void downloadAndInstall(Window owner, ReleaseInfo release) {
         LinuxDistribution distribution = LinuxDistribution.current();
         ReleasePackage releasePackage = release.packageAsset();
-        if (!installationSupported(owner, distribution, releasePackage)) {
-            return;
-        }
+        if (!installationSupported(owner, distribution, releasePackage)) return;
 
         Dialog<Void> dialog = progressDialog(owner, "Downloading PinDB Update", "Downloading " + release.tag());
         Label status = (Label) ((VBox) dialog.getDialogPane().getContent()).getChildren().getFirst();
@@ -66,457 +67,454 @@ public final class UpdateInstaller {
         AtomicBoolean installing = new AtomicBoolean();
 
         Task<DownloadedUpdate> downloadTask = new Task<>() {
-            @Override
-            protected DownloadedUpdate call() throws Exception {
+            @Override protected DownloadedUpdate call() throws Exception {
                 Path directory = AppPaths.ensure(AppPaths.cacheDirectory().resolve("updates"));
                 Path destination = directory.resolve(safeAssetName(releasePackage));
                 Path partial = destination.resolveSibling(destination.getFileName() + ".part");
                 Files.deleteIfExists(partial);
                 download(releasePackage.downloadUri(), partial, cancelled, this::updateProgress, this::updateMessage);
-                if (cancelled.get()) {
-                    throw new InterruptedException("Update download cancelled.");
-                }
+                if (cancelled.get()) throw new InterruptedException("Update download cancelled.");
                 Files.move(partial, destination, StandardCopyOption.REPLACE_EXISTING);
                 String digest = verifyChecksum(destination, releasePackage.checksumUri(), this::updateMessage);
                 Path notes = directory.resolve("release-notes-" + release.version().normalized() + ".md");
-                Files.writeString(notes, release.markdownNotes() == null ? "" : release.markdownNotes(),
-                        StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                Files.writeString(notes, release.markdownNotes() == null ? "" : release.markdownNotes(), StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
                 return new DownloadedUpdate(destination, notes, digest, releasePackage, distribution);
             }
         };
         taskMessages(downloadTask, status);
         progress.progressProperty().bind(downloadTask.progressProperty());
         dialog.setOnCloseRequest(event -> {
-            if (installing.get()) {
-                event.consume();
-            } else {
-                cancelled.set(true);
-                downloadTask.cancel(true);
-            }
+            if (installing.get()) event.consume();
+            else { cancelled.set(true); downloadTask.cancel(true); }
         });
-
         downloadTask.setOnSucceeded(event -> {
-            progress.progressProperty().unbind();
-            installing.set(true);
-            cancel.setDisable(true);
-            dialog.setTitle("Installing PinDB Update");
-            dialog.setHeaderText("Installing " + release.tag());
-            progress.setProgress(-1);
+            progress.progressProperty().unbind(); installing.set(true); cancel.setDisable(true);
+            dialog.setTitle("Installing PinDB Update"); dialog.setHeaderText("Installing " + release.tag()); progress.setProgress(-1);
             install(owner, dialog, status, installing, downloadTask.getValue(), release.tag());
         });
         downloadTask.setOnCancelled(event -> dialog.close());
         downloadTask.setOnFailed(event -> {
-            dialog.close();
-            Throwable failure = downloadTask.getException();
+            dialog.close(); Throwable failure = downloadTask.getException();
             if (!(failure instanceof InterruptedException)) {
                 Path log = writeFailureLog(null, failure, "download");
                 Platform.runLater(() -> showFailureAlert(owner, null, releasePackage.type(), distribution, failure, log));
             }
         });
-
-        Thread thread = new Thread(downloadTask, "pindb-update-download");
-        thread.setDaemon(true);
-        thread.start();
+        Thread thread = new Thread(downloadTask, "pindb-update-download"); thread.setDaemon(true); thread.start();
         dialog.showAndWait();
     }
 
     private Dialog<Void> progressDialog(Window owner, String title, String header) {
-        Dialog<Void> dialog = new Dialog<>();
-        if (owner != null) {
-            dialog.initOwner(owner);
-        }
-        dialog.setTitle(title);
-        dialog.setHeaderText(header);
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
-        Label status = new Label("Connecting to GitHub…");
-        status.setWrapText(true);
-        ProgressBar progress = new ProgressBar(-1);
-        progress.setMaxWidth(Double.MAX_VALUE);
-        dialog.getDialogPane().setContent(new VBox(12, status, progress));
-        dialog.getDialogPane().setPrefWidth(520);
-        dialog.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
-            if (newScene != null) {
-                UiUtil.applyStyles(newScene, settings);
-            }
-        });
+        Dialog<Void> dialog = new Dialog<>(); if (owner != null) dialog.initOwner(owner);
+        dialog.setTitle(title); dialog.setHeaderText(header); dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+        Label status = new Label("Connecting to GitHub…"); status.setWrapText(true);
+        ProgressBar progress = new ProgressBar(-1); progress.setMaxWidth(Double.MAX_VALUE);
+        dialog.getDialogPane().setContent(new VBox(12, status, progress)); dialog.getDialogPane().setPrefWidth(520);
+        dialog.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> { if (newScene != null) UiUtil.applyStyles(newScene, settings); });
         return dialog;
     }
 
     private static void taskMessages(Task<?> task, Label status) {
-        task.messageProperty().addListener((observable, oldMessage, newMessage) -> {
-            if (newMessage != null && !newMessage.isBlank()) {
-                status.setText(newMessage);
-            }
-        });
+        task.messageProperty().addListener((observable, oldMessage, newMessage) -> { if (newMessage != null && !newMessage.isBlank()) status.setText(newMessage); });
     }
 
-    private void install(Window owner, Dialog<Void> dialog, Label status, AtomicBoolean installing,
-                         DownloadedUpdate update, String tag) {
+    private void install(Window owner, Dialog<Void> dialog, Label status, AtomicBoolean installing, DownloadedUpdate update, String tag) {
+        if (update.releasePackage().type() == NativePackageType.WINDOWS_EXE) {
+            try {
+                status.setText("Starting the Windows installer…");
+                launchWindowsInstaller(update.packageFile());
+                installing.set(false); dialog.close(); Platform.exit();
+            } catch (IOException exception) {
+                installing.set(false); dialog.close();
+                Path log = writeFailureLog(update.packageFile(), exception, "install");
+                showFailureAlert(owner, update.packageFile(), update.releasePackage().type(), update.distribution(), exception, log);
+            }
+            return;
+        }
+        if (update.releasePackage().type() == NativePackageType.MACOS_PKG) {
+            status.setText("Securing the verified macOS package…");
+            AtomicReference<Path> protectedPackage = new AtomicReference<>();
+            Task<Void> macInstallerTask = new Task<>() {
+                @Override protected Void call() throws Exception {
+                    Path staged = stageMacInstaller(update.packageFile(), update.digest());
+                    protectedPackage.set(staged);
+                    updateMessage("Opening the protected package in macOS Installer…");
+                    launchMacInstaller(staged);
+                    return null;
+                }
+            };
+            taskMessages(macInstallerTask, status);
+            macInstallerTask.setOnSucceeded(event -> {
+                try { Files.deleteIfExists(update.packageFile()); } catch (IOException cleanupFailure) { cleanupFailure.printStackTrace(System.err); }
+                installing.set(false);
+                dialog.close();
+                Platform.exit();
+            });
+            macInstallerTask.setOnFailed(event -> {
+                installing.set(false);
+                dialog.close();
+                Throwable failure = macInstallerTask.getException();
+                Path recoveryPackage = protectedPackage.get();
+                if (recoveryPackage == null) {
+                    try { Files.deleteIfExists(update.packageFile()); } catch (IOException cleanupFailure) { cleanupFailure.printStackTrace(System.err); }
+                }
+                Path log = writeFailureLog(recoveryPackage, failure, "install");
+                showFailureAlert(owner, recoveryPackage, update.releasePackage().type(), update.distribution(), failure, log);
+            });
+            Thread thread = new Thread(macInstallerTask, "pindb-macos-installer-open");
+            thread.setDaemon(true);
+            thread.start();
+            return;
+        }
         Task<Void> task = new Task<>() {
-            @Override
-            protected Void call() throws Exception {
-                installPrivileged(update.packageFile(), update.digest(), update.releasePackage().type(),
-                        this::updateMessage);
-                return null;
+            @Override protected Void call() throws Exception {
+                installPrivileged(update.packageFile(), update.digest(), update.releasePackage().type(), this::updateMessage); return null;
             }
         };
         taskMessages(task, status);
         task.setOnSucceeded(event -> {
-            installing.set(false);
-            dialog.close();
+            installing.set(false); dialog.close();
             try {
                 restartAfterUpdate(update.notesFile(), tag);
-                try {
-                    Files.deleteIfExists(update.packageFile());
-                } catch (IOException cleanupFailure) {
-                    cleanupFailure.printStackTrace(System.err);
-                }
+                try { Files.deleteIfExists(update.packageFile()); } catch (IOException cleanupFailure) { cleanupFailure.printStackTrace(System.err); }
                 Platform.exit();
             } catch (IOException exception) {
                 writeFailureLog(update.packageFile(), exception, "restart");
-                UiUtil.error(owner, "Update Installed",
-                        "The update installed successfully, but PinDB could not restart automatically. "
-                                + "Open PinDB from the application menu.", exception);
+                UiUtil.error(owner, "Update Installed", "The update installed successfully, but PinDB could not restart automatically. Open PinDB from the application menu.", exception);
             }
         });
         task.setOnFailed(event -> {
-            installing.set(false);
-            dialog.close();
-            Throwable failure = task.getException();
+            installing.set(false); dialog.close(); Throwable failure = task.getException();
             Path log = writeFailureLog(update.packageFile(), failure, "install");
-            showFailureAlert(owner, update.packageFile(), update.releasePackage().type(),
-                    update.distribution(), failure, log);
+            showFailureAlert(owner, update.packageFile(), update.releasePackage().type(), update.distribution(), failure, log);
         });
-        Thread thread = new Thread(task, "pindb-update-install");
-        thread.setDaemon(true);
-        thread.start();
+        Thread thread = new Thread(task, "pindb-update-install"); thread.setDaemon(true); thread.start();
     }
 
-    private static boolean installationSupported(Window owner, LinuxDistribution distribution,
-                                                  ReleasePackage releasePackage) {
-        if (!distribution.isLinux()) {
-            UiUtil.warning(owner, "Automatic Update Unavailable",
-                    "Automatic package installation is available only on supported Linux distributions.");
-            return false;
+    private static boolean installationSupported(Window owner, LinuxDistribution distribution, ReleasePackage releasePackage) {
+        OperatingSystem operatingSystem = OperatingSystem.current();
+        if (releasePackage.type() == NativePackageType.WINDOWS_EXE) {
+            if (operatingSystem == OperatingSystem.WINDOWS) return true;
+            UiUtil.warning(owner, "Automatic Update Unavailable", "The Windows installer can only run on Windows."); return false;
         }
-        Optional<LinuxPackageType> expected = distribution.packageType();
-        if (expected.isEmpty()) {
-            UiUtil.warning(owner, "Automatic Update Unavailable",
-                    "Automatic installation currently supports Debian-family and Fedora-family Linux systems.");
-            return false;
+        if (releasePackage.type() == NativePackageType.MACOS_PKG) {
+            if (operatingSystem == OperatingSystem.MACOS) return true;
+            UiUtil.warning(owner, "Automatic Update Unavailable", "The macOS installer can only run on macOS."); return false;
         }
-        if (expected.get() != releasePackage.type()) {
-            UiUtil.warning(owner, "Automatic Update Unavailable",
-                    "The release does not contain the correct package type for " + distribution.prettyName() + ".");
-            return false;
-        }
-        if (distribution.immutable()) {
-            UiUtil.warning(owner, "Automatic Update Unavailable",
-                    "Fedora Atomic desktops must install the RPM with rpm-ostree and reboot into the new deployment.");
-            return false;
-        }
+        if (!distribution.isLinux()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic package installation is available only on supported Linux distributions, macOS, and Windows 11."); return false; }
+        Optional<NativePackageType> expected = distribution.packageType();
+        if (expected.isEmpty()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Automatic installation currently supports Debian-family and Fedora-family Linux systems, macOS, and Windows 11."); return false; }
+        if (expected.get() != releasePackage.type()) { UiUtil.warning(owner, "Automatic Update Unavailable", "The release does not contain the correct package type for " + distribution.prettyName() + "."); return false; }
+        if (distribution.immutable()) { UiUtil.warning(owner, "Automatic Update Unavailable", "Fedora Atomic desktops must install the RPM with rpm-ostree and reboot into the new deployment."); return false; }
         return true;
     }
 
-    private static String safeAssetName(ReleasePackage releasePackage) {
-        String name;
-        try {
-            name = Path.of(releasePackage.fileName()).getFileName().toString();
-        } catch (RuntimeException exception) {
-            name = "";
-        }
-        return name.isBlank() || !releasePackage.type().matchesFileName(name)
-                ? "pindb-update" + releasePackage.type().extension() : name;
+    private static void launchWindowsInstaller(Path packageFile) throws IOException {
+        Path installer = packageFile.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(installer) || !installer.toString().toLowerCase(Locale.ROOT).endsWith(".exe")) throw new IOException("The downloaded Windows installer is unavailable.");
+        new ProcessBuilder(installer.toString()).directory(installer.getParent().toFile()).start();
     }
 
-    private void download(URI uri, Path destination, AtomicBoolean cancelled,
-                          ProgressReporter progress, MessageReporter message) throws Exception {
+    private static Path stageMacInstaller(Path packageFile, String digest) throws Exception {
+        Path source = packageFile.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(source)
+                || !source.toString().toLowerCase(Locale.ROOT).endsWith(".pkg")) {
+            throw new IOException("The downloaded macOS installer is unavailable.");
+        }
+        if (digest == null || !digest.matches("(?i)[0-9a-f]{64}")) {
+            throw new IOException("The verified macOS package digest is invalid.");
+        }
+        Path osascript = Path.of("/usr/bin/osascript");
+        if (!Files.isExecutable(osascript)) {
+            throw new IOException("The macOS authorization utility is unavailable at /usr/bin/osascript.");
+        }
+        Process process = new ProcessBuilder(macStagingCommand(source, digest))
+                .redirectErrorStream(true)
+                .start();
+        String output;
+        try (InputStream input = process.getInputStream()) {
+            output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
+        }
+        int status;
+        try {
+            status = process.waitFor();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while securing the verified macOS package.", exception);
+        }
+        if (status != 0) {
+            throw new IOException("The protected macOS package staging step exited with status " + status + ".\n\n"
+                    + (output.isBlank() ? "No additional staging output was provided." : output));
+        }
+
+        Path staged = parseMacStagedInstallerPath(output)
+                .orElseThrow(() -> new IOException("The protected macOS staging step returned an invalid package path."));
+        if (!isProtectedMacStagedPackage(staged)) {
+            throw new IOException("The protected macOS package was not created with secure ownership and permissions.");
+        }
+        String stagedDigest = sha256(staged);
+        if (!stagedDigest.equalsIgnoreCase(digest)) {
+            throw new IOException("The protected macOS package no longer matches the verified SHA-256 digest.");
+        }
+        return staged;
+    }
+
+    static Optional<Path> parseMacStagedInstallerPath(String output) {
+        if (output == null) return Optional.empty();
+        String value = output.trim();
+        if (value.isEmpty() || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) return Optional.empty();
+        try {
+            Path path = Path.of(value).toAbsolutePath().normalize();
+            return isExpectedMacStagedInstallerPath(path) ? Optional.of(path) : Optional.empty();
+        } catch (RuntimeException exception) {
+            return Optional.empty();
+        }
+    }
+
+    static boolean isExpectedMacStagedInstallerPath(Path packageFile) {
+        if (packageFile == null) return false;
+        Path absolute = packageFile.toAbsolutePath().normalize();
+        Path stageDirectory = absolute.getParent();
+        if (stageDirectory == null || !MAC_STAGING_ROOT.equals(stageDirectory.getParent())
+                || !MAC_STAGED_INSTALLER_NAME.equals(absolute.getFileName().toString())) {
+            return false;
+        }
+        String directoryName = stageDirectory.getFileName().toString();
+        if (!directoryName.startsWith(MAC_STAGING_DIRECTORY_PREFIX)) return false;
+        String uniqueSuffix = directoryName.substring(MAC_STAGING_DIRECTORY_PREFIX.length());
+        return !uniqueSuffix.isBlank() && uniqueSuffix.chars().allMatch(character -> Character.isLetterOrDigit(character));
+    }
+
+    static List<String> macStagingCommand(Path packageFile, String digest) {
+        if (digest == null || !digest.matches("(?i)[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("A valid SHA-256 digest is required for macOS staging.");
+        }
+        Path source = packageFile.toAbsolutePath().normalize();
+        String shell = "umask 077; stageDir=$(/usr/bin/mktemp -d /private/var/tmp/PinDB-verified-update.XXXXXXXX); "
+                + "packagePath=\"$stageDir/PinDB-verified-update.pkg\"; "
+                + "trap '/bin/rm -rf \"$stageDir\"' EXIT HUP INT TERM; "
+                + "/usr/bin/install -o root -g wheel -m 0400 \"$1\" \"$packagePath\"; "
+                + "actual=$(/usr/bin/shasum -a 256 \"$packagePath\" | /usr/bin/cut -d ' ' -f 1); "
+                + "[ \"$actual\" = \"$2\" ] || exit 65; "
+                + "/usr/sbin/chown root:wheel \"$stageDir\" \"$packagePath\"; "
+                + "/bin/chmod 0755 \"$stageDir\"; /bin/chmod 0444 \"$packagePath\"; "
+                + "[ -x /usr/bin/nohup ] && [ -x /bin/sleep ] || exit 69; "
+                + "/usr/bin/nohup /bin/sh -c '/bin/sleep \"$1\"; /bin/rm -rf \"$2\"' pindb-cleanup "
+                + MAC_STAGED_INSTALLER_RETENTION_SECONDS + " \"$stageDir\" >/dev/null 2>&1 </dev/null & "
+                + "cleanupPid=$!; [ -n \"$cleanupPid\" ] || exit 69; "
+                + "/usr/bin/printf '%s\\n' \"$packagePath\"; trap - EXIT HUP INT TERM";
+        return List.of(
+                "/usr/bin/osascript",
+                "-e", "on run argv",
+                "-e", "set sourcePath to item 1 of argv",
+                "-e", "set expectedDigest to item 2 of argv",
+                "-e", "set commandText to \"/bin/sh -c \" & quoted form of "
+                        + "\"" + shell.replace("\\", "\\\\").replace("\"", "\\\"") + "\" & \" -- \" & quoted form of sourcePath & \" \" & quoted form of expectedDigest",
+                "-e", "set stagedPath to do shell script commandText with administrator privileges",
+                "-e", "return stagedPath",
+                "-e", "end run",
+                source.toString(),
+                digest.toLowerCase(Locale.ROOT));
+    }
+
+    private static boolean isProtectedMacStagedPackage(Path packageFile) {
+        Path absolute = packageFile.toAbsolutePath().normalize();
+        if (!isExpectedMacStagedInstallerPath(absolute) || Files.isSymbolicLink(absolute)
+                || !Files.isRegularFile(absolute, LinkOption.NOFOLLOW_LINKS)) {
+            return false;
+        }
+        try {
+            Path stageDirectory = absolute.getParent();
+            Object uid = Files.getAttribute(absolute, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+            Object mode = Files.getAttribute(absolute, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+            Object directoryUid = Files.getAttribute(stageDirectory, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+            Object directoryMode = Files.getAttribute(stageDirectory, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+            Object rootUid = Files.getAttribute(MAC_STAGING_ROOT, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+            Object rootMode = Files.getAttribute(MAC_STAGING_ROOT, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+            return uid instanceof Number owner && owner.longValue() == 0L
+                    && mode instanceof Number permissions && (permissions.intValue() & 0022) == 0
+                    && directoryUid instanceof Number directoryOwner && directoryOwner.longValue() == 0L
+                    && directoryMode instanceof Number directoryPermissions && (directoryPermissions.intValue() & 0022) == 0
+                    && rootUid instanceof Number rootOwner && rootOwner.longValue() == 0L
+                    && rootMode instanceof Number rootPermissions && (rootPermissions.intValue() & 01000) != 0
+                    && Files.isDirectory(stageDirectory, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(stageDirectory)
+                    && Files.isDirectory(MAC_STAGING_ROOT, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(MAC_STAGING_ROOT);
+        } catch (IOException | UnsupportedOperationException | SecurityException exception) {
+            return false;
+        }
+    }
+
+    private static void launchMacInstaller(Path packageFile) throws IOException {
+        Path installer = packageFile.toAbsolutePath().normalize();
+        if (!isProtectedMacStagedPackage(installer)) {
+            throw new IOException("The macOS installer must be opened from the protected verified staging location.");
+        }
+        Path open = Path.of("/usr/bin/open");
+        if (!Files.isExecutable(open)) throw new IOException("The macOS open utility is unavailable at /usr/bin/open.");
+        Process process = new ProcessBuilder(macInstallerCommand(installer))
+                .directory(installer.getParent().toFile())
+                .redirectErrorStream(true)
+                .start();
+        String output;
+        try (InputStream input = process.getInputStream()) {
+            output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
+        }
+        int status;
+        try {
+            status = process.waitFor();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for macOS to open the Installer.", exception);
+        }
+        requireSuccessfulMacInstallerLaunch(status, output);
+    }
+
+    static void requireSuccessfulMacInstallerLaunch(int status, String output) throws IOException {
+        if (status == 0) return;
+        String details = output == null || output.isBlank()
+                ? "No additional output was provided by /usr/bin/open."
+                : output.trim();
+        throw new IOException("The macOS open utility exited with status " + status + ".\n\n" + details);
+    }
+
+    static List<String> macInstallerCommand(Path packageFile) {
+        return List.of("/usr/bin/open", packageFile.toAbsolutePath().normalize().toString());
+    }
+
+    private static String safeAssetName(ReleasePackage releasePackage) {
+        String name; try { name = Path.of(releasePackage.fileName()).getFileName().toString(); } catch (RuntimeException exception) { name = ""; }
+        return name.isBlank() || !releasePackage.type().matchesFileName(name) ? "pindb-update" + releasePackage.type().extension() : name;
+    }
+
+    private void download(URI uri, Path destination, AtomicBoolean cancelled, ProgressReporter progress, MessageReporter message) throws Exception {
         message.report("Downloading update package…");
-        HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofMinutes(10))
-                .header("User-Agent", "PinDB-Updater").GET().build();
+        HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofMinutes(10)).header("User-Agent", "PinDB-Updater").GET().build();
         HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("GitHub returned HTTP " + response.statusCode() + " while downloading the update.");
-        }
+        if (response.statusCode() < 200 || response.statusCode() >= 300) throw new IOException("GitHub returned HTTP " + response.statusCode() + " while downloading the update.");
         long total = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
-        try (InputStream input = new BufferedInputStream(response.body());
-             var output = Files.newOutputStream(destination, StandardOpenOption.CREATE_NEW)) {
-            byte[] buffer = new byte[64 * 1024];
-            long received = 0;
-            int read;
+        try (InputStream input = new BufferedInputStream(response.body()); var output = Files.newOutputStream(destination, StandardOpenOption.CREATE_NEW)) {
+            byte[] buffer = new byte[64 * 1024]; long received = 0; int read;
             while ((read = input.read(buffer)) >= 0) {
-                if (cancelled.get() || Thread.currentThread().isInterrupted()) {
-                    throw new InterruptedException("Update download cancelled.");
-                }
-                output.write(buffer, 0, read);
-                received += read;
-                progress.report(received, total);
+                if (cancelled.get() || Thread.currentThread().isInterrupted()) throw new InterruptedException("Update download cancelled.");
+                output.write(buffer, 0, read); received += read; progress.report(received, total);
             }
-        } catch (Exception exception) {
-            Files.deleteIfExists(destination);
-            throw exception;
-        }
+        } catch (Exception exception) { Files.deleteIfExists(destination); throw exception; }
     }
 
     private String verifyChecksum(Path packageFile, URI checksumUri, MessageReporter message) throws Exception {
-        if (checksumUri == null) {
-            throw new IOException("Automatic installation requires a published SHA-256 checksum.");
-        }
-        HttpRequest request = HttpRequest.newBuilder(checksumUri).timeout(Duration.ofSeconds(30))
-                .header("User-Agent", "PinDB-Updater").GET().build();
+        if (checksumUri == null) throw new IOException("Automatic installation requires a published SHA-256 checksum.");
+        HttpRequest request = HttpRequest.newBuilder(checksumUri).timeout(Duration.ofSeconds(30)).header("User-Agent", "PinDB-Updater").GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("Could not download the update checksum.");
-        }
+        if (response.statusCode() < 200 || response.statusCode() >= 300) throw new IOException("Could not download the update checksum.");
         Optional<String> expected = parseExpectedChecksum(response.body(), packageFile.getFileName().toString());
         if (expected.isPresent()) {
-            message.report("Verifying downloaded package…");
-            String actual = sha256(packageFile);
-            if (!actual.equalsIgnoreCase(expected.get())) {
-                throw new IOException("The downloaded update failed its SHA-256 verification.");
-            }
+            message.report("Verifying downloaded package…"); String actual = sha256(packageFile);
+            if (!actual.equalsIgnoreCase(expected.get())) throw new IOException("The downloaded update failed its SHA-256 verification.");
             return actual;
         }
         throw new IOException("The checksum file did not contain a usable SHA-256 digest.");
     }
 
     static Optional<String> parseExpectedChecksum(String checksumText, String packageName) throws IOException {
-        String expectedName = normalizeChecksumName(packageName);
-        List<String> hashes = new ArrayList<>();
+        String expectedName = normalizeChecksumName(packageName); List<String> hashes = new ArrayList<>();
         for (String line : (checksumText == null ? "" : checksumText).lines().toList()) {
-            String[] pieces = line.trim().split("\\s+", 2);
-            if (pieces.length == 0 || !pieces[0].matches("(?i)[0-9a-f]{64}")) {
-                continue;
-            }
-            hashes.add(pieces[0]);
-            if (pieces.length == 1 || normalizeChecksumName(pieces[1]).equals(expectedName)) {
-                return Optional.of(pieces[0]);
-            }
+            String[] pieces = line.trim().split("\\s+", 2); if (pieces.length == 0 || !pieces[0].matches("(?i)[0-9a-f]{64}")) continue;
+            hashes.add(pieces[0]); if (pieces.length == 1 || normalizeChecksumName(pieces[1]).equals(expectedName)) return Optional.of(pieces[0]);
         }
-        if (hashes.size() == 1) {
-            return Optional.of(hashes.getFirst());
-        }
+        if (hashes.size() == 1) return Optional.of(hashes.getFirst());
         throw new IOException("The checksum file did not contain an entry for " + packageName + ".");
     }
 
     private static String normalizeChecksumName(String value) {
-        String name = value == null ? "" : value.trim();
-        if (name.startsWith("*")) {
-            name = name.substring(1).trim();
-        }
-        name = name.replace('\\', '/');
-        int slash = name.lastIndexOf('/');
-        return (slash >= 0 ? name.substring(slash + 1) : name)
-                .replace('~', '.').toLowerCase(Locale.ROOT);
+        String name = value == null ? "" : value.trim(); if (name.startsWith("*")) name = name.substring(1).trim();
+        name = name.replace('\\', '/'); int slash = name.lastIndexOf('/');
+        return (slash >= 0 ? name.substring(slash + 1) : name).replace('~', '.').toLowerCase(Locale.ROOT);
     }
 
     private static String sha256(Path file) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (InputStream input = Files.newInputStream(file)) {
-            byte[] buffer = new byte[64 * 1024];
-            int read;
-            while ((read = input.read(buffer)) >= 0) {
-                digest.update(buffer, 0, read);
-            }
-        }
+        try (InputStream input = Files.newInputStream(file)) { byte[] buffer = new byte[64 * 1024]; int read; while ((read = input.read(buffer)) >= 0) digest.update(buffer, 0, read); }
         return HexFormat.of().formatHex(digest.digest());
     }
 
-    private static void installPrivileged(Path packageFile, String digest, LinuxPackageType type,
-                                          MessageReporter message) throws Exception {
-        Path pkexec = Path.of("/usr/bin/pkexec");
-        if (!Files.isExecutable(pkexec)) {
-            throw new IOException("The pkexec administrator tool is not installed at /usr/bin/pkexec.");
-        }
-        packageManagerCandidates(type).stream().filter(Files::isExecutable).findFirst()
-                .orElseThrow(() -> new IOException(type == LinuxPackageType.DEB
-                        ? "The apt-get package installer is unavailable."
-                        : "Neither dnf5 nor dnf is available under /usr/bin."));
-        Path helper = installedUpdateHelper();
-        if (helper == null) {
-            throw new IOException("The secure PinDB update helper is unavailable. Reinstall PinDB from a native package.");
-        }
+    private static void installPrivileged(Path packageFile, String digest, NativePackageType type, MessageReporter message) throws Exception {
+        if (type != NativePackageType.DEB && type != NativePackageType.RPM) throw new IOException("The privileged updater only accepts Linux DEB and RPM packages.");
+        Path pkexec = Path.of("/usr/bin/pkexec"); if (!Files.isExecutable(pkexec)) throw new IOException("The pkexec administrator tool is not installed at /usr/bin/pkexec.");
+        packageManagerCandidates(type).stream().filter(Files::isExecutable).findFirst().orElseThrow(() -> new IOException(type == NativePackageType.DEB ? "The apt-get package installer is unavailable." : "Neither dnf5 nor dnf is available under /usr/bin."));
+        Path helper = installedUpdateHelper(); if (helper == null) throw new IOException("The secure PinDB update helper is unavailable. Reinstall PinDB from a native package.");
         message.report("Approve the administrator prompt to install the update…");
-        Process process = new ProcessBuilder(privilegedInstallCommand(pkexec, helper, packageFile, digest, type))
-                .redirectErrorStream(true).start();
-        String output;
-        try (InputStream input = process.getInputStream()) {
-            output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
-        }
-        int status = process.waitFor();
-        if (status != 0) {
-            throw new IOException("The administrator installer exited with status " + status + ".\n\n"
-                    + (output.isBlank() ? "No additional installer output was provided." : output));
-        }
+        Process process = new ProcessBuilder(privilegedInstallCommand(pkexec, helper, packageFile, digest, type)).redirectErrorStream(true).start();
+        String output; try (InputStream input = process.getInputStream()) { output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim(); }
+        int status = process.waitFor(); if (status != 0) throw new IOException("The administrator installer exited with status " + status + ".\n\n" + (output.isBlank() ? "No additional installer output was provided." : output));
     }
 
-    static List<Path> packageManagerCandidates(LinuxPackageType type) {
-        return PrivilegedUpdateHelper.packageManagerCandidates(type);
+    static List<Path> packageManagerCandidates(NativePackageType type) { return PrivilegedUpdateHelper.packageManagerCandidates(type); }
+    static List<String> privilegedInstallCommand(Path pkexec, Path helper, Path packageFile, String digest, NativePackageType type) {
+        if (type != NativePackageType.DEB && type != NativePackageType.RPM) throw new IllegalArgumentException("Privileged install commands are only valid for Linux DEB and RPM packages.");
+        return List.of(pkexec.toString(), helper.toString(), "install", type.scriptValue(), digest, packageFile.toAbsolutePath().normalize().toString());
     }
-
-    static List<String> privilegedInstallCommand(Path pkexec, Path helper, Path packageFile, String digest,
-                                                 LinuxPackageType type) {
-        return List.of(pkexec.toString(), helper.toString(), "install", type.scriptValue(), digest,
-                packageFile.toAbsolutePath().normalize().toString());
-    }
-
-    static List<Path> installedUpdateHelperCandidates() {
-        return List.of(Path.of("/opt/pindb/pindb/bin/pindb-update-helper"),
-                Path.of("/opt/pindb/bin/pindb-update-helper"));
-    }
-
-    private static Path installedUpdateHelper() {
-        return installedUpdateHelperCandidates().stream()
-                .filter(UpdateInstaller::isSecureRootOwnedExecutable).findFirst().orElse(null);
-    }
+    static List<Path> installedUpdateHelperCandidates() { return List.of(Path.of("/opt/pindb/pindb/bin/pindb-update-helper"), Path.of("/opt/pindb/bin/pindb-update-helper")); }
+    private static Path installedUpdateHelper() { return installedUpdateHelperCandidates().stream().filter(UpdateInstaller::isSecureRootOwnedExecutable).findFirst().orElse(null); }
 
     private static boolean isSecureRootOwnedExecutable(Path candidate) {
-        Path absolute = candidate.toAbsolutePath().normalize();
-        Path current = absolute.getRoot();
+        Path absolute = candidate.toAbsolutePath().normalize(); Path current = absolute.getRoot();
         try {
             for (Path component : absolute) {
-                current = current.resolve(component);
-                Object uid = Files.getAttribute(current, "unix:uid", LinkOption.NOFOLLOW_LINKS);
-                Object mode = Files.getAttribute(current, "unix:mode", LinkOption.NOFOLLOW_LINKS);
-                if (!(uid instanceof Number owner) || owner.longValue() != 0L
-                        || !(mode instanceof Number permissions)
-                        || (permissions.intValue() & 0022) != 0
-                        || Files.isSymbolicLink(current)) {
-                    return false;
-                }
-                if (current.equals(absolute)) {
-                    return Files.isRegularFile(current, LinkOption.NOFOLLOW_LINKS) && Files.isExecutable(current);
-                }
-                if (!Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
-                    return false;
-                }
+                current = current.resolve(component); Object uid = Files.getAttribute(current, "unix:uid", LinkOption.NOFOLLOW_LINKS); Object mode = Files.getAttribute(current, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+                if (!(uid instanceof Number owner) || owner.longValue() != 0L || !(mode instanceof Number permissions) || (permissions.intValue() & 0022) != 0 || Files.isSymbolicLink(current)) return false;
+                if (current.equals(absolute)) return Files.isRegularFile(current, LinkOption.NOFOLLOW_LINKS) && Files.isExecutable(current);
+                if (!Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) return false;
             }
-        } catch (IOException | UnsupportedOperationException | SecurityException exception) {
-            return false;
-        }
+        } catch (IOException | UnsupportedOperationException | SecurityException exception) { return false; }
         return false;
     }
 
-    static List<Path> installedLauncherCandidates() {
-        return List.of(Path.of("/opt/pindb/pindb/bin/PinDB"), Path.of("/opt/pindb/bin/PinDB"),
-                Path.of("/usr/local/bin/pindb"), Path.of("/usr/bin/pindb"));
-    }
-
-    private static Path installedLauncher() {
-        return installedLauncherCandidates().stream().filter(Files::isExecutable).findFirst().orElse(null);
-    }
-
+    static List<Path> installedLauncherCandidates() { return List.of(Path.of("/opt/pindb/pindb/bin/PinDB"), Path.of("/opt/pindb/bin/PinDB"), Path.of("/usr/local/bin/pindb"), Path.of("/usr/bin/pindb")); }
+    private static Path installedLauncher() { return installedLauncherCandidates().stream().filter(Files::isExecutable).findFirst().orElse(null); }
     private static void restartAfterUpdate(Path notes, String tag) throws IOException {
-        Path launcher = installedLauncher();
-        if (launcher == null) {
-            throw new IOException("The installed PinDB launcher could not be found after the update.");
-        }
-        new ProcessBuilder(restartCommand(launcher, notes, tag))
-                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                .redirectError(ProcessBuilder.Redirect.DISCARD)
-                .start();
+        Path launcher = installedLauncher(); if (launcher == null) throw new IOException("The installed PinDB launcher could not be found after the update.");
+        new ProcessBuilder(restartCommand(launcher, notes, tag)).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
     }
-
-    static List<String> restartCommand(Path launcher, Path notes, String tag) {
-        return List.of(launcher.toString(), "--updated-tag=" + tag, "--updated-notes=" + notes);
-    }
-
-    static String manualInstallCommand(Path packageFile, LinuxPackageType type,
-                                       LinuxDistribution distribution) {
-        String command = distribution.manualInstallCommand(packageFile);
-        if (!command.isBlank()) {
-            return command;
-        }
+    static List<String> restartCommand(Path launcher, Path notes, String tag) { return List.of(launcher.toString(), "--updated-tag=" + tag, "--updated-notes=" + notes); }
+    static String manualInstallCommand(Path packageFile, NativePackageType type, LinuxDistribution distribution) {
         String quoted = "\"" + packageFile.toAbsolutePath().normalize() + "\"";
-        return type == LinuxPackageType.DEB ? "sudo apt install " + quoted : "sudo dnf install " + quoted;
+        if (type == NativePackageType.WINDOWS_EXE) return quoted;
+        if (type == NativePackageType.MACOS_PKG) return "/usr/bin/open " + quoted;
+        String command = distribution.manualInstallCommand(packageFile); if (!command.isBlank()) return command;
+        return type == NativePackageType.DEB ? "sudo apt install " + quoted : "sudo dnf install " + quoted;
     }
 
-    private void showFailureAlert(Window owner, Path packageFile, LinuxPackageType type,
-                                  LinuxDistribution distribution, Throwable failure, Path log) {
-        StringBuilder text = new StringBuilder("The current PinDB installation was preserved.\n\nCause: ")
-                .append(failureSummary(failure));
-        if (packageFile != null) {
-            text.append("\n\nDownloaded package:\n").append(packageFile)
-                    .append("\n\nManual command:\n")
-                    .append(manualInstallCommand(packageFile, type, distribution));
-        }
-        if (log != null) {
-            text.append("\n\nDiagnostic log:\n").append(log);
-        }
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        if (owner != null && owner.isShowing()) {
-            alert.initOwner(owner);
-        }
-        alert.setTitle("Update Failed");
-        alert.setHeaderText("PinDB could not install the update");
-        alert.setContentText(text.toString());
-        alert.getDialogPane().setPrefWidth(720);
-        alert.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
-            if (newScene != null) {
-                UiUtil.applyStyles(newScene, settings);
-            }
-        });
-        alert.showAndWait();
+    private void showFailureAlert(Window owner, Path packageFile, NativePackageType type, LinuxDistribution distribution, Throwable failure, Path log) {
+        StringBuilder text = new StringBuilder("The current PinDB installation was preserved.\n\nCause: ").append(failureSummary(failure));
+        if (packageFile != null) text.append("\n\nDownloaded package:\n").append(packageFile).append("\n\nManual command:\n").append(manualInstallCommand(packageFile, type, distribution));
+        if (log != null) text.append("\n\nDiagnostic log:\n").append(log);
+        Alert alert = new Alert(Alert.AlertType.ERROR); if (owner != null && owner.isShowing()) alert.initOwner(owner);
+        alert.setTitle("Update Failed"); alert.setHeaderText("PinDB could not install the update"); alert.setContentText(text.toString()); alert.getDialogPane().setPrefWidth(720);
+        alert.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> { if (newScene != null) UiUtil.applyStyles(newScene, settings); }); alert.showAndWait();
     }
 
     private static Path writeFailureLog(Path packageFile, Throwable failure, String stage) {
         try {
-            Path log = AppPaths.ensure(AppPaths.stateDirectory()).resolve("update-error.log");
-            StringWriter trace = new StringWriter();
-            if (failure != null) {
-                failure.printStackTrace(new PrintWriter(trace));
-            }
-            Files.writeString(log, "PinDB update failure\nTime: " + Instant.now() + "\nStage: " + stage
-                            + "\nPackage: " + (packageFile == null ? "none" : packageFile)
-                            + "\nCause: " + failureSummary(failure) + "\n\n" + trace,
-                    StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            return log;
-        } catch (RuntimeException | IOException exception) {
-            exception.printStackTrace(System.err);
-            return null;
-        }
+            Path log = AppPaths.ensure(AppPaths.stateDirectory()).resolve("update-error.log"); StringWriter trace = new StringWriter(); if (failure != null) failure.printStackTrace(new PrintWriter(trace));
+            Files.writeString(log, "PinDB update failure\nTime: " + Instant.now() + "\nStage: " + stage + "\nPackage: " + (packageFile == null ? "none" : packageFile) + "\nCause: " + failureSummary(failure) + "\n\n" + trace, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING); return log;
+        } catch (RuntimeException | IOException exception) { exception.printStackTrace(System.err); return null; }
     }
 
     private static String failureSummary(Throwable failure) {
-        if (failure == null) {
-            return "Unknown update error.";
-        }
-        Throwable root = failure;
-        while (root.getCause() != null && root.getCause() != root) {
-            root = root.getCause();
-        }
-        return root.getMessage() == null || root.getMessage().isBlank()
-                ? root.getClass().getSimpleName() : root.getMessage();
+        if (failure == null) return "Unknown update error."; Throwable root = failure; while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+        return root.getMessage() == null || root.getMessage().isBlank() ? root.getClass().getSimpleName() : root.getMessage();
     }
 
     public static void showFailedInstallPrompt(Window owner, Path packageFile) {
-        LinuxPackageType type = packageFile.toString().toLowerCase(Locale.ROOT).endsWith(".rpm")
-                ? LinuxPackageType.RPM : LinuxPackageType.DEB;
-        LinuxDistribution distribution = LinuxDistribution.current();
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        if (owner != null && owner.isShowing()) {
-            alert.initOwner(owner);
-        }
-        alert.setTitle("PinDB Update Failed");
-        alert.setHeaderText("The update could not be installed");
-        alert.setContentText("Your previous PinDB installation was preserved. The downloaded package is at:\n"
-                + packageFile + "\n\nInstall it manually with:\n"
-                + manualInstallCommand(packageFile, type, distribution));
-        alert.getButtonTypes().setAll(ButtonType.CLOSE);
-        alert.showAndWait();
+        NativePackageType type = NativePackageType.fromFileName(packageFile.toString()).orElse(NativePackageType.DEB);
+        LinuxDistribution distribution = LinuxDistribution.current(); Alert alert = new Alert(Alert.AlertType.ERROR); if (owner != null && owner.isShowing()) alert.initOwner(owner);
+        alert.setTitle("PinDB Update Failed"); alert.setHeaderText("The update could not be installed");
+        alert.setContentText("Your previous PinDB installation was preserved. The downloaded package is at:\n" + packageFile + "\n\nInstall it manually with:\n" + manualInstallCommand(packageFile, type, distribution));
+        alert.getButtonTypes().setAll(ButtonType.CLOSE); alert.showAndWait();
     }
 
-    private record DownloadedUpdate(Path packageFile, Path notesFile, String digest,
-                                    ReleasePackage releasePackage, LinuxDistribution distribution) {
-    }
-
-    @FunctionalInterface
-    private interface ProgressReporter {
-        void report(long complete, long total);
-    }
-
-    @FunctionalInterface
-    private interface MessageReporter {
-        void report(String message);
-    }
+    private record DownloadedUpdate(Path packageFile, Path notesFile, String digest, ReleasePackage releasePackage, LinuxDistribution distribution) {}
+    @FunctionalInterface private interface ProgressReporter { void report(long complete, long total); }
+    @FunctionalInterface private interface MessageReporter { void report(String message); }
 }

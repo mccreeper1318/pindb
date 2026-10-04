@@ -51,11 +51,7 @@ public final class PinDBApplication extends Application {
                     pendingNotes.tag(), pendingNotes.markdown()).showAndWait();
         }
 
-        Path requestedDatabase = arguments.stream()
-                .filter(argument -> !argument.startsWith("--"))
-                .map(Path::of)
-                .filter(Files::isRegularFile)
-                .findFirst().orElse(null);
+        Path requestedDatabase = requestedDatabase(arguments);
         if (requestedDatabase != null) {
             context.openDatabase(requestedDatabase);
         } else if (context.settings().autoOpenLastDatabase()) {
@@ -66,6 +62,17 @@ public final class PinDBApplication extends Application {
         }
 
         context.checkForUpdates(context.launcher().stage(), false);
+    }
+
+    static Path requestedDatabase(List<String> arguments) {
+        if (arguments == null) {
+            return null;
+        }
+        return arguments.stream()
+                .filter(argument -> argument != null && !argument.startsWith("--"))
+                .map(Path::of)
+                .filter(Files::isRegularFile)
+                .findFirst().orElse(null);
     }
 
     private String readUpdatedNotes(String notesPath) {
@@ -102,7 +109,7 @@ public final class PinDBApplication extends Application {
     @Override
     public void stop() {
         if (context != null) {
-            // Database windows close their own connections. JavaFX invokes this after all windows are closed.
+            context.closeDatabaseWindows();
         }
     }
 
