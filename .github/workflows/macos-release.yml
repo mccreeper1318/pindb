@@ -245,6 +245,24 @@ jobs:
           declare -A LOCAL_DIGESTS
           declare -A LOCAL_SIZES
 
+          temporary_name() {
+            local final_name="$1"
+            local kind="$2"
+            if [[ "$final_name" == *.pkg.sha256 ]]; then
+              printf '%s.%s-%s.pkg.sha256' \
+                "${final_name%.pkg.sha256}" \
+                "$kind" \
+                "$RUN_KEY"
+            elif [[ "$final_name" == *.pkg ]]; then
+              printf '%s.%s-%s.pkg' \
+                "${final_name%.pkg}" \
+                "$kind" \
+                "$RUN_KEY"
+            else
+              printf '%s.%s-%s' "$final_name" "$kind" "$RUN_KEY"
+            fi
+          }
+
           asset_id_by_name() {
             local name="$1"
             gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100" \
@@ -290,7 +308,7 @@ jobs:
           }
 
           for final_name in "${FINAL_NAMES[@]}"; do
-            stage_name="pindb-stage-${RUN_KEY}-${final_name}"
+            stage_name="$(temporary_name "$final_name" stage)"
             STAGE_NAMES["$final_name"]="$stage_name"
             cp "release-assets/$final_name" "$STAGE_DIR/$stage_name"
             LOCAL_DIGESTS["$final_name"]="sha256:$(sha256sum "release-assets/$final_name" | awk '{print $1}')"
@@ -355,7 +373,7 @@ jobs:
                   if [[ -n "$current_id" && "$current_id" != "$old_id" ]]; then
                     rename_asset \
                       "$current_id" \
-                      "pindb-failed-${RUN_KEY}-${final_name}" \
+                      "$(temporary_name "$final_name" failed)" \
                       || true
                   fi
                   rename_asset "$old_id" "$final_name" || true
@@ -363,7 +381,7 @@ jobs:
               elif [[ -n "$current_id" && "$current_id" == "${STAGE_IDS[$final_name]}" ]]; then
                 rename_asset \
                   "$current_id" \
-                  "pindb-failed-${RUN_KEY}-${final_name}" \
+                  "$(temporary_name "$final_name" failed)" \
                   || true
               fi
             done
@@ -378,7 +396,7 @@ jobs:
             if [[ -n "$old_id" ]]; then
               rename_asset \
                 "$old_id" \
-                "pindb-backup-${RUN_KEY}-${final_name}"
+                "$(temporary_name "$final_name" backup)"
             fi
           done
 
