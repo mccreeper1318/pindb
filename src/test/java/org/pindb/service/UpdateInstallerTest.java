@@ -112,6 +112,9 @@ class UpdateInstallerTest {
         assertTrue(appleScript.contains("/usr/bin/install -o root -g wheel -m 0400"));
         assertTrue(appleScript.contains("/usr/bin/shasum -a 256"));
         assertTrue(appleScript.contains("PinDB-verified-update.pkg"));
+        assertTrue(appleScript.contains("/usr/bin/nohup /bin/sh -c"));
+        assertTrue(appleScript.contains("pindb-cleanup 86400"));
+        assertTrue(appleScript.contains(">/dev/null 2>&1 </dev/null &"));
         assertFalse(appleScript.contains("/private/var/tmp/PinDB-verified-update.pkg"));
         assertFalse(appleScript.contains(source.toString()));
         assertFalse(appleScript.contains(HASH));
