@@ -1,0 +1,102 @@
+name: Issue 78 macOS Release Smoke
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SMOKE_VERSION: 0.3-beta.999
+
+jobs:
+  build-macos:
+    name: Smoke macOS release (${{ matrix.release_arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            release_arch: arm64
+            machine_arch: arm64
+          - runner: macos-15-intel
+            release_arch: x64
+            machine_arch: x86_64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Verify runner architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(uname -m)" == "${{ matrix.machine_arch }}" ]]
+
+      - name: Build and verify prerelease PKG
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test packageMacPkg -PappVersion="${SMOKE_VERSION}"
+          PKG="build/packages/PinDB-${SMOKE_VERSION}-macos-${{ matrix.release_arch }}.pkg"
+          bash packaging/macos/verify-package.sh "$PKG" "${{ matrix.release_arch }}" "org.pindb.PinDB"
+          (
+            cd build/packages
+            shasum -a 256 "$(basename "$PKG")" > "$(basename "$PKG").sha256"
+            shasum -a 256 -c "$(basename "$PKG").sha256"
+          )
+
+      - name: Upload smoke release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-78-macos-${{ matrix.release_arch }}
+          path: |
+            build/packages/PinDB-${{ env.SMOKE_VERSION }}-macos-${{ matrix.release_arch }}.pkg
+            build/packages/PinDB-${{ env.SMOKE_VERSION }}-macos-${{ matrix.release_arch }}.pkg.sha256
+          if-no-files-found: error
+
+  verify-assets:
+    name: Verify merged macOS release assets
+    needs: build-macos
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download smoke artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify exact four-file release set
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$SMOKE_VERSION"
+          EXPECTED=(
+            "PinDB-${VERSION}-macos-arm64.pkg"
+            "PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            "PinDB-${VERSION}-macos-x64.pkg"
+            "PinDB-${VERSION}-macos-x64.pkg.sha256"
+          )
+
+          mapfile -t FILES < <(find release-assets -maxdepth 1 -type f -printf '%f\n' | sort)
+          [[ "${#FILES[@]}" -eq 4 ]]
+          for NAME in "${EXPECTED[@]}"; do
+            [[ -s "release-assets/$NAME" ]]
+          done
+
+          (
+            cd release-assets
+            sha256sum -c "PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            sha256sum -c "PinDB-${VERSION}-macos-x64.pkg.sha256"
+          )
