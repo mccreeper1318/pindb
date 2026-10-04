@@ -23,6 +23,7 @@
 - Updated the main CI workflow to run on direct pushes to `dev`.
 - Aligned Windows CI push coverage with `dev`, `main`, and pull requests (Issue #77).
 - Limited release tags to two or three numeric version components for consistent cross-platform packaging.
+- Documented macOS installation, updates, release assets, signing limitations, and website support for 0.3 (Issue #80).
 
 ### Fixed
 - Fixed the Windows installer package task and hardened installer verification.
