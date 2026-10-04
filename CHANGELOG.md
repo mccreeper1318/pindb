@@ -27,6 +27,8 @@
 
 ### Fixed
 - Fixed the Windows installer package task and hardened installer verification.
+- Fixed Windows release rebuilds so verified installer/checksum replacements are staged and swapped transactionally instead of destructively clobbering published assets.
+- Fixed Windows update guidance to accurately require completing the installer and reopening PinDB manually.
 - Fixed Windows CI failures caused by Linux-only privileged updater tests and Linux-specific path assertions.
 - Fixed fallback GitHub credential storage on Windows by using owner-only ACLs (Issue #65).
 - Fixed Windows credential staging so inherited ACL entries cannot expose token data before permissions are restricted (Issue #68).
