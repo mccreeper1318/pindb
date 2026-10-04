@@ -108,8 +108,14 @@ public final class PinDBApplication extends Application {
 
     @Override
     public void stop() {
-        if (context != null) {
+        if (context == null) {
+            return;
+        }
+        try {
             context.closeDatabaseWindows();
+        } catch (RuntimeException exception) {
+            System.err.println("PinDB could not close every database cleanly during application shutdown.");
+            exception.printStackTrace(System.err);
         }
     }
 

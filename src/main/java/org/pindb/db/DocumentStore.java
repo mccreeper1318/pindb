@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class DocumentStore implements AutoCloseable {
-    private final Connection connection;
+    private Connection connection;
 
     public DocumentStore(Path databasePath) {
         try {
@@ -228,7 +228,7 @@ public final class DocumentStore implements AutoCloseable {
         }
     }
 
-    private void checkpointWal() throws SQLException {
+    private static void checkpointWal(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(TRUNCATE)")) {
             if (result.next() && result.getInt(1) != 0) {
@@ -239,20 +239,27 @@ public final class DocumentStore implements AutoCloseable {
 
     @Override
     public void close() {
+        Connection current = connection;
+        if (current == null) {
+            return;
+        }
+
         SQLException failure = null;
         try {
-            checkpointWal();
+            checkpointWal(current);
         } catch (SQLException exception) {
             failure = exception;
         }
         try {
-            connection.close();
+            current.close();
         } catch (SQLException exception) {
             if (failure == null) {
                 failure = exception;
             } else {
                 failure.addSuppressed(exception);
             }
+        } finally {
+            connection = null;
         }
         if (failure != null) {
             throw new DatabaseException("Could not close embedded document storage cleanly or checkpoint pending SQLite data.",
