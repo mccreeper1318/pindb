@@ -24,6 +24,7 @@ public final class AppContext {
     private final UpdateService updateService = new UpdateService();
     private final Map<Path, DatabaseWindow> databaseWindows = new LinkedHashMap<>();
     private LauncherWindow launcher;
+    private boolean shuttingDown;
 
     public SettingsService settings() {
         return settings;
@@ -48,7 +49,7 @@ public final class AppContext {
             DatabaseService database = DatabaseService.open(normalized);
             DatabaseWindow window = new DatabaseWindow(this, database, () -> {
                 databaseWindows.remove(normalized);
-                if (databaseWindows.isEmpty() && launcher != null) {
+                if (!shuttingDown && databaseWindows.isEmpty() && launcher != null) {
                     launcher.showAndFocus();
                 }
             });
@@ -70,10 +71,20 @@ public final class AppContext {
         }
     }
 
-    public void closeAll() {
-        for (DatabaseWindow window : databaseWindows.values().toArray(DatabaseWindow[]::new)) {
-            window.close();
+    void closeDatabaseWindows() {
+        boolean previousShuttingDown = shuttingDown;
+        shuttingDown = true;
+        try {
+            for (DatabaseWindow window : databaseWindows.values().toArray(DatabaseWindow[]::new)) {
+                window.close();
+            }
+        } finally {
+            shuttingDown = previousShuttingDown;
         }
+    }
+
+    public void closeAll() {
+        closeDatabaseWindows();
         Platform.exit();
     }
 

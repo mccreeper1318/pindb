@@ -109,7 +109,7 @@ public final class PinDBApplication extends Application {
     @Override
     public void stop() {
         if (context != null) {
-            // Database windows close their own connections. JavaFX invokes this after all windows are closed.
+            context.closeDatabaseWindows();
         }
     }
 
