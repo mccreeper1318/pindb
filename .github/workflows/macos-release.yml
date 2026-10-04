@@ -265,7 +265,8 @@ jobs:
 
           asset_id_by_name() {
             local name="$1"
-            gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100" \
+            gh api --paginate \
+              "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100" \
               | jq -r --arg name "$name" '.[] | select(.name == $name) | .id' \
               | head -n 1
           }
@@ -358,10 +359,10 @@ jobs:
           done
 
           rollback() {
-            local exit_code=$?
-            trap - ERR
+            local exit_code="${1:-1}"
+            trap - ERR INT TERM
             set +e
-            echo "Publication failed; restoring the pre-run macOS release asset names."
+            echo "Publication failed or was interrupted; restoring the pre-run macOS release asset names."
 
             for final_name in "${FINAL_NAMES[@]}"; do
               old_id="${ORIGINAL_IDS[$final_name]}"
@@ -389,7 +390,9 @@ jobs:
             echo "Old assets were retained server-side for rollback. Any staged/failed assets are intentionally left for recovery if cleanup could not complete."
             exit "$exit_code"
           }
-          trap rollback ERR
+          trap 'rollback $?' ERR
+          trap 'rollback 130' INT
+          trap 'rollback 143' TERM
 
           for final_name in "${FINAL_NAMES[@]}"; do
             old_id="${ORIGINAL_IDS[$final_name]}"
@@ -422,7 +425,7 @@ jobs:
             fi
           done
 
-          trap - ERR
+          trap - ERR INT TERM
 
           for final_name in "${FINAL_NAMES[@]}"; do
             old_id="${ORIGINAL_IDS[$final_name]}"
