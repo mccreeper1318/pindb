@@ -1,122 +1,66 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Build PinDB Windows, Debian, and Fedora packages from source.">
-  <title>Build From Source - PinDB</title>
-  <link rel="icon" href="assets/icon.png" type="image/png">
-  <link rel="stylesheet" href="assets/style.css">
-  <script src="assets/site.js" defer></script>
-</head>
-<body>
-  <div class="shell">
-    <header class="masthead">
-      <div class="brand">
-        <img class="brand-icon" src="assets/icon.png" alt="PinDB logo">
-        <div class="logo">PinDB<span class="blink">_</span></div>
-      </div>
-      <p class="tagline">A FLEXIBLE PERSONAL DATABASE FOR YOUR COMPUTER</p>
-    </header>
-    <nav class="navbar" aria-label="Main navigation">
-      <a href="index.html">HOME</a>
-      <a href="download.html">DOWNLOAD</a>
-      <a href="features.html">FEATURES</a>
-      <a href="gallery.html">GALLERY</a>
-      <a href="manual.html">USER GUIDE</a>
-      <a href="build.html" class="current">BUILD FROM SOURCE</a>
-      <a href="about.html">ABOUT</a>
-    </nav>
-    <main class="content">
-<h1>Build PinDB From Source</h1>
+---
+layout: default
+title: Build PinDB from Source
+---
 
-<p>PinDB is a Java 25 application built with Gradle and JavaFX 25.</p>
+<nav class="site-nav">
+  <a href="index.html">Home</a><a href="download.html">Download</a><a href="features.html">Features</a><a href="gallery.html">Gallery</a><a href="manual.html">User Guide</a><a href="build.html">Build</a><a href="about.html">About</a>
+</nav>
 
-<h2>General requirements</h2>
+<h1>Build from source</h1>
+
+<h2>Requirements</h2>
 <ul>
   <li>Git</li>
-  <li>JDK 25, including <code>jpackage</code></li>
-  <li>Internet access for Gradle dependency downloads</li>
-  <li>A 64-bit build system matching the native package you want to create</li>
+  <li>JDK 25 including <code>jpackage</code></li>
+  <li>Platform-native packaging tools where required</li>
 </ul>
-
-<h2>Package-specific requirements</h2>
-<table class="status-table">
-  <tr><th>Package</th><th>Build system and tools</th></tr>
-  <tr><td>Windows <code>.exe</code></td><td>64-bit Windows with WiX Toolset, as required by <code>jpackage</code>.</td></tr>
-  <tr><td>Debian <code>.deb</code></td><td>Debian-family Linux with <code>dpkg</code>, <code>dpkg-deb</code>, and <code>fakeroot</code>.</td></tr>
-  <tr><td>Fedora <code>.rpm</code></td><td>Fedora or another RPM-based build system with <code>rpm-build</code> and <code>rpmbuild</code>.</td></tr>
-</table>
-<p>Native <code>jpackage</code> installers must be built on the corresponding operating system.</p>
+<p>PinDB includes the Gradle wrapper; a system Gradle installation is not required.</p>
 
 <h2>Clone and test</h2>
-<p>Use the stable tag for the 0.2.1 source or the development branch for the 0.3 preview:</p>
 <pre>git clone https://github.com/mccreeper1318/pindb.git
 cd pindb
-git switch --detach 0.2.1</pre>
-<pre>git switch dev</pre>
-<p>Linux:</p>
-<pre>chmod +x gradlew
+git switch dev
+chmod +x gradlew
 ./gradlew clean test</pre>
-<p>Windows PowerShell:</p>
-<pre>.\gradlew.bat clean test</pre>
+<p>On Windows use <code>gradlew.bat</code>.</p>
 
 <h2>Run from source</h2>
-<p>Linux:</p>
-<pre>./gradlew run -PappVersion=0.3-beta.3</pre>
-<p>Windows PowerShell:</p>
-<pre>.\gradlew.bat run -PappVersion=0.3-beta.3</pre>
+<pre>./gradlew run -PappVersion=0.3</pre>
 
-<h2>Build the Windows installer</h2>
-<p>On Windows x64 with WiX installed:</p>
-<pre>.\gradlew.bat clean test packageWindows -PappVersion=0.3-beta.3</pre>
-<p>Beginning with 0.3 Beta 2, the release workflow verifies that this task creates exactly one nonempty Windows installer. Beta 3 keeps Linux-only updater tests and Linux path assertions from breaking Windows builds.</p>
+<h2>Native package tasks</h2>
 
-<h2>Build the Debian package</h2>
-<pre>./gradlew clean test packageDeb -PappVersion=0.3-beta.3</pre>
+<h3>Windows x64</h3>
+<pre>.\gradlew.bat clean test packageWindows -PappVersion=0.3</pre>
+<p>WiX is required by <code>jpackage</code> for the Windows EXE.</p>
 
-<h2>Build the Fedora RPM</h2>
-<p>On Fedora, install the native RPM packaging tools first:</p>
-<pre>sudo dnf install rpm-build desktop-file-utils cpio
-./gradlew clean test packageRpm -PappVersion=0.3-beta.3</pre>
+<h3>macOS</h3>
+<pre>./gradlew clean test packageMacPkg -PappVersion=0.3</pre>
+<p>Build the ARM64 package on Apple Silicon and the x64 package on Intel. The release workflow uses native runners for each architecture.</p>
 
-<p>Every package task writes its self-contained installer to:</p>
-<pre>build/packages/</pre>
+<h3>Debian family</h3>
+<pre>./gradlew clean test packageDeb -PappVersion=0.3</pre>
 
-<h2>Inspect the RPM</h2>
-<pre>rpm -qpi build/packages/*.rpm
-rpm -qpl build/packages/*.rpm</pre>
-<p>The native packages should include the PinDB launcher, private Java runtime, icon, and <code>.pindb</code> file association. Linux packages install under <code>/opt/pindb</code>; Windows uses a per-user installation.</p>
+<h3>Fedora/RPM</h3>
+<pre>./gradlew clean test packageRpm -PappVersion=0.3</pre>
 
-<h2>Automated builds</h2>
-<p>The GitHub Actions workflows test and package each native format independently:</p>
-<ul>
-  <li>The Windows x64 <code>.exe</code> is built on Windows with Java 25 and WiX.</li>
-  <li>Windows packaging must produce exactly one nonempty installer before it is uploaded.</li>
-  <li>Linux-only updater tests run only on Linux; credential-security tests verify native Windows ACLs or Linux POSIX permissions.</li>
-  <li>The Debian package is built on Ubuntu with Java 25.</li>
-  <li>The RPM is built inside Fedora with Temurin Java 25.</li>
-  <li>Package metadata, launchers, icons, and file associations are checked before release.</li>
-  <li>SHA-256 checksum files are generated and attached beside each installer.</li>
-</ul>
+<p>Native packages are written under <code>build/packages/</code> and include a private Java runtime.</p>
 
-<h2>Open in IntelliJ IDEA</h2>
-<ol>
-  <li>Open the cloned repository as a Gradle project.</li>
-  <li>Set both the project SDK and Gradle JVM to JDK 25.</li>
-  <li>Allow Gradle to load the dependencies.</li>
-  <li>Run the Gradle <code>run</code> task or <code>org.pindb.PinDBLauncher</code>.</li>
-</ol>
+<h2>0.3 release assets</h2>
+<p>A complete native 0.3 release contains Windows EXE, Debian DEB, Fedora RPM, Apple Silicon PKG, and Intel PKG packages, each with its own <code>.sha256</code> file.</p>
 
-<h2>Contributing</h2>
-<p>Keep changes focused, run the applicable clean test task, and do not commit databases or documents containing private information.</p>
-<p><a class="download-button" href="https://github.com/mccreeper1318/pindb/issues">View Issues</a> <a class="download-button" href="https://github.com/mccreeper1318/pindb">Browse Source</a></p>
-    </main>
-    <footer class="footer">
-      <div>PinDB Project &mdash; Hosted with simple HTML suitable for GitHub Pages.</div>
-      <div>Responsive on desktop, tablet, and mobile. JavaScript is optional except for live release links.</div>
-      <div>&copy; <span id="year">2026</span> PinDB Project &nbsp;|&nbsp; <a href="https://github.com/mccreeper1318/pindb">View Source on GitHub</a></div>
-    </footer>
-  </div>
-</body>
-</html>
+<pre>PinDB-&lt;version&gt;-windows-x64.exe
+PinDB-&lt;version&gt;-windows-x64.exe.sha256
+PinDB-&lt;version&gt;-macos-arm64.pkg
+PinDB-&lt;version&gt;-macos-arm64.pkg.sha256
+PinDB-&lt;version&gt;-macos-x64.pkg
+PinDB-&lt;version&gt;-macos-x64.pkg.sha256
+pindb_&lt;version&gt;_amd64.deb
+pindb_&lt;version&gt;_amd64.deb.sha256
+pindb-&lt;version&gt;.x86_64.rpm
+pindb-&lt;version&gt;.x86_64.rpm.sha256</pre>
+
+<h2>Release automation</h2>
+<p>Publishing a GitHub Release triggers independent Windows, Linux, and macOS release workflows. The Mac workflow tests and packages on native Apple Silicon and Intel runners, verifies the bundle/runtime architecture and metadata, generates SHA-256 files, and publishes the two PKG/checksum pairs only after both builds succeed.</p>
+
+<p>See the repository <a href="https://github.com/mccreeper1318/pindb/blob/dev/docs/release-process.md">release process</a> for the complete checklist.</p>

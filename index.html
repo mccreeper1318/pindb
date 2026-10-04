@@ -1,139 +1,55 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PinDB - a flexible personal database application for Windows 11, Debian, Ubuntu, Linux Mint, and Fedora.">
-  <title>Home - PinDB</title>
-  <link rel="icon" href="assets/icon.png" type="image/png">
-  <link rel="stylesheet" href="assets/style.css">
-  <script src="assets/site.js" defer></script>
-</head>
-<body>
-  <div class="shell">
-    <header class="masthead">
-      <div class="brand">
-        <img class="brand-icon" src="assets/icon.png" alt="PinDB logo">
-        <div class="logo">PinDB<span class="blink">_</span></div>
-      </div>
-      <p class="tagline">A FLEXIBLE PERSONAL DATABASE FOR YOUR COMPUTER</p>
-    </header>
-    <nav class="navbar" aria-label="Main navigation">
-      <a href="index.html" class="current">HOME</a>
-      <a href="download.html">DOWNLOAD</a>
-      <a href="features.html">FEATURES</a>
-      <a href="gallery.html">GALLERY</a>
-      <a href="manual.html">USER GUIDE</a>
-      <a href="build.html">BUILD FROM SOURCE</a>
-      <a href="about.html">ABOUT</a>
-    </nav>
-    <main class="content">
-<div class="marquee"><span>*** PINDB 0.2.1 IS THE CURRENT STABLE LINUX RELEASE *** PINDB 0.3 BETA 4 HARDENS WINDOWS CREDENTIAL STORAGE ***</span></div>
+---
+layout: default
+title: PinDB
+---
 
-<p class="welcome">Organize your information without writing SQL or running a database server—now on Windows 11 and Linux.</p>
+<nav class="site-nav">
+  <a href="index.html">Home</a>
+  <a href="download.html">Download</a>
+  <a href="features.html">Features</a>
+  <a href="gallery.html">Gallery</a>
+  <a href="manual.html">User Guide</a>
+  <a href="build.html">Build</a>
+  <a href="about.html">About</a>
+</nav>
 
-<div class="columns">
-  <section>
-    <h1>Welcome to PinDB</h1>
-    <p><b>PinDB</b> is a desktop personal database application for keeping structured information in portable <code>.pindb</code> files.</p>
-    <p>Create your own fields, add records, search and filter your information, attach documents, print reports, and keep internal backups—all from a graphical desktop program.</p>
+<p><img src="assets/icon.png" alt="PinDB logo" width="96"></p>
 
-    <div class="box">
-      <h2>Quick Download</h2>
-      <p>Choose the current stable Linux release or try the Windows 11 preview. Every official package includes a private Java runtime.</p>
-      <p>
-        <a class="download-button primary" href="download.html#stable-downloads">STABLE .DEB</a>
-        <a class="download-button fedora" href="download.html#stable-downloads">STABLE .RPM</a>
-        <a class="download-button windows" href="download.html#windows-downloads">WINDOWS 11 .EXE</a>
-      </p>
-      <p class="small">PinDB 0.2.1 is the stable Linux release. PinDB 0.3 Beta 4 is the current Windows and Linux preview.</p>
-    </div>
+<h1>A personal database that stays yours</h1>
 
-    <h2>Available platforms</h2>
-    <div class="package-grid">
-      <div class="package-card windows">
-        <h3>Windows 11</h3>
-        <p>Self-contained per-user installer for 64-bit Windows 11.</p>
-        <p><code>.exe</code> &mdash; x64 &mdash; 0.3 Beta 4</p>
-        <p class="small"><a href="windows.html">Read the Windows installation guide.</a></p>
-      </div>
-      <div class="package-card debian">
-        <h3>Debian Package</h3>
-        <p>For Linux Mint, Ubuntu, Debian, and related distributions.</p>
-        <p><code>.deb</code> &mdash; x86-64</p>
-        <p class="small"><a href="debian.html">Read the Debian installation guide.</a></p>
-      </div>
-      <div class="package-card fedora">
-        <h3>Fedora RPM</h3>
-        <p>For Fedora Workstation, Fedora KDE, and traditional Fedora spins.</p>
-        <p><code>.rpm</code> &mdash; x86-64</p>
-        <p class="small"><a href="fedora.html">Read the Fedora installation guide.</a></p>
-      </div>
-    </div>
+<p>PinDB is a desktop personal database for organizing structured information without writing SQL or running a separate database server. Each database is one portable <code>.pindb</code> file containing fields, records, display preferences, deleted items, internal backups, and embedded documents.</p>
 
-    <h2>Release highlights</h2>
-    <div class="package-grid">
-      <div class="package-card debian">
-        <h3>0.2.1 Stable</h3>
-        <p>A Linux reliability and security release with safer updates, stronger database diagnostics, backup-restore fixes, Java 25, and Fedora menu and printing improvements.</p>
-        <p><a href="https://github.com/mccreeper1318/pindb/releases/tag/0.2.1">Read the 0.2.1 release notes.</a></p>
-      </div>
-      <div class="package-card windows">
-        <h3>0.3 Beta 4</h3>
-        <p>Hardens Windows credential staging so inherited access-control entries cannot expose GitHub credentials before owner-only permissions are enforced.</p>
-        <p><a href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.4">Read the 0.3 Beta 4 release notes.</a></p>
-      </div>
-      <div class="package-card fedora">
-        <h3>0.3 Beta 3</h3>
-        <p>Fixes Windows-specific updater-test failures and protects fallback GitHub credentials with owner-only Windows access-control lists.</p>
-        <p><a href="https://github.com/mccreeper1318/pindb/releases/tag/0.3-beta.3">Read the 0.3 Beta 3 release notes.</a></p>
-      </div>
-    </div>
+<p><a class="btn" href="download.html">Download PinDB</a> <a class="btn" href="features.html">Explore features</a></p>
 
-    <h2>Why PinDB?</h2>
-    <ul>
-      <li>One portable file for each database.</li>
-      <li>No SQL knowledge or database server required.</li>
-      <li>Table and record-card views.</li>
-      <li>Embedded PDF, DOCX, image, and text documents.</li>
-      <li>Search, sorting, filters, summaries, printing, and CSV tools.</li>
-      <li>Automatic update checks through GitHub Releases.</li>
-      <li>Native packages for Windows 11, Debian-family Linux, and Fedora-family Linux.</li>
-    </ul>
-  </section>
+<h2>Supported platforms</h2>
 
-  <aside>
-    <div class="sidebox">
-      <h2>Project Status</h2>
-      <img src="assets/icon.png" alt="PinDB logo" width="160" height="160">
-      <p><b>Platforms:</b> Windows 11 / Linux</p>
-      <p><b>Packages:</b> .exe / .deb / .rpm</p>
-      <p><b>Stable:</b> <span id="latest-stable-version">0.2.1</span></p>
-      <p><b>Preview:</b> <span id="latest-beta-version">0.3-beta.4</span></p>
-      <p><b>Source:</b> Java 25 / JavaFX 25</p>
-      <p><b>Database:</b> SQLite</p>
-      <p><b>Newest listed release:</b> <span id="latest-version">0.3-beta.4</span></p>
-    </div>
-
-    <div class="sidebox">
-      <h2>Useful Links</h2>
-      <ul>
-        <li><a href="https://github.com/mccreeper1318/pindb/releases">All releases</a></li>
-        <li><a href="windows.html">Windows guide</a></li>
-        <li><a href="debian.html">Debian guide</a></li>
-        <li><a href="fedora.html">Fedora guide</a></li>
-        <li><a href="https://github.com/mccreeper1318/pindb/issues">Report a problem</a></li>
-        <li><a href="https://github.com/mccreeper1318/pindb">Source repository</a></li>
-      </ul>
-    </div>
-  </aside>
+<div class="platform-grid">
+  <div class="platform-card"><h3>Windows 11</h3><p>Self-contained x64 EXE installer with File Explorer association and in-app updates.</p></div>
+  <div class="platform-card"><h3>macOS</h3><p>Native PKGs for Apple Silicon and Intel, Finder association, architecture-aware updates, and native Library/Caches paths.</p></div>
+  <div class="platform-card"><h3>Debian family</h3><p>DEB packages for Linux Mint, Ubuntu, Debian, and related x86-64 systems.</p></div>
+  <div class="platform-card"><h3>Fedora family</h3><p>RPM packages for traditional Fedora desktops, with manual rpm-ostree guidance for Atomic editions.</p></div>
 </div>
-    </main>
-    <footer class="footer">
-      <div>PinDB Project &mdash; Hosted with simple HTML suitable for GitHub Pages.</div>
-      <div>Responsive on desktop, tablet, and mobile. JavaScript is optional except for live release links.</div>
-      <div>&copy; <span id="year">2026</span> PinDB Project &nbsp;|&nbsp; <a href="https://github.com/mccreeper1318/pindb">View Source on GitHub</a></div>
-    </footer>
-  </div>
-</body>
-</html>
+
+<div class="warning"><strong>macOS 0.3 packages are unsigned and not notarized.</strong> Verify the matching SHA-256 file before opening the PKG and approve only that verified package through normal macOS security controls. PinDB does not require disabling Gatekeeper.</div>
+
+<h2>What PinDB does</h2>
+
+<ul>
+  <li>Create custom databases with text, number, currency, date/time, yes/no, dropdown, and embedded-document fields.</li>
+  <li>Search, sort, filter, summarize, and switch between table and record views.</li>
+  <li>Store PDF, DOCX, text, and image documents inside the database.</li>
+  <li>Import/export CSV and create formatted print layouts.</li>
+  <li>Restore internal backups and Recently Deleted records.</li>
+  <li>Check GitHub Releases for stable or prerelease updates and verify published SHA-256 checksums before installation.</li>
+  <li>Submit privacy-conscious bug reports through GitHub device authorization.</li>
+</ul>
+
+<h2>Portable by design</h2>
+
+<p>Close a database normally, then copy its <code>.pindb</code> file like any other file. PinDB checkpoints SQLite WAL data during normal shutdown so the closed database is self-contained. Keep separate external backups of important databases in addition to PinDB's internal snapshots.</p>
+
+<h2>0.3 platform work</h2>
+
+<p>PinDB 0.3 expands the application from Linux-first support to a cross-platform release line with Windows 11 and native macOS packages. The Mac work includes Apple Silicon and Intel builds, native file associations, architecture-matched updates, protected Installer staging, two-architecture CI, and automatic release assets.</p>
+
+<p><a href="https://github.com/mccreeper1318/pindb">Source repository</a> · <a href="https://github.com/mccreeper1318/pindb/releases">All GitHub Releases</a> · <a href="https://github.com/mccreeper1318/pindb/issues">Issues</a></p>

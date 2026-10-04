@@ -3,92 +3,111 @@
 
   const repo = "mccreeper1318/pindb";
   const releasesUrl = `https://github.com/${repo}/releases`;
-  const api = `https://api.github.com/repos/${repo}/releases`;
+  const api = `https://api.github.com/repos/${repo}/releases?per_page=30`;
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
 
   function setText(id, value) {
-    const node = document.getElementById(id);
+    const node = byId(id);
     if (node) node.textContent = value;
   }
 
-  function choosePackage(release, extension) {
-    if (!release) return null;
-    const packages = release.assets.filter(asset => asset.name.toLowerCase().endsWith(extension));
-    return packages.find(asset => /(?:x86_64|amd64|x64)/i.test(asset.name)) || packages[0] || null;
+  function findAsset(release, predicate) {
+    if (!release || !Array.isArray(release.assets)) return null;
+    return release.assets.find(asset => predicate(asset.name.toLowerCase())) || null;
   }
 
-  function chooseChecksum(release, packageAsset) {
+  function choosePackage(release, kind) {
+    switch (kind) {
+      case "windows-x64":
+        return findAsset(release, name => name.endsWith("-windows-x64.exe"));
+      case "macos-arm64":
+        return findAsset(release, name => name.endsWith("-macos-arm64.pkg"));
+      case "macos-x64":
+        return findAsset(release, name => name.endsWith("-macos-x64.pkg"));
+      case "deb-x64":
+        return findAsset(release, name => name.endsWith(".deb") && /(?:amd64|x86_64)/.test(name));
+      case "rpm-x64":
+        return findAsset(release, name => name.endsWith(".rpm") && /(?:x86_64|amd64)/.test(name));
+      default:
+        return null;
+    }
+  }
+
+  function platformAggregate(kind) {
+    if (kind.startsWith("macos-")) return "checksums-macos.sha256";
+    if (kind.startsWith("windows-")) return "checksums-windows.sha256";
+    return "checksums-linux.sha256";
+  }
+
+  function chooseChecksum(release, packageAsset, kind) {
     if (!release || !packageAsset) return null;
-    const exactName = `${packageAsset.name}.sha256`.toLowerCase();
-    return release.assets.find(asset => asset.name.toLowerCase() === exactName) ||
-      release.assets.find(asset => {
-        const name = asset.name.toLowerCase();
-        return name === "checksums.sha256" || name === "checksums-linux.sha256";
-      }) || null;
+    const exact = `${packageAsset.name}.sha256`.toLowerCase();
+    return findAsset(release, name => name === exact) ||
+      findAsset(release, name => name === platformAggregate(kind)) ||
+      findAsset(release, name => name === "checksums.sha256");
   }
 
   function makeUnavailable(link, text) {
+    if (!link) return;
     link.removeAttribute("href");
     link.textContent = text;
     link.classList.add("unavailable");
     link.setAttribute("aria-disabled", "true");
-    link.removeAttribute("title");
   }
 
-  function setPackageLink(id, release, asset, packageLabel, channelLabel) {
-    const link = document.getElementById(id);
-    if (!link) return;
+  function setAssetLink(prefix, release, kind, label) {
+    const packageLink = byId(`${prefix}-${kind}`);
+    const checksumLink = byId(`${prefix}-${kind}-checksum`);
+    if (!packageLink && !checksumLink) return;
 
+    const asset = choosePackage(release, kind);
     if (!asset) {
-      makeUnavailable(link, `No ${channelLabel} ${packageLabel} published yet`);
+      makeUnavailable(packageLink, `${label} not published for this release`);
+      makeUnavailable(checksumLink, "Checksum unavailable");
       return;
     }
 
-    link.href = asset.browser_download_url;
-    link.textContent = `Download ${asset.name}`;
-    link.title = `${packageLabel} for ${release.tag_name}`;
-    link.classList.remove("unavailable");
-    link.removeAttribute("aria-disabled");
-  }
+    if (packageLink) {
+      packageLink.href = asset.browser_download_url;
+      packageLink.textContent = `Download ${asset.name}`;
+      packageLink.classList.remove("unavailable");
+      packageLink.removeAttribute("aria-disabled");
+    }
 
-  function setChecksumLink(id, release, packageAsset, packageLabel) {
-    const link = document.getElementById(id);
-    if (!link) return;
-
-    const checksum = chooseChecksum(release, packageAsset);
+    const checksum = chooseChecksum(release, asset, kind);
     if (!checksum) {
-      makeUnavailable(link, packageAsset ? `No ${packageLabel} checksum published` : "Checksum unavailable");
-      return;
+      makeUnavailable(checksumLink, `No checksum published for ${asset.name}`);
+    } else if (checksumLink) {
+      checksumLink.href = checksum.browser_download_url;
+      checksumLink.textContent = `Checksum: ${checksum.name}`;
+      checksumLink.classList.remove("unavailable");
+      checksumLink.removeAttribute("aria-disabled");
     }
-
-    link.href = checksum.browser_download_url;
-    link.textContent = `Checksum: ${checksum.name}`;
-    link.classList.remove("unavailable");
-    link.removeAttribute("aria-disabled");
   }
 
-  function fillRelease(prefix, release, channelLabel) {
+  function fillRelease(prefix, release) {
     if (!release) {
       setText(`${prefix}-version`, "not published");
-      setPackageLink(`${prefix}-deb`, null, null, "Debian package", channelLabel);
-      setPackageLink(`${prefix}-rpm`, null, null, "Fedora RPM", channelLabel);
-      setPackageLink(`${prefix}-exe`, null, null, "Windows installer", channelLabel);
-      return;
+    } else {
+      setText(`${prefix}-version`, release.tag_name);
     }
 
-    const deb = choosePackage(release, ".deb");
-    const rpm = choosePackage(release, ".rpm");
-    const exe = choosePackage(release, ".exe");
+    const platforms = [
+      ["windows-x64", "Windows x64 installer"],
+      ["macos-arm64", "Apple Silicon PKG"],
+      ["macos-x64", "Intel Mac PKG"],
+      ["deb-x64", "Debian x86-64 package"],
+      ["rpm-x64", "Fedora x86-64 package"]
+    ];
 
-    setText(`${prefix}-version`, release.tag_name);
-    setPackageLink(`${prefix}-deb`, release, deb, "Debian package", channelLabel);
-    setChecksumLink(`${prefix}-deb-checksum`, release, deb, "Debian package");
-    setPackageLink(`${prefix}-rpm`, release, rpm, "Fedora RPM", channelLabel);
-    setChecksumLink(`${prefix}-rpm-checksum`, release, rpm, "Fedora RPM");
-    setPackageLink(`${prefix}-exe`, release, exe, "Windows installer", channelLabel);
-    setChecksumLink(`${prefix}-exe-checksum`, release, exe, "Windows installer");
+    platforms.forEach(([kind, label]) => setAssetLink(prefix, release, kind, label));
   }
 
   async function loadReleases() {
+    const status = byId("release-status");
     try {
       const response = await fetch(api, {
         headers: {
@@ -98,34 +117,24 @@
       });
       if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
 
-      const releases = await response.json();
-      const published = releases.filter(release => !release.draft);
-      const stable = published.find(release => !release.prerelease);
-      const beta = published.find(release => release.prerelease);
+      const releases = (await response.json()).filter(release => !release.draft);
+      const stable = releases.find(release => !release.prerelease) || null;
+      const preview = releases.find(release => release.prerelease) || null;
 
-      fillRelease("stable", stable, "stable");
-      fillRelease("beta", beta, "preview");
-      if (stable) setText("latest-stable-version", stable.tag_name);
-      if (beta) setText("latest-beta-version", beta.tag_name);
+      fillRelease("stable", stable);
+      fillRelease("preview", preview);
 
-      const newest = published[0];
-      if (newest) setText("latest-version", newest.tag_name);
-
-      const windowsPreview = choosePackage(beta, ".exe");
-      const status = beta && !windowsPreview
-        ? "GitHub release information loaded. The latest preview does not currently include a Windows installer; available Linux package buttons download directly."
-        : "GitHub release information loaded. Available package buttons download the files directly.";
-      setText("release-status", status);
+      if (status) {
+        status.textContent = "Live release information loaded from GitHub. Buttons are enabled only when the matching native package and published release asset are present.";
+      }
     } catch (error) {
-      setText("release-status", `Live release lookup is unavailable. Visit ${releasesUrl} for all packages.`);
+      if (status) {
+        status.textContent = `Live release lookup is unavailable. Visit ${releasesUrl} to view all published packages.`;
+      }
     }
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    if (document.querySelector("[data-release-page]") || document.getElementById("latest-version")) {
-      loadReleases();
-    }
-    const year = document.getElementById("year");
-    if (year) year.textContent = new Date().getFullYear();
+    if (document.querySelector("[data-release-page]")) loadReleases();
   });
 }());
