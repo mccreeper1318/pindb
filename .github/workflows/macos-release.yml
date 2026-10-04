@@ -15,11 +15,14 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: pindb-macos-release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
 
 env:
   RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-  GH_TOKEN: ${{ github.token }}
 
 jobs:
   prepare:
@@ -33,6 +36,8 @@ jobs:
       - name: Resolve and validate version
         id: version
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -87,6 +92,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.prepare.outputs.tag }}
+          persist-credentials: false
 
       - name: Set up Java 25
         uses: actions/setup-java@v4
@@ -166,6 +172,8 @@ jobs:
       - prepare
       - build-macos
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
 
     steps:
       - name: Download macOS release artifacts
@@ -210,6 +218,8 @@ jobs:
 
       - name: Upload macOS release files
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           VERSION="${{ needs.prepare.outputs.version }}"
@@ -228,6 +238,8 @@ jobs:
 
       - name: Verify attached macOS assets
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           VERSION="${{ needs.prepare.outputs.version }}"
