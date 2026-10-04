@@ -239,6 +239,13 @@ jobs:
             "PinDB-${VERSION}-macos-x64.pkg.sha256"
           )
 
+          PROMOTION_NAMES=(
+            "PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            "PinDB-${VERSION}-macos-arm64.pkg"
+            "PinDB-${VERSION}-macos-x64.pkg.sha256"
+            "PinDB-${VERSION}-macos-x64.pkg"
+          )
+
           declare -A STAGE_NAMES
           declare -A STAGE_IDS
           declare -A ORIGINAL_IDS
@@ -267,8 +274,7 @@ jobs:
             local name="$1"
             gh api --paginate \
               "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100" \
-              | jq -r --arg name "$name" '.[] | select(.name == $name) | .id' \
-              | head -n 1
+              | jq -r --arg name "$name" '.[] | select(.name == $name) | .id'
           }
 
           asset_field_by_id() {
@@ -364,7 +370,7 @@ jobs:
             set +e
             echo "Publication failed or was interrupted; restoring the pre-run macOS release asset names."
 
-            for final_name in "${FINAL_NAMES[@]}"; do
+            for final_name in "${PROMOTION_NAMES[@]}"; do
               old_id="${ORIGINAL_IDS[$final_name]}"
               current_id="$(asset_id_by_name "$final_name")"
 
@@ -403,7 +409,7 @@ jobs:
             fi
           done
 
-          for final_name in "${FINAL_NAMES[@]}"; do
+          for final_name in "${PROMOTION_NAMES[@]}"; do
             rename_asset \
               "${STAGE_IDS[$final_name]}" \
               "$final_name"
