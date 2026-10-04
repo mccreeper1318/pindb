@@ -43,7 +43,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class UpdateInstaller {
-    private static final Path MAC_STAGED_INSTALLER = Path.of("/private/var/tmp/PinDB-verified-update.pkg");
+    private static final Path MAC_STAGING_ROOT = Path.of("/private/var/tmp");
+    private static final String MAC_STAGING_DIRECTORY_PREFIX = "PinDB-verified-update.";
+    private static final String MAC_STAGED_INSTALLER_NAME = "PinDB-verified-update.pkg";
 
     private final SettingsService settings;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20))
@@ -245,7 +247,8 @@ public final class UpdateInstaller {
                     + (output.isBlank() ? "No additional staging output was provided." : output));
         }
 
-        Path staged = macStagedInstallerPath();
+        Path staged = parseMacStagedInstallerPath(output)
+                .orElseThrow(() -> new IOException("The protected macOS staging step returned an invalid package path."));
         if (!isProtectedMacStagedPackage(staged)) {
             throw new IOException("The protected macOS package was not created with secure ownership and permissions.");
         }
@@ -256,8 +259,30 @@ public final class UpdateInstaller {
         return staged;
     }
 
-    static Path macStagedInstallerPath() {
-        return MAC_STAGED_INSTALLER;
+    static Optional<Path> parseMacStagedInstallerPath(String output) {
+        if (output == null) return Optional.empty();
+        String value = output.trim();
+        if (value.isEmpty() || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) return Optional.empty();
+        try {
+            Path path = Path.of(value).toAbsolutePath().normalize();
+            return isExpectedMacStagedInstallerPath(path) ? Optional.of(path) : Optional.empty();
+        } catch (RuntimeException exception) {
+            return Optional.empty();
+        }
+    }
+
+    static boolean isExpectedMacStagedInstallerPath(Path packageFile) {
+        if (packageFile == null) return false;
+        Path absolute = packageFile.toAbsolutePath().normalize();
+        Path stageDirectory = absolute.getParent();
+        if (stageDirectory == null || !MAC_STAGING_ROOT.equals(stageDirectory.getParent())
+                || !MAC_STAGED_INSTALLER_NAME.equals(absolute.getFileName().toString())) {
+            return false;
+        }
+        String directoryName = stageDirectory.getFileName().toString();
+        if (!directoryName.startsWith(MAC_STAGING_DIRECTORY_PREFIX)) return false;
+        String uniqueSuffix = directoryName.substring(MAC_STAGING_DIRECTORY_PREFIX.length());
+        return !uniqueSuffix.isBlank() && uniqueSuffix.chars().allMatch(character -> Character.isLetterOrDigit(character));
     }
 
     static List<String> macStagingCommand(Path packageFile, String digest) {
@@ -265,15 +290,15 @@ public final class UpdateInstaller {
             throw new IllegalArgumentException("A valid SHA-256 digest is required for macOS staging.");
         }
         Path source = packageFile.toAbsolutePath().normalize();
-        String shell = "umask 077; tempPath=/private/var/tmp/.PinDB-verified-update.$$.pkg; "
-                + "trap '/bin/rm -f \"$tempPath\"' EXIT HUP INT TERM; "
-                + "/usr/bin/install -o root -g wheel -m 0400 "
-                + "\"$1\" \"$tempPath\"; "
-                + "actual=$(/usr/bin/shasum -a 256 \"$tempPath\" | /usr/bin/cut -d ' ' -f 1); "
+        String shell = "umask 077; stageDir=$(/usr/bin/mktemp -d /private/var/tmp/PinDB-verified-update.XXXXXXXX); "
+                + "packagePath=\"$stageDir/PinDB-verified-update.pkg\"; "
+                + "trap '/bin/rm -rf \"$stageDir\"' EXIT HUP INT TERM; "
+                + "/usr/bin/install -o root -g wheel -m 0400 \"$1\" \"$packagePath\"; "
+                + "actual=$(/usr/bin/shasum -a 256 \"$packagePath\" | /usr/bin/cut -d ' ' -f 1); "
                 + "[ \"$actual\" = \"$2\" ] || exit 65; "
-                + "/bin/chmod 0444 \"$tempPath\"; /usr/sbin/chown root:wheel \"$tempPath\"; "
-                + "/bin/mv -f \"$tempPath\" /private/var/tmp/PinDB-verified-update.pkg; "
-                + "trap - EXIT HUP INT TERM";
+                + "/usr/sbin/chown root:wheel \"$stageDir\" \"$packagePath\"; "
+                + "/bin/chmod 0755 \"$stageDir\"; /bin/chmod 0444 \"$packagePath\"; "
+                + "/usr/bin/printf '%s\\n' \"$packagePath\"; trap - EXIT HUP INT TERM";
         return List.of(
                 "/usr/bin/osascript",
                 "-e", "on run argv",
@@ -281,8 +306,8 @@ public final class UpdateInstaller {
                 "-e", "set expectedDigest to item 2 of argv",
                 "-e", "set commandText to \"/bin/sh -c \" & quoted form of "
                         + "\"" + shell.replace("\\", "\\\\").replace("\"", "\\\"") + "\" & \" -- \" & quoted form of sourcePath & \" \" & quoted form of expectedDigest",
-                "-e", "do shell script commandText with administrator privileges",
-                "-e", "return \"/private/var/tmp/PinDB-verified-update.pkg\"",
+                "-e", "set stagedPath to do shell script commandText with administrator privileges",
+                "-e", "return stagedPath",
                 "-e", "end run",
                 source.toString(),
                 digest.toLowerCase(Locale.ROOT));
@@ -290,21 +315,26 @@ public final class UpdateInstaller {
 
     private static boolean isProtectedMacStagedPackage(Path packageFile) {
         Path absolute = packageFile.toAbsolutePath().normalize();
-        if (!absolute.equals(MAC_STAGED_INSTALLER) || Files.isSymbolicLink(absolute)
+        if (!isExpectedMacStagedInstallerPath(absolute) || Files.isSymbolicLink(absolute)
                 || !Files.isRegularFile(absolute, LinkOption.NOFOLLOW_LINKS)) {
             return false;
         }
         try {
+            Path stageDirectory = absolute.getParent();
             Object uid = Files.getAttribute(absolute, "unix:uid", LinkOption.NOFOLLOW_LINKS);
             Object mode = Files.getAttribute(absolute, "unix:mode", LinkOption.NOFOLLOW_LINKS);
-            Path parent = absolute.getParent();
-            Object parentUid = Files.getAttribute(parent, "unix:uid", LinkOption.NOFOLLOW_LINKS);
-            Object parentMode = Files.getAttribute(parent, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+            Object directoryUid = Files.getAttribute(stageDirectory, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+            Object directoryMode = Files.getAttribute(stageDirectory, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+            Object rootUid = Files.getAttribute(MAC_STAGING_ROOT, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+            Object rootMode = Files.getAttribute(MAC_STAGING_ROOT, "unix:mode", LinkOption.NOFOLLOW_LINKS);
             return uid instanceof Number owner && owner.longValue() == 0L
                     && mode instanceof Number permissions && (permissions.intValue() & 0022) == 0
-                    && parentUid instanceof Number directoryOwner && directoryOwner.longValue() == 0L
-                    && parentMode instanceof Number directoryMode && (directoryMode.intValue() & 01000) != 0
-                    && Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(parent);
+                    && directoryUid instanceof Number directoryOwner && directoryOwner.longValue() == 0L
+                    && directoryMode instanceof Number directoryPermissions && (directoryPermissions.intValue() & 0022) == 0
+                    && rootUid instanceof Number rootOwner && rootOwner.longValue() == 0L
+                    && rootMode instanceof Number rootPermissions && (rootPermissions.intValue() & 01000) != 0
+                    && Files.isDirectory(stageDirectory, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(stageDirectory)
+                    && Files.isDirectory(MAC_STAGING_ROOT, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(MAC_STAGING_ROOT);
         } catch (IOException | UnsupportedOperationException | SecurityException exception) {
             return false;
         }
