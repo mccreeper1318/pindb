@@ -136,7 +136,7 @@ for declaration_key in ("UTExportedTypeDeclarations", "UTImportedTypeDeclaration
     for declaration in plist.get(declaration_key, []):
         identifier = declaration.get("UTTypeIdentifier")
         if identifier:
-            declarations[str(identifier)] = declaration.get("UTTypeTagSpecification", {})
+            declarations[str(identifier).lower()] = declaration.get("UTTypeTagSpecification", {})
 
 association_found = False
 association_details = []
