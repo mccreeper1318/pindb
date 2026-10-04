@@ -91,7 +91,7 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.prepare.outputs.tag }}
+          ref: refs/tags/${{ needs.prepare.outputs.tag }}
           persist-credentials: false
 
       - name: Set up Java 25
@@ -216,47 +216,203 @@ jobs:
 
           printf '%s\n' "${FILES[@]}"
 
-      - name: Upload macOS release files
+      - name: Stage and publish macOS release files transactionally
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+
+          TAG="${{ needs.prepare.outputs.tag }}"
           VERSION="${{ needs.prepare.outputs.version }}"
-          FILES=(
-            "release-assets/PinDB-${VERSION}-macos-arm64.pkg"
-            "release-assets/PinDB-${VERSION}-macos-arm64.pkg.sha256"
-            "release-assets/PinDB-${VERSION}-macos-x64.pkg"
-            "release-assets/PinDB-${VERSION}-macos-x64.pkg.sha256"
+          RELEASE_ID="$(
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.id'
+          )"
+          RUN_KEY="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          STAGE_DIR="$(mktemp -d)"
+          trap 'rm -rf "$STAGE_DIR"' EXIT
+
+          FINAL_NAMES=(
+            "PinDB-${VERSION}-macos-arm64.pkg"
+            "PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            "PinDB-${VERSION}-macos-x64.pkg"
+            "PinDB-${VERSION}-macos-x64.pkg.sha256"
           )
 
-          gh release upload \
-            "${{ needs.prepare.outputs.tag }}" \
+          declare -A STAGE_NAMES
+          declare -A STAGE_IDS
+          declare -A ORIGINAL_IDS
+          declare -A LOCAL_DIGESTS
+          declare -A LOCAL_SIZES
+
+          asset_id_by_name() {
+            local name="$1"
+            gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100" \
+              | jq -r --arg name "$name" '.[] | select(.name == $name) | .id' \
+              | head -n 1
+          }
+
+          asset_field_by_id() {
+            local id="$1"
+            local field="$2"
+            gh api "repos/$GITHUB_REPOSITORY/releases/assets/$id" --jq ".$field"
+          }
+
+          rename_asset() {
+            local id="$1"
+            local name="$2"
+            gh api \
+              --method PATCH \
+              "repos/$GITHUB_REPOSITORY/releases/assets/$id" \
+              -f name="$name" \
+              >/dev/null
+          }
+
+          delete_asset() {
+            local id="$1"
+            gh api \
+              --method DELETE \
+              "repos/$GITHUB_REPOSITORY/releases/assets/$id" \
+              >/dev/null
+          }
+
+          cleanup_staged_uploads() {
+            set +e
+            for final_name in "${FINAL_NAMES[@]}"; do
+              local stage_name="${STAGE_NAMES[$final_name]}"
+              local stage_id
+              stage_id="$(asset_id_by_name "$stage_name")"
+              if [[ -n "$stage_id" ]]; then
+                delete_asset "$stage_id" || true
+              fi
+            done
+            set -e
+          }
+
+          for final_name in "${FINAL_NAMES[@]}"; do
+            stage_name="pindb-stage-${RUN_KEY}-${final_name}"
+            STAGE_NAMES["$final_name"]="$stage_name"
+            cp "release-assets/$final_name" "$STAGE_DIR/$stage_name"
+            LOCAL_DIGESTS["$final_name"]="sha256:$(sha256sum "release-assets/$final_name" | awk '{print $1}')"
+            LOCAL_SIZES["$final_name"]="$(stat -c '%s' "release-assets/$final_name")"
+          done
+
+          if ! gh release upload \
+            "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            "${FILES[@]}" \
-            --clobber
+            "$STAGE_DIR"/*; then
+            echo "Staging the replacement assets failed; the existing release assets were not modified."
+            cleanup_staged_uploads
+            exit 1
+          fi
 
-      - name: Verify attached macOS assets
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          VERSION="${{ needs.prepare.outputs.version }}"
-          mapfile -t ATTACHED < <(
-            gh release view "${{ needs.prepare.outputs.tag }}" \
-              --repo "$GITHUB_REPOSITORY" \
-              --json assets \
-              --jq '.assets[].name'
-          )
+          for final_name in "${FINAL_NAMES[@]}"; do
+            stage_name="${STAGE_NAMES[$final_name]}"
+            stage_id=""
 
-          for NAME in \
-            "PinDB-${VERSION}-macos-arm64.pkg" \
-            "PinDB-${VERSION}-macos-arm64.pkg.sha256" \
-            "PinDB-${VERSION}-macos-x64.pkg" \
-            "PinDB-${VERSION}-macos-x64.pkg.sha256"; do
-            if ! printf '%s\n' "${ATTACHED[@]}" | grep -Fxq "$NAME"; then
-              echo "GitHub Release is missing expected macOS asset: $NAME"
+            for attempt in {1..10}; do
+              stage_id="$(asset_id_by_name "$stage_name")"
+              if [[ -n "$stage_id" ]]; then
+                remote_state="$(asset_field_by_id "$stage_id" state || true)"
+                remote_digest="$(asset_field_by_id "$stage_id" digest || true)"
+                remote_size="$(asset_field_by_id "$stage_id" size || true)"
+                if [[ "$remote_state" == "uploaded" \
+                      && "$remote_digest" == "${LOCAL_DIGESTS[$final_name]}" \
+                      && "$remote_size" == "${LOCAL_SIZES[$final_name]}" ]]; then
+                  break
+                fi
+              fi
+              stage_id=""
+              sleep 2
+            done
+
+            if [[ -z "$stage_id" ]]; then
+              echo "Staged asset failed server-side digest/size verification: $stage_name"
+              cleanup_staged_uploads
               exit 1
             fi
+
+            STAGE_IDS["$final_name"]="$stage_id"
           done
+
+          for final_name in "${FINAL_NAMES[@]}"; do
+            ORIGINAL_IDS["$final_name"]="$(asset_id_by_name "$final_name")"
+          done
+
+          rollback() {
+            local exit_code=$?
+            trap - ERR
+            set +e
+            echo "Publication failed; restoring the pre-run macOS release asset names."
+
+            for final_name in "${FINAL_NAMES[@]}"; do
+              old_id="${ORIGINAL_IDS[$final_name]}"
+              current_id="$(asset_id_by_name "$final_name")"
+
+              if [[ -n "$old_id" ]]; then
+                old_name="$(asset_field_by_id "$old_id" name 2>/dev/null)"
+                if [[ "$old_name" != "$final_name" ]]; then
+                  if [[ -n "$current_id" && "$current_id" != "$old_id" ]]; then
+                    rename_asset \
+                      "$current_id" \
+                      "pindb-failed-${RUN_KEY}-${final_name}" \
+                      || true
+                  fi
+                  rename_asset "$old_id" "$final_name" || true
+                fi
+              elif [[ -n "$current_id" && "$current_id" == "${STAGE_IDS[$final_name]}" ]]; then
+                rename_asset \
+                  "$current_id" \
+                  "pindb-failed-${RUN_KEY}-${final_name}" \
+                  || true
+              fi
+            done
+
+            echo "Old assets were retained server-side for rollback. Any staged/failed assets are intentionally left for recovery if cleanup could not complete."
+            exit "$exit_code"
+          }
+          trap rollback ERR
+
+          for final_name in "${FINAL_NAMES[@]}"; do
+            old_id="${ORIGINAL_IDS[$final_name]}"
+            if [[ -n "$old_id" ]]; then
+              rename_asset \
+                "$old_id" \
+                "pindb-backup-${RUN_KEY}-${final_name}"
+            fi
+          done
+
+          for final_name in "${FINAL_NAMES[@]}"; do
+            rename_asset \
+              "${STAGE_IDS[$final_name]}" \
+              "$final_name"
+          done
+
+          for final_name in "${FINAL_NAMES[@]}"; do
+            published_id="$(asset_id_by_name "$final_name")"
+            if [[ "$published_id" != "${STAGE_IDS[$final_name]}" ]]; then
+              echo "Unexpected published asset identity for $final_name."
+              false
+            fi
+
+            published_digest="$(asset_field_by_id "$published_id" digest)"
+            published_size="$(asset_field_by_id "$published_id" size)"
+            if [[ "$published_digest" != "${LOCAL_DIGESTS[$final_name]}" \
+                  || "$published_size" != "${LOCAL_SIZES[$final_name]}" ]]; then
+              echo "Published asset failed digest/size verification: $final_name"
+              false
+            fi
+          done
+
+          trap - ERR
+
+          for final_name in "${FINAL_NAMES[@]}"; do
+            old_id="${ORIGINAL_IDS[$final_name]}"
+            if [[ -n "$old_id" ]]; then
+              if ! delete_asset "$old_id"; then
+                echo "::warning::Published replacement is verified, but the backup asset could not be deleted for $final_name."
+              fi
+            fi
+          done
+
+          echo "Published and verified four macOS release assets without destructive clobbering."
