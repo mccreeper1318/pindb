@@ -14,6 +14,7 @@
 - Added architecture-matched, checksum-verified automatic macOS updates with protected root-owned staging and deferred cleanup before native Installer handoff (Issue #76).
 - Added native Intel and Apple Silicon macOS CI with PKG architecture, metadata, runtime, and `.pindb` association verification (Issue #77).
 - Added automatic Intel and Apple Silicon macOS release builds with package-specific SHA-256 assets and safe GitHub Release rebuilds (Issue #78).
+- Added macOS updater parity regression coverage and a two-architecture manual acceptance checklist for the 0.3 release (Issue #79).
 
 ### Changed
 - Extended native package handling across Debian, Fedora, and Windows packages.
