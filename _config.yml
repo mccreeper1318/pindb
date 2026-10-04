@@ -1,6 +1,6 @@
 title: PinDB
 description: A flexible personal database for Windows, macOS, Debian-family Linux, and Fedora-family Linux.
 theme: jekyll-theme-cayman
-show_downloads: true
+show_downloads: false
 url: https://mccreeper1318.github.io
 baseurl: /pindb
