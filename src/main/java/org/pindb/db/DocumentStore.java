@@ -12,6 +12,7 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 public final class DocumentStore implements AutoCloseable {
@@ -46,6 +47,10 @@ public final class DocumentStore implements AutoCloseable {
         } catch (SQLException | ClassNotFoundException exception) {
             throw new DatabaseException("Could not initialize embedded document storage.", exception);
         }
+    }
+
+    DocumentStore(Connection connection) {
+        this.connection = Objects.requireNonNull(connection, "connection");
     }
 
     public Map<Long, DocumentData> documentsForRecord(long recordId) {
@@ -244,26 +249,18 @@ public final class DocumentStore implements AutoCloseable {
             return;
         }
 
-        SQLException failure = null;
         try {
             checkpointWal(current);
         } catch (SQLException exception) {
-            failure = exception;
+            throw new DatabaseException(
+                    "Could not checkpoint pending SQLite data before closing embedded document storage.", exception);
         }
+
         try {
             current.close();
-        } catch (SQLException exception) {
-            if (failure == null) {
-                failure = exception;
-            } else {
-                failure.addSuppressed(exception);
-            }
-        } finally {
             connection = null;
-        }
-        if (failure != null) {
-            throw new DatabaseException("Could not close embedded document storage cleanly or checkpoint pending SQLite data.",
-                    failure);
+        } catch (SQLException exception) {
+            throw new DatabaseException("Could not close embedded document storage cleanly.", exception);
         }
     }
 }
