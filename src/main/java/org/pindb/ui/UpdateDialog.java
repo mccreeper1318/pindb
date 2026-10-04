@@ -55,6 +55,10 @@ public final class UpdateDialog extends Dialog<UpdateDialog.Action> {
                     + " package with administrator approval, open it in macOS Installer, then close. "
                     + "Complete the installation in Installer and reopen PinDB when it finishes.";
         }
+        if (packageType == NativePackageType.WINDOWS_EXE) {
+            return "PinDB will download and verify the matching " + packageName
+                    + " installer, launch it, then close. Complete the installation and reopen PinDB when it finishes.";
+        }
         return "PinDB will install the matching " + packageName
                 + " package after administrator approval, then close and reopen.";
     }
