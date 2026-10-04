@@ -1,0 +1,48 @@
+---
+layout: default
+title: PinDB on macOS
+---
+
+<nav class="site-nav"><a href="index.html">Home</a><a href="download.html">Download</a><a href="manual.html">User Guide</a><a href="about.html">About</a></nav>
+
+<h1>macOS — Apple Silicon and Intel</h1>
+
+<p>PinDB 0.3 provides two native PKGs:</p>
+<ul>
+  <li><strong>Apple Silicon:</strong> <code>PinDB-&lt;version&gt;-macos-arm64.pkg</code></li>
+  <li><strong>Intel:</strong> <code>PinDB-&lt;version&gt;-macos-x64.pkg</code></li>
+</ul>
+
+<div class="warning"><strong>Unsigned and not notarized:</strong> the 0.3 PKGs are not currently signed with an Apple Developer ID or notarized by Apple. Verify the official SHA-256 checksum before opening the package. Approve only that verified package through normal macOS security controls; do not disable Gatekeeper globally.</div>
+
+<h2>Verify the PKG</h2>
+<p>Download the PKG and matching <code>.pkg.sha256</code> from the same GitHub Release, then run the command for your architecture:</p>
+<pre>shasum -a 256 -c PinDB-&lt;version&gt;-macos-arm64.pkg.sha256
+# or
+shasum -a 256 -c PinDB-&lt;version&gt;-macos-x64.pkg.sha256</pre>
+<p>The command must report <code>OK</code>.</p>
+
+<h2>Install</h2>
+<ol>
+  <li>Open the verified PKG in Finder.</li>
+  <li>If macOS blocks the package because it is unidentified/unverified, use the normal warning or <strong>System Settings → Privacy &amp; Security</strong> to approve that specific verified package.</li>
+  <li>Complete the installation in macOS Installer.</li>
+  <li>Launch PinDB from Applications/Finder.</li>
+</ol>
+<p>The package registers <code>.pindb</code> files so databases can be opened directly from Finder.</p>
+
+<h2>Automatic update flow</h2>
+<p>PinDB rejects wrong-architecture, unknown-architecture, and unmarked Mac packages. For a valid update it downloads the exact architecture match, verifies SHA-256, asks for administrator approval to create a protected root-owned staged copy, re-verifies that copy, and opens it in macOS Installer.</p>
+<p>PinDB exits after the Installer handoff. Finish the install and <strong>reopen PinDB manually</strong>; pending release notes are shown on the next launch.</p>
+
+<h2>Native paths</h2>
+<ul>
+  <li>Configuration: <code>~/Library/Application Support/PinDB</code></li>
+  <li>State/diagnostics: <code>~/Library/Application Support/PinDB/State</code></li>
+  <li>Cache/update downloads: <code>~/Library/Caches/PinDB</code></li>
+</ul>
+
+<h2>Manual recovery</h2>
+<p>If an update reaches protected staging but macOS Installer cannot be opened, PinDB retains the protected package temporarily and reports an <code>/usr/bin/open</code> command for that exact staged path.</p>
+
+<p><a class="btn" href="download.html">Download PinDB for macOS</a></p>
