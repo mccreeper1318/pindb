@@ -47,11 +47,40 @@
   margin: 1rem 0;
 }
 
+.main-content .btn {
+  color: #fff;
+  background-color: #159957;
+  border-color: #117a46;
+}
+
+.main-content .btn:hover,
+.main-content .btn:focus {
+  color: #fff;
+  background-color: #117a46;
+  border-color: #0d6037;
+  text-decoration: none;
+}
+
+.main-content .btn[aria-disabled="true"],
+.main-content .btn.unavailable {
+  color: #4a4a4a;
+  background-color: #e9ecef;
+  border-color: #c7ccd1;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
 .download-group .btn {
   display: block;
   width: fit-content;
   max-width: 100%;
   margin: .5rem 0;
+}
+
+.download-group .guide-link {
+  display: inline-block;
+  margin-top: .35rem;
+  font-weight: 600;
 }
 
 .unavailable {
