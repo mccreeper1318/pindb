@@ -1,0 +1,250 @@
+name: Build macOS Release
+
+run-name: Build PinDB ${{ github.event.release.tag_name || inputs.tag }} for macOS
+
+on:
+  release:
+    types:
+      - published
+
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub release tag to build
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  prepare:
+    name: Validate macOS release
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Resolve and validate version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RAW_TAG="$RELEASE_TAG"
+          VERSION="$RAW_TAG"
+
+          if [[ "$VERSION" == v.* ]]; then
+            VERSION="${VERSION#v.}"
+          elif [[ "$VERSION" == v* ]]; then
+            VERSION="${VERSION#v}"
+          fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid PinDB release tag: $RAW_TAG"
+            exit 1
+          fi
+
+          RELEASE_TAG_NAME="$(
+            gh release view "$RAW_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json tagName \
+              --jq '.tagName'
+          )"
+
+          if [[ "$RELEASE_TAG_NAME" != "$RAW_TAG" ]]; then
+            echo "Expected GitHub release tag $RAW_TAG, got $RELEASE_TAG_NAME."
+            exit 1
+          fi
+
+          echo "tag=$RAW_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "PinDB macOS release version: $VERSION"
+
+  build-macos:
+    name: Build macOS ${{ matrix.release_arch }} PKG
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            release_arch: arm64
+            machine_arch: arm64
+          - runner: macos-15-intel
+            release_arch: x64
+            machine_arch: x86_64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Verify runner architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_ARCH="$(uname -m)"
+          if [[ "$ACTUAL_ARCH" != "${{ matrix.machine_arch }}" ]]; then
+            echo "Expected runner architecture ${{ matrix.machine_arch }}, got $ACTUAL_ARCH."
+            exit 1
+          fi
+
+      - name: Build and test native PKG
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test packageMacPkg \
+            -PappVersion="${{ needs.prepare.outputs.version }}"
+
+      - name: Verify native PKG
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG="build/packages/PinDB-${{ needs.prepare.outputs.version }}-macos-${{ matrix.release_arch }}.pkg"
+
+          if [[ ! -s "$PKG" ]]; then
+            echo "Expected macOS package is missing or empty: $PKG"
+            exit 1
+          fi
+
+          bash packaging/macos/verify-package.sh \
+            "$PKG" \
+            "${{ matrix.release_arch }}" \
+            "org.pindb.PinDB"
+
+          echo "package=$PKG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate and verify SHA-256 checksum
+        id: checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE="${{ steps.package.outputs.package }}"
+          PACKAGE_DIR="$(dirname "$PACKAGE")"
+          PACKAGE_NAME="$(basename "$PACKAGE")"
+          CHECKSUM_NAME="$PACKAGE_NAME.sha256"
+
+          (
+            cd "$PACKAGE_DIR"
+            shasum -a 256 "$PACKAGE_NAME" > "$CHECKSUM_NAME"
+            shasum -a 256 -c "$CHECKSUM_NAME"
+            cat "$CHECKSUM_NAME"
+          )
+
+          echo "checksum=$PACKAGE.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload macOS release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pindb-macos-${{ needs.prepare.outputs.version }}-${{ matrix.release_arch }}
+          path: |
+            ${{ steps.package.outputs.package }}
+            ${{ steps.checksum.outputs.checksum }}
+          if-no-files-found: error
+
+  publish:
+    name: Attach macOS packages to release
+    needs:
+      - prepare
+      - build-macos
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download macOS release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
+          EXPECTED=(
+            "PinDB-${VERSION}-macos-arm64.pkg"
+            "PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            "PinDB-${VERSION}-macos-x64.pkg"
+            "PinDB-${VERSION}-macos-x64.pkg.sha256"
+          )
+
+          mapfile -t FILES < <(find release-assets -maxdepth 1 -type f -printf '%f\n' | sort)
+          if [[ "${#FILES[@]}" -ne 4 ]]; then
+            echo "Expected exactly four macOS release files; found ${#FILES[@]}."
+            printf '%s\n' "${FILES[@]}"
+            exit 1
+          fi
+
+          for NAME in "${EXPECTED[@]}"; do
+            if [[ ! -s "release-assets/$NAME" ]]; then
+              echo "Missing or empty macOS release asset: $NAME"
+              exit 1
+            fi
+          done
+
+          (
+            cd release-assets
+            sha256sum -c "PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            sha256sum -c "PinDB-${VERSION}-macos-x64.pkg.sha256"
+          )
+
+          printf '%s\n' "${FILES[@]}"
+
+      - name: Upload macOS release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
+          FILES=(
+            "release-assets/PinDB-${VERSION}-macos-arm64.pkg"
+            "release-assets/PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            "release-assets/PinDB-${VERSION}-macos-x64.pkg"
+            "release-assets/PinDB-${VERSION}-macos-x64.pkg.sha256"
+          )
+
+          gh release upload \
+            "${{ needs.prepare.outputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            "${FILES[@]}" \
+            --clobber
+
+      - name: Verify attached macOS assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
+          mapfile -t ATTACHED < <(
+            gh release view "${{ needs.prepare.outputs.tag }}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json assets \
+              --jq '.assets[].name'
+          )
+
+          for NAME in \
+            "PinDB-${VERSION}-macos-arm64.pkg" \
+            "PinDB-${VERSION}-macos-arm64.pkg.sha256" \
+            "PinDB-${VERSION}-macos-x64.pkg" \
+            "PinDB-${VERSION}-macos-x64.pkg.sha256"; do
+            if ! printf '%s\n' "${ATTACHED[@]}" | grep -Fxq "$NAME"; then
+              echo "GitHub Release is missing expected macOS asset: $NAME"
+              exit 1
+            fi
+          done
