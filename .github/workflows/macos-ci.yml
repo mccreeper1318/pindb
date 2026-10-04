@@ -1,0 +1,80 @@
+name: macOS CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CI_APP_VERSION: 0.0.0-ci
+
+jobs:
+  macos-test-and-package:
+    name: Test and build macOS PKG (${{ matrix.release_arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            release_arch: arm64
+            machine_arch: arm64
+          - runner: macos-15-intel
+            release_arch: x64
+            machine_arch: x86_64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Verify runner architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_ARCH="$(uname -m)"
+          if [[ "$ACTUAL_ARCH" != "${{ matrix.machine_arch }}" ]]; then
+            echo "Expected runner architecture ${{ matrix.machine_arch }}, got $ACTUAL_ARCH."
+            exit 1
+          fi
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Run tests and build native PKG
+        run: ./gradlew --no-daemon clean test packageMacPkg -PappVersion="${CI_APP_VERSION}"
+
+      - name: Verify native PKG
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG="build/packages/PinDB-${CI_APP_VERSION}-macos-${{ matrix.release_arch }}.pkg"
+          bash packaging/macos/verify-package.sh "$PKG" "${{ matrix.release_arch }}" "org.pindb.PinDB"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pindb-test-report-macos-${{ matrix.release_arch }}
+          path: build/reports/tests/test
+          if-no-files-found: ignore
+
+      - name: Upload macOS PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: pindb-macos-${{ matrix.release_arch }}
+          path: build/packages/PinDB-${{ env.CI_APP_VERSION }}-macos-${{ matrix.release_arch }}.pkg
+          if-no-files-found: error

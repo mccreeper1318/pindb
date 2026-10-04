@@ -12,12 +12,14 @@
 - Added unsigned self-contained macOS PKG packaging for Intel and Apple Silicon with `.pindb` file associations and normalized release filenames (Issue #74).
 - Added native macOS Finder/Dock icon resources and verified `.pindb` open-by-file launch handling (Issue #75).
 - Added architecture-matched, checksum-verified automatic macOS updates with protected root-owned staging and deferred cleanup before native Installer handoff (Issue #76).
+- Added native Intel and Apple Silicon macOS CI with PKG architecture, metadata, runtime, and `.pindb` association verification (Issue #77).
 
 ### Changed
 - Extended native package handling across Debian, Fedora, and Windows packages.
 - Generalized operating-system and native-package handling to prepare macOS `.pkg` support (Issue #72).
 - Updated architecture detection to recognize Windows `x64` release assets.
 - Updated the main CI workflow to run on direct pushes to `dev`.
+- Aligned Windows CI push coverage with `dev`, `main`, and pull requests (Issue #77).
 - Limited release tags to two or three numeric version components for consistent cross-platform packaging.
 
 ### Fixed

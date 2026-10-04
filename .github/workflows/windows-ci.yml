@@ -2,8 +2,14 @@ name: Windows CI
 
 on:
   push:
-    branches: ['34-release-windows-support']
+    branches:
+      - dev
+      - main
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   windows-test:
