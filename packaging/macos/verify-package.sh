@@ -122,12 +122,27 @@ bundle_name = plist.get("CFBundleName") or plist.get("CFBundleDisplayName")
 if bundle_name != "PinDB":
     raise SystemExit(f"Unexpected PinDB bundle name: {bundle_name!r}")
 
-document_types = plist.get("CFBundleDocumentTypes", [])
 extensions = set()
 mime_types = set()
-for document_type in document_types:
-    extensions.update(str(value).lower() for value in document_type.get("CFBundleTypeExtensions", []))
-    mime_types.update(str(value).lower() for value in document_type.get("CFBundleTypeMIMETypes", []))
+
+def add_values(target, value):
+    if value is None:
+        return
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            target.add(str(item).lower())
+    else:
+        target.add(str(value).lower())
+
+for document_type in plist.get("CFBundleDocumentTypes", []):
+    add_values(extensions, document_type.get("CFBundleTypeExtensions"))
+    add_values(mime_types, document_type.get("CFBundleTypeMIMETypes"))
+
+for declaration_key in ("UTExportedTypeDeclarations", "UTImportedTypeDeclarations"):
+    for declaration in plist.get(declaration_key, []):
+        tags = declaration.get("UTTypeTagSpecification", {})
+        add_values(extensions, tags.get("public.filename-extension"))
+        add_values(mime_types, tags.get("public.mime-type"))
 
 if "pindb" not in extensions:
     raise SystemExit(f"PinDB.app does not advertise the .pindb extension: {sorted(extensions)!r}")
