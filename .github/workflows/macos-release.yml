@@ -239,6 +239,16 @@ jobs:
             "PinDB-${VERSION}-macos-x64.pkg.sha256"
           )
 
+          PACKAGE_NAMES=(
+            "PinDB-${VERSION}-macos-arm64.pkg"
+            "PinDB-${VERSION}-macos-x64.pkg"
+          )
+
+          CHECKSUM_NAMES=(
+            "PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            "PinDB-${VERSION}-macos-x64.pkg.sha256"
+          )
+
           PROMOTION_NAMES=(
             "PinDB-${VERSION}-macos-arm64.pkg.sha256"
             "PinDB-${VERSION}-macos-arm64.pkg"
@@ -364,33 +374,60 @@ jobs:
             ORIGINAL_IDS["$final_name"]="$(asset_id_by_name "$final_name")"
           done
 
+          restore_original_asset() {
+            local final_name="$1"
+            local old_id="${ORIGINAL_IDS[$final_name]}"
+            local current_id
+            current_id="$(asset_id_by_name "$final_name")"
+
+            if [[ -n "$old_id" ]]; then
+              local old_name
+              old_name="$(asset_field_by_id "$old_id" name 2>/dev/null)"
+              if [[ "$old_name" != "$final_name" ]]; then
+                if [[ -n "$current_id" && "$current_id" != "$old_id" ]]; then
+                  rename_asset \
+                    "$current_id" \
+                    "$(temporary_name "$final_name" failed)" \
+                    || true
+                fi
+                rename_asset "$old_id" "$final_name" || true
+              fi
+            elif [[ -n "$current_id" && "$current_id" == "${STAGE_IDS[$final_name]}" ]]; then
+              rename_asset \
+                "$current_id" \
+                "$(temporary_name "$final_name" failed)" \
+                || true
+            fi
+          }
+
           rollback() {
             local exit_code="${1:-1}"
             trap - ERR INT TERM
             set +e
             echo "Publication failed or was interrupted; restoring the pre-run macOS release asset names."
 
-            for final_name in "${PROMOTION_NAMES[@]}"; do
-              old_id="${ORIGINAL_IDS[$final_name]}"
+            # Hide every newly promoted package before touching canonical checksums.
+            # This prevents clients from ever seeing a new package paired with an
+            # old checksum, or a package with no checksum on first publication.
+            for final_name in "${PACKAGE_NAMES[@]}"; do
               current_id="$(asset_id_by_name "$final_name")"
-
-              if [[ -n "$old_id" ]]; then
-                old_name="$(asset_field_by_id "$old_id" name 2>/dev/null)"
-                if [[ "$old_name" != "$final_name" ]]; then
-                  if [[ -n "$current_id" && "$current_id" != "$old_id" ]]; then
-                    rename_asset \
-                      "$current_id" \
-                      "$(temporary_name "$final_name" failed)" \
-                      || true
-                  fi
-                  rename_asset "$old_id" "$final_name" || true
-                fi
-              elif [[ -n "$current_id" && "$current_id" == "${STAGE_IDS[$final_name]}" ]]; then
+              if [[ -n "$current_id" \
+                    && "$current_id" == "${STAGE_IDS[$final_name]}" ]]; then
                 rename_asset \
                   "$current_id" \
                   "$(temporary_name "$final_name" failed)" \
                   || true
               fi
+            done
+
+            # With promoted packages hidden, checksums can be restored safely.
+            for final_name in "${CHECKSUM_NAMES[@]}"; do
+              restore_original_asset "$final_name"
+            done
+
+            # Restore packages only after their old checksums are canonical again.
+            for final_name in "${PACKAGE_NAMES[@]}"; do
+              restore_original_asset "$final_name"
             done
 
             echo "Old assets were retained server-side for rollback. Any staged/failed assets are intentionally left for recovery if cleanup could not complete."
