@@ -8,6 +8,9 @@
 - Fixed automatic Linux update restarts so every open database is closed and its pending SQLite WAL data is checkpointed before the replacement PinDB process is launched (Issue #38).
 - Fixed database shutdown stopping at the first close failure; shutdown now attempts every resource, aggregates failures, keeps close operations idempotent, and blocks automatic restart when cleanup is not clean (Issue #38).
 - Added defensive application-stop cleanup and regression coverage for aggregated shutdown failures (Issue #38).
+- Fixed automatic updates being offered or started when the selected package has no published SHA-256 checksum asset (Issue #40).
+- Tightened checksum verification so manifests must contain an exact, case-sensitive entry for the downloaded package filename; bare hashes, path-prefixed names, normalized near-matches, and unrelated single entries are rejected (Issue #40).
+- Added regression coverage for checksum-less releases, exact checksum asset matching, aggregate manifests, and malformed or mismatched checksum entries (Issue #40).
 
 ## 0.3
 
