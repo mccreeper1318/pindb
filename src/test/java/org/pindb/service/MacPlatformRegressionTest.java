@@ -1,6 +1,8 @@
 package org.pindb.service;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.pindb.platform.LinuxDistribution;
 import org.pindb.platform.NativePackageType;
 import org.pindb.platform.OperatingSystem;
@@ -91,6 +93,7 @@ class MacPlatformRegressionTest {
     }
 
     @Test
+    @EnabledOnOs(OS.MAC)
     void macManualRecoveryUsesNativeInstallerOpenCommand() {
         LinuxDistribution mac = LinuxDistribution.detect("Mac OS X", "");
         Path staged = Path.of(
