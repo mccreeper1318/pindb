@@ -2,6 +2,7 @@ package org.pindb.db;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.pindb.model.BackupSnapshot;
 import org.pindb.model.DatabaseView;
 import org.pindb.model.DocumentData;
 import org.pindb.model.FieldDefinition;
@@ -63,7 +64,7 @@ class DocumentStoreTest {
         Path databasePath = tempDirectory.resolve("atomic-restore.pindb");
 
         try (DatabaseService database = DatabaseService.create(databasePath, "Atomic Restore", "Snapshot description",
-                List.of(documentField()), DatabaseView.TABLE, 10);
+                List.of(documentField()), DatabaseView.TABLE, 3);
              DocumentStore documents = new DocumentStore(databasePath)) {
             long fieldId = database.fields().getFirst().id();
             long recordId = database.addRecord(Map.of(fieldId, "snapshot.txt"));
@@ -76,7 +77,8 @@ class DocumentStoreTest {
             DocumentData activeDocument = textDocument("active.txt", "active data");
             documents.replaceDocuments(recordId, Map.of(fieldId, activeDocument));
             database.setMeta("description", "Active description");
-            int snapshotCount = database.backupSnapshots().size();
+            List<BackupSnapshot> snapshotsBeforeRestore = List.copyOf(database.backupSnapshots());
+            assertEquals(database.info().backupLimit(), snapshotsBeforeRestore.size());
 
             try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + databasePath.toAbsolutePath());
                  PreparedStatement statement = connection.prepareStatement(
@@ -102,7 +104,7 @@ class DocumentStoreTest {
             DocumentData currentDocument = documents.document(recordId, fieldId).orElseThrow();
             assertEquals("active.txt", currentDocument.fileName());
             assertArrayEquals(activeDocument.data(), currentDocument.data());
-            assertEquals(snapshotCount, database.backupSnapshots().size());
+            assertEquals(snapshotsBeforeRestore, database.backupSnapshots());
             assertTrue(database.backupSnapshots().stream().anyMatch(snapshot -> snapshot.id() == snapshotId));
             assertTrue(database.integrityCheck());
         }
