@@ -97,19 +97,38 @@ public final class UpdateService {
     static Optional<ReleasePackage> selectInstallablePackage(List<Map<String, Object>> assets,
                                                               NativePackageType packageType,
                                                               SystemArchitecture architecture) {
-        return selectPackage(assets, packageType, architecture)
-                .filter(releasePackage -> releasePackage.checksumUri() != null);
+        List<ReleasePackage> candidates = packageCandidates(assets, packageType).stream()
+                .filter(releasePackage -> releasePackage.checksumUri() != null)
+                .toList();
+        return selectCandidate(candidates, packageType, architecture);
     }
 
     static Optional<ReleasePackage> selectPackage(List<Map<String, Object>> assets, NativePackageType packageType,
                                                    SystemArchitecture architecture) {
-        List<ReleasePackage> candidates = assets.stream().map(asset -> toPackage(asset, assets, packageType)).flatMap(Optional::stream).toList();
+        return selectCandidate(packageCandidates(assets, packageType), packageType, architecture);
+    }
+
+    private static List<ReleasePackage> packageCandidates(List<Map<String, Object>> assets,
+                                                          NativePackageType packageType) {
+        return assets.stream()
+                .map(asset -> toPackage(asset, assets, packageType))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    private static Optional<ReleasePackage> selectCandidate(List<ReleasePackage> candidates,
+                                                            NativePackageType packageType,
+                                                            SystemArchitecture architecture) {
         if (architecture == SystemArchitecture.UNKNOWN) {
             return packageType == NativePackageType.MACOS_PKG ? Optional.empty() : candidates.stream().findFirst();
         }
-        Optional<ReleasePackage> exact = candidates.stream().filter(candidate -> candidate.architecture() == architecture).findFirst();
+        Optional<ReleasePackage> exact = candidates.stream()
+                .filter(candidate -> candidate.architecture() == architecture)
+                .findFirst();
         if (exact.isPresent() || packageType == NativePackageType.MACOS_PKG) return exact;
-        return candidates.stream().filter(candidate -> candidate.architecture() == SystemArchitecture.UNKNOWN).findFirst();
+        return candidates.stream()
+                .filter(candidate -> candidate.architecture() == SystemArchitecture.UNKNOWN)
+                .findFirst();
     }
 
     private static Optional<ReleasePackage> toPackage(Map<String, Object> asset, List<Map<String, Object>> allAssets,
