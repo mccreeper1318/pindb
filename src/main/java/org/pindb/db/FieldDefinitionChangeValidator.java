@@ -104,7 +104,7 @@ final class FieldDefinitionChangeValidator {
             }
         }
 
-        if (updated.uniqueValue()) {
+        if (!current.uniqueValue() && updated.uniqueValue()) {
             String duplicate = firstDuplicateValue(connection, updated.id());
             if (duplicate != null) {
                 errors.add("Values are not unique across active and Recently Deleted entries; “" + duplicate
