@@ -205,6 +205,11 @@ public final class UpdateInstaller {
     }
 
     private static boolean installationSupported(Window owner, LinuxDistribution distribution, ReleasePackage releasePackage) {
+        if (releasePackage.checksumUri() == null) {
+            UiUtil.warning(owner, "Automatic Update Unavailable",
+                    "Automatic installation requires a published SHA-256 checksum for the selected package.");
+            return false;
+        }
         OperatingSystem operatingSystem = OperatingSystem.current();
         if (releasePackage.type() == NativePackageType.WINDOWS_EXE) {
             if (operatingSystem == OperatingSystem.WINDOWS) return true;
@@ -429,13 +434,18 @@ public final class UpdateInstaller {
     }
 
     static Optional<String> parseExpectedChecksum(String checksumText, String packageName) throws IOException {
-        String expectedName = normalizeChecksumName(packageName); List<String> hashes = new ArrayList<>();
-        for (String line : (checksumText == null ? "" : checksumText).lines().toList()) {
-            String[] pieces = line.trim().split("\\s+", 2); if (pieces.length == 0 || !pieces[0].matches("(?i)[0-9a-f]{64}")) continue;
-            hashes.add(pieces[0]); if (pieces.length == 1 || normalizeChecksumName(pieces[1]).equals(expectedName)) return Optional.of(pieces[0]);
+        String expectedName = packageName == null ? "" : packageName.trim();
+        if (expectedName.isEmpty()) {
+            throw new IOException("The downloaded package did not have a valid filename for checksum verification.");
         }
-        if (hashes.size() == 1) return Optional.of(hashes.getFirst());
-        throw new IOException("The checksum file did not contain an entry for " + packageName + ".");
+        for (String line : (checksumText == null ? "" : checksumText).lines().toList()) {
+            String[] pieces = line.trim().split("\\s+", 2);
+            if (pieces.length != 2 || !pieces[0].matches("(?i)[0-9a-f]{64}")) continue;
+            String listedName = pieces[1].trim();
+            if (listedName.startsWith("*")) listedName = listedName.substring(1);
+            if (listedName.equals(expectedName)) return Optional.of(pieces[0]);
+        }
+        throw new IOException("The checksum file did not contain an exact entry for " + packageName + ".");
     }
 
     private static String normalizeChecksumName(String value) {
