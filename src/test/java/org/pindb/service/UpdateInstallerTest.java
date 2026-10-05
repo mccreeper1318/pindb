@@ -54,6 +54,7 @@ class UpdateInstallerTest {
     }
 
     @Test
+    @EnabledOnOs(OS.MAC)
     void buildsMacManualInstallCommand() {
         LinuxDistribution mac = LinuxDistribution.detect("Mac OS X", "");
         assertEquals("/usr/bin/open \"/tmp/PinDB-0.3-macos-arm64.pkg\"",
@@ -62,6 +63,7 @@ class UpdateInstallerTest {
     }
 
     @Test
+    @EnabledOnOs(OS.MAC)
     void buildsMacInstallerCommandWithoutShellQuoting() {
         assertEquals(List.of(
                         "/usr/bin/open",
@@ -71,6 +73,7 @@ class UpdateInstallerTest {
     }
 
     @Test
+    @EnabledOnOs(OS.MAC)
     void macStagingAcceptsDistinctUniqueProtectedPaths() {
         Path first = Path.of("/private/var/tmp/PinDB-verified-update.Ab12Cd34/PinDB-verified-update.pkg");
         Path second = Path.of("/private/var/tmp/PinDB-verified-update.Z9y8X7w6/PinDB-verified-update.pkg");
