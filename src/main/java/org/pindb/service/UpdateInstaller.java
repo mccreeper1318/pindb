@@ -49,10 +49,18 @@ public final class UpdateInstaller {
     private static final long MAC_STAGED_INSTALLER_RETENTION_SECONDS = 24L * 60L * 60L;
 
     private final SettingsService settings;
+    private final Runnable beforeRestart;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20))
             .followRedirects(HttpClient.Redirect.NORMAL).build();
 
-    public UpdateInstaller(SettingsService settings) { this.settings = settings; }
+    public UpdateInstaller(SettingsService settings) {
+        this(settings, () -> { });
+    }
+
+    public UpdateInstaller(SettingsService settings, Runnable beforeRestart) {
+        this.settings = settings;
+        this.beforeRestart = beforeRestart == null ? () -> { } : beforeRestart;
+    }
 
     public void downloadAndInstall(Window owner, ReleaseInfo release) {
         LinuxDistribution distribution = LinuxDistribution.current();
@@ -176,12 +184,16 @@ public final class UpdateInstaller {
         task.setOnSucceeded(event -> {
             installing.set(false); dialog.close();
             try {
+                beforeRestart.run();
                 restartAfterUpdate(update.notesFile(), tag);
                 try { Files.deleteIfExists(update.packageFile()); } catch (IOException cleanupFailure) { cleanupFailure.printStackTrace(System.err); }
                 Platform.exit();
-            } catch (IOException exception) {
+            } catch (RuntimeException | IOException exception) {
                 writeFailureLog(update.packageFile(), exception, "restart");
-                UiUtil.error(owner, "Update Installed", "The update installed successfully, but PinDB could not restart automatically. Open PinDB from the application menu.", exception);
+                UiUtil.error(owner, "Update Installed",
+                        "The update installed successfully, but PinDB could not safely close every database and restart automatically. "
+                                + "PinDB was not restarted. Close any open databases and reopen PinDB from the application menu.",
+                        exception);
             }
         });
         task.setOnFailed(event -> {

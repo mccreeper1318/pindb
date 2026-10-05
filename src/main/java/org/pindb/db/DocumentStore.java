@@ -12,10 +12,11 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 public final class DocumentStore implements AutoCloseable {
-    private final Connection connection;
+    private Connection connection;
 
     public DocumentStore(Path databasePath) {
         try {
@@ -46,6 +47,10 @@ public final class DocumentStore implements AutoCloseable {
         } catch (SQLException | ClassNotFoundException exception) {
             throw new DatabaseException("Could not initialize embedded document storage.", exception);
         }
+    }
+
+    DocumentStore(Connection connection) {
+        this.connection = Objects.requireNonNull(connection, "connection");
     }
 
     public Map<Long, DocumentData> documentsForRecord(long recordId) {
@@ -228,7 +233,7 @@ public final class DocumentStore implements AutoCloseable {
         }
     }
 
-    private void checkpointWal() throws SQLException {
+    private static void checkpointWal(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(TRUNCATE)")) {
             if (result.next() && result.getInt(1) != 0) {
@@ -239,24 +244,23 @@ public final class DocumentStore implements AutoCloseable {
 
     @Override
     public void close() {
-        SQLException failure = null;
-        try {
-            checkpointWal();
-        } catch (SQLException exception) {
-            failure = exception;
+        Connection current = connection;
+        if (current == null) {
+            return;
         }
+
         try {
-            connection.close();
+            checkpointWal(current);
         } catch (SQLException exception) {
-            if (failure == null) {
-                failure = exception;
-            } else {
-                failure.addSuppressed(exception);
-            }
+            throw new DatabaseException(
+                    "Could not checkpoint pending SQLite data before closing embedded document storage.", exception);
         }
-        if (failure != null) {
-            throw new DatabaseException("Could not close embedded document storage cleanly or checkpoint pending SQLite data.",
-                    failure);
+
+        try {
+            current.close();
+            connection = null;
+        } catch (SQLException exception) {
+            throw new DatabaseException("Could not close embedded document storage cleanly.", exception);
         }
     }
 }

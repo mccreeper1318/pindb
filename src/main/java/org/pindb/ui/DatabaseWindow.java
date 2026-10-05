@@ -53,6 +53,7 @@ import org.pindb.model.FilterSpec;
 import org.pindb.model.RecordData;
 import org.pindb.service.CsvService;
 import org.pindb.service.PrintService;
+import org.pindb.util.CloseUtil;
 
 import java.io.File;
 import java.math.BigDecimal;
@@ -65,7 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public final class DatabaseWindow {
+public final class DatabaseWindow implements AutoCloseable {
     private static final DateTimeFormatter MODIFIED_FORMAT = DateTimeFormatter.ofPattern("MMM d, uuuu h:mm a");
 
     private final AppContext context;
@@ -157,13 +158,13 @@ public final class DatabaseWindow {
         UiUtil.applyStyles(scene, context.settings());
     }
 
+    @Override
     public void close() {
         if (closed) {
             return;
         }
+        CloseUtil.closeAll(documentStore, database);
         closed = true;
-        documentStore.close();
-        database.close();
         stage.hide();
         onClosed.run();
     }

@@ -12,6 +12,7 @@ import org.pindb.ui.LauncherWindow;
 import org.pindb.ui.ReleaseNotesDialog;
 import org.pindb.ui.UiUtil;
 import org.pindb.ui.UpdateDialog;
+import org.pindb.util.CloseUtil;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -75,9 +76,7 @@ public final class AppContext {
         boolean previousShuttingDown = shuttingDown;
         shuttingDown = true;
         try {
-            for (DatabaseWindow window : databaseWindows.values().toArray(DatabaseWindow[]::new)) {
-                window.close();
-            }
+            CloseUtil.closeAll(databaseWindows.values().toArray(DatabaseWindow[]::new));
         } finally {
             shuttingDown = previousShuttingDown;
         }
@@ -140,9 +139,13 @@ public final class AppContext {
                 settings.snoozeUpdatesForHours(24);
             } else if (action == UpdateDialog.Action.UPDATE) {
                 settings.setPendingReleaseNotes(available.tag(), available.markdownNotes());
-                new UpdateInstaller(settings).downloadAndInstall(owner, available);
+                new UpdateInstaller(settings, this::prepareForUpdateRestart).downloadAndInstall(owner, available);
             }
         }));
+    }
+
+    private void prepareForUpdateRestart() {
+        closeDatabaseWindows();
     }
 
     public void showReleaseNotes(String tag, String markdown) {
