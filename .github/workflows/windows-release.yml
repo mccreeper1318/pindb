@@ -56,7 +56,40 @@ jobs:
       - name: Build and test Windows installer
         shell: pwsh
         run: |
-          .\gradlew.bat --no-daemon clean test packageWindows -PappVersion="${{ steps.version.outputs.version }}"
+          $gradleArgs = @(
+            '--no-daemon',
+            'clean',
+            'test',
+            'packageWindows',
+            "-PappVersion=${{ steps.version.outputs.version }}"
+          )
+
+          # PinDB 0.3 predates the OS guards added to four macOS path tests.
+          # Keep rebuilding the immutable 0.3 tag from its original source while
+          # excluding only those tests that are invalid on Windows path semantics.
+          if ($env:RELEASE_TAG -eq '0.3') {
+            $compatInit = Join-Path $env:RUNNER_TEMP 'pindb-0.3-windows-release-tests.gradle'
+            $compatScript = @(
+              'allprojects {',
+              '    tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {',
+              '        filter {',
+              "            excludeTestsMatching 'org.pindb.service.MacPlatformRegressionTest.macManualRecoveryUsesNativeInstallerOpenCommand'",
+              "            excludeTestsMatching 'org.pindb.service.UpdateInstallerTest.buildsMacManualInstallCommand'",
+              "            excludeTestsMatching 'org.pindb.service.UpdateInstallerTest.buildsMacInstallerCommandWithoutShellQuoting'",
+              "            excludeTestsMatching 'org.pindb.service.UpdateInstallerTest.macStagingAcceptsDistinctUniqueProtectedPaths'",
+              '        }',
+              '    }',
+              '}'
+            ) -join "`n"
+            Set-Content -Path $compatInit -Value $compatScript -Encoding utf8
+            $gradleArgs = @('-I', $compatInit) + $gradleArgs
+          }
+
+          & .\gradlew.bat @gradleArgs
+          if ($LASTEXITCODE -ne 0) {
+            throw "Gradle Windows release build failed with exit code $LASTEXITCODE."
+          }
+
           if (-not (Test-Path 'build\packages')) {
             throw 'packageWindows completed without creating build\packages. The Windows packaging task was skipped or did not run.'
           }
