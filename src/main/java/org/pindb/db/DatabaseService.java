@@ -70,6 +70,7 @@ public final class DatabaseService implements AutoCloseable {
                 for (FieldDefinition definition : fields) {
                     FieldDefinition copy = definition.copy();
                     copy.setPosition(position++);
+                    FieldDefinitionChangeValidator.validateDefinition(copy);
                     service.insertFieldInternal(copy);
                 }
                 return null;
@@ -357,10 +358,12 @@ public final class DatabaseService implements AutoCloseable {
     }
 
     public FieldDefinition addField(FieldDefinition definition) {
-        createSnapshot("Before adding field " + definition.name());
         return transaction(() -> {
             FieldDefinition copy = definition.copy();
             copy.setPosition(fields().size());
+            FieldDefinitionChangeValidator.validateAddition(connection, copy);
+            createSnapshotInternal("Before adding field " + copy.name());
+            pruneSnapshotsInternal(info().backupLimit());
             long id = insertFieldInternal(copy);
             copy.setId(id);
             return copy;
@@ -368,15 +371,24 @@ public final class DatabaseService implements AutoCloseable {
     }
 
     public void updateField(FieldDefinition definition) {
-        createSnapshot("Before editing field " + definition.name());
         transaction(() -> {
+            FieldDefinition current = fields().stream()
+                    .filter(value -> value.id() == definition.id())
+                    .findFirst()
+                    .orElseThrow(() -> new DatabaseException("The selected field no longer exists."));
+            FieldDefinitionChangeValidator.validateUpdate(connection, current, definition);
+            createSnapshotInternal("Before editing field " + current.name());
+            pruneSnapshotsInternal(info().backupLimit());
             String sql = "UPDATE field_definitions SET name=?,field_type=?,position=?,required=?,default_value=?,"
                     + "min_value=?,max_value=?,unique_value=?,char_limit=?,dropdown_options=?,summary_type=? WHERE id=?";
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 bindField(statement, definition, false);
                 statement.setLong(12, definition.id());
-                statement.executeUpdate();
+                if (statement.executeUpdate() == 0) {
+                    throw new DatabaseException("The selected field no longer exists.");
+                }
             }
+            FieldDefinitionChangeValidator.cleanupAfterUpdate(connection, current, definition);
             return null;
         });
     }
