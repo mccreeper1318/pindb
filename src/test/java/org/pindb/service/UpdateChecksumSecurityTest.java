@@ -36,6 +36,18 @@ class UpdateChecksumSecurityTest {
     }
 
     @Test
+    void automaticInstallSelectionSkipsEarlierChecksumlessCandidate() {
+        String unchecked = "PinDB-0.3.1-alt-windows-x64.exe";
+        ReleasePackage selected = UpdateService.selectInstallablePackage(
+                List.of(asset(unchecked), asset(PACKAGE), asset(PACKAGE + ".sha256")),
+                NativePackageType.WINDOWS_EXE,
+                SystemArchitecture.X86_64).orElseThrow();
+
+        assertEquals(PACKAGE, selected.fileName());
+        assertTrue(selected.checksumUri().toString().endsWith(PACKAGE + ".sha256"));
+    }
+
+    @Test
     void checksumAssetNameMustMatchPackageExactly() {
         assertTrue(UpdateService.selectInstallablePackage(
                 List.of(asset(PACKAGE), asset(PACKAGE.toLowerCase() + ".sha256")),
