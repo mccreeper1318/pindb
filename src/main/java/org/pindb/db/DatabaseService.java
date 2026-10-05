@@ -45,6 +45,14 @@ public final class DatabaseService implements AutoCloseable {
                                          List<FieldDefinition> fields, DatabaseView defaultView,
                                          int backupLimit) {
         Objects.requireNonNull(path, "path");
+        List<FieldDefinition> validatedFields = new ArrayList<>();
+        int position = 0;
+        for (FieldDefinition definition : Objects.requireNonNull(fields, "fields")) {
+            FieldDefinition copy = Objects.requireNonNull(definition, "field definition").copy();
+            copy.setPosition(position++);
+            FieldDefinitionChangeValidator.validateDefinition(copy);
+            validatedFields.add(copy);
+        }
         try {
             Path parent = path.toAbsolutePath().getParent();
             if (parent != null) {
@@ -66,11 +74,7 @@ public final class DatabaseService implements AutoCloseable {
                 service.setMetaInternal("backup_limit", String.valueOf(Math.max(1, backupLimit)));
                 service.setMetaInternal("print_layout", "COLUMNS");
                 service.setMetaInternal("print_orientation", "LANDSCAPE");
-                int position = 0;
-                for (FieldDefinition definition : fields) {
-                    FieldDefinition copy = definition.copy();
-                    copy.setPosition(position++);
-                    FieldDefinitionChangeValidator.validateDefinition(copy);
+                for (FieldDefinition copy : validatedFields) {
                     service.insertFieldInternal(copy);
                 }
                 return null;
