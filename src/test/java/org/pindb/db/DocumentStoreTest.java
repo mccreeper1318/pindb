@@ -12,6 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Map;
 
@@ -51,6 +54,56 @@ class DocumentStoreTest {
             DocumentData restored = documents.document(recordId, createdField.id()).orElseThrow();
             assertEquals("first.txt", restored.fileName());
             assertArrayEquals(first.data(), restored.data());
+            assertTrue(database.integrityCheck());
+        }
+    }
+
+    @Test
+    void failedDocumentRestoreRollsBackCoreAndDocumentState() throws Exception {
+        Path databasePath = tempDirectory.resolve("atomic-restore.pindb");
+
+        try (DatabaseService database = DatabaseService.create(databasePath, "Atomic Restore", "Snapshot description",
+                List.of(documentField()), DatabaseView.TABLE, 10);
+             DocumentStore documents = new DocumentStore(databasePath)) {
+            long fieldId = database.fields().getFirst().id();
+            long recordId = database.addRecord(Map.of(fieldId, "snapshot.txt"));
+            DocumentData snapshotDocument = textDocument("snapshot.txt", "snapshot data");
+            documents.replaceDocuments(recordId, Map.of(fieldId, snapshotDocument));
+            database.createSnapshot("Document snapshot");
+            long snapshotId = database.backupSnapshots().getFirst().id();
+
+            database.updateRecord(recordId, Map.of(fieldId, "active.txt"));
+            DocumentData activeDocument = textDocument("active.txt", "active data");
+            documents.replaceDocuments(recordId, Map.of(fieldId, activeDocument));
+            database.setMeta("description", "Active description");
+            int snapshotCount = database.backupSnapshots().size();
+
+            try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + databasePath.toAbsolutePath());
+                 PreparedStatement statement = connection.prepareStatement(
+                         "INSERT INTO backup_document_values("
+                                 + "snapshot_id,record_id,field_id,file_name,mime_type,file_size,data,created_at) "
+                                 + "VALUES(?,?,?,?,?,?,?,?)")) {
+                byte[] invalidData = "invalid backup row".getBytes(StandardCharsets.UTF_8);
+                statement.setLong(1, snapshotId);
+                statement.setLong(2, Long.MAX_VALUE);
+                statement.setLong(3, fieldId);
+                statement.setString(4, "invalid.txt");
+                statement.setString(5, "text/plain");
+                statement.setLong(6, invalidData.length);
+                statement.setBytes(7, invalidData);
+                statement.setString(8, "2026-10-04T00:00:00");
+                statement.executeUpdate();
+            }
+
+            assertThrows(DatabaseException.class, () -> database.restoreSnapshot(snapshotId));
+
+            assertEquals("Active description", database.info().description());
+            assertEquals("active.txt", database.activeRecords().getFirst().value(fieldId));
+            DocumentData currentDocument = documents.document(recordId, fieldId).orElseThrow();
+            assertEquals("active.txt", currentDocument.fileName());
+            assertArrayEquals(activeDocument.data(), currentDocument.data());
+            assertEquals(snapshotCount, database.backupSnapshots().size());
+            assertTrue(database.backupSnapshots().stream().anyMatch(snapshot -> snapshot.id() == snapshotId));
             assertTrue(database.integrityCheck());
         }
     }
