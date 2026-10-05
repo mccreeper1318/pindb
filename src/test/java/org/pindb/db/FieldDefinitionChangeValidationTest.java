@@ -9,6 +9,7 @@ import org.pindb.model.FieldType;
 import org.pindb.model.SummaryType;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FieldDefinitionChangeValidationTest {
     @TempDir
     Path tempDirectory;
+
+    @Test
+    void invalidInitialFieldDefinitionDoesNotCreateDestinationFile() {
+        Path file = tempDirectory.resolve("invalid-create.pindb");
+        FieldDefinition amount = field("Amount", FieldType.NUMBER, 0);
+        amount.setDefaultValue("not-a-number");
+
+        assertThrows(DatabaseException.class, () -> DatabaseService.create(file, "Invalid", "",
+                List.of(amount), DatabaseView.TABLE, 10));
+        assertFalse(Files.exists(file));
+
+        amount.setDefaultValue("12.5");
+        try (DatabaseService database = DatabaseService.create(file, "Valid", "",
+                List.of(amount), DatabaseView.TABLE, 10)) {
+            assertEquals("12.5", database.fields().getFirst().defaultValue());
+        }
+    }
 
     @Test
     void requiredConstraintChecksRecentlyDeletedEntriesAndDoesNotCreateBackupOnFailure() {
@@ -59,6 +77,27 @@ class FieldDefinitionChangeValidationTest {
             DatabaseException failure = assertThrows(DatabaseException.class, () -> database.updateField(updated));
             assertTrue(failure.getMessage().contains("not unique"));
             assertFalse(database.fields().getFirst().uniqueValue());
+        }
+    }
+
+    @Test
+    void unchangedUniqueConstraintDoesNotRecheckRecentlyDeletedDuplicates() {
+        Path file = tempDirectory.resolve("unique-rename.pindb");
+        FieldDefinition name = field("Name", FieldType.TEXT, 0);
+        name.setUniqueValue(true);
+        try (DatabaseService database = DatabaseService.create(file, "Unique Rename", "",
+                List.of(name), DatabaseView.TABLE, 10)) {
+            long fieldId = database.fields().getFirst().id();
+            long deletedId = database.addRecord(Map.of(fieldId, "Alex"));
+            database.moveToTrash(deletedId);
+            database.addRecord(Map.of(fieldId, "alex"));
+
+            FieldDefinition updated = database.fields().getFirst().copy();
+            updated.setName("Display Name");
+            database.updateField(updated);
+
+            assertEquals("Display Name", database.fields().getFirst().name());
+            assertTrue(database.fields().getFirst().uniqueValue());
         }
     }
 
