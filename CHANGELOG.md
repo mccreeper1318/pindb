@@ -11,6 +11,9 @@
 - Fixed automatic updates being offered or started when the selected package has no published SHA-256 checksum asset (Issue #40).
 - Tightened checksum verification so manifests must contain an exact, case-sensitive entry for the downloaded package filename; bare hashes, path-prefixed names, normalized near-matches, and unrelated single entries are rejected (Issue #40).
 - Added regression coverage for checksum-less releases, exact checksum asset matching, aggregate manifests, and malformed or mismatched checksum entries (Issue #40).
+- Fixed field edits so type, required, unique, numeric-limit, character-limit, and dropdown changes are preflighted against every active and Recently Deleted entry before metadata is changed (Issue #41).
+- Added field-definition validation for defaults, numeric minimum/maximum ordering, dropdown membership, and required fields added to databases that already contain entries (Issue #41).
+- Blocked unsafe transitions to or from Document fields when they would create filename-only documents or silently orphan embedded BLOBs, with regression coverage for document and constraint changes (Issue #41).
 
 ## 0.3
 
