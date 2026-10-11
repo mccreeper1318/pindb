@@ -57,7 +57,8 @@ public final class DocumentStore implements AutoCloseable {
     public Map<Long, DocumentData> documentsForRecord(long recordId) {
         LinkedHashMap<Long, DocumentData> documents = new LinkedHashMap<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT field_id,file_name,mime_type,file_size,data FROM document_values WHERE record_id=? ORDER BY field_id")) {
+                "SELECT field_id,file_name,mime_type,file_size,length(data) AS data_length,data "
+                        + "FROM document_values WHERE record_id=? ORDER BY field_id")) {
             statement.setLong(1, recordId);
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
@@ -72,7 +73,8 @@ public final class DocumentStore implements AutoCloseable {
 
     public Optional<DocumentData> document(long recordId, long fieldId) {
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT file_name,mime_type,file_size,data FROM document_values WHERE record_id=? AND field_id=?")) {
+                "SELECT file_name,mime_type,file_size,length(data) AS data_length,data "
+                        + "FROM document_values WHERE record_id=? AND field_id=?")) {
             statement.setLong(1, recordId);
             statement.setLong(2, fieldId);
             try (ResultSet result = statement.executeQuery()) {
@@ -141,20 +143,32 @@ public final class DocumentStore implements AutoCloseable {
     }
 
     private static DocumentData readDocument(ResultSet result) throws SQLException {
+        String fileName = result.getString("file_name");
         long storedSize = result.getLong("file_size");
+        long actualSize = result.getLong("data_length");
+        validateDocumentSize(fileName, storedSize);
+        validateDocumentSize(fileName, actualSize);
+        if (actualSize != storedSize) {
+            throw new DatabaseException("Embedded document “" + fileName
+                    + "” has inconsistent stored size metadata.");
+        }
+
+        byte[] data = result.getBytes("data");
+        if (data.length != actualSize) {
+            throw new DatabaseException("Embedded document “" + fileName
+                    + "” changed while it was being read.");
+        }
+        return new DocumentData(fileName, result.getString("mime_type"), data);
+    }
+
+    private static void validateDocumentSize(String fileName, long size) {
         try {
-            DocumentData.requireSupportedSize(storedSize);
+            DocumentData.requireSupportedSize(size);
         } catch (IllegalArgumentException exception) {
-            throw new DatabaseException("Embedded document “" + result.getString("file_name")
+            throw new DatabaseException("Embedded document “" + fileName
                     + "” exceeds the supported " + DocumentData.MAX_EMBEDDED_MIB
                     + " MiB per-file limit. The database was not modified.", exception);
         }
-        byte[] data = result.getBytes("data");
-        if (data.length != storedSize) {
-            throw new DatabaseException("Embedded document “" + result.getString("file_name")
-                    + "” has inconsistent stored size metadata.");
-        }
-        return new DocumentData(result.getString("file_name"), result.getString("mime_type"), data);
     }
 
     public void restoreSnapshot(long snapshotId) {
