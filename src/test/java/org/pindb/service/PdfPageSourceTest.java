@@ -28,13 +28,15 @@ class PdfPageSourceTest {
 
         DocumentData data = new DocumentData("multipage.pdf", "application/pdf", pdfBytes);
         Path temporary;
-        try (PdfPageSource source = new PdfPageSource(data)) {
-            temporary = source.temporaryFile();
-            assertEquals(12, source.pageCount());
-            assertTrue(Files.exists(temporary));
-            assertTrue(source.renderPage(0, 72).getWidth() > 0);
-            assertTrue(source.renderPage(11, 72).getHeight() > 0);
-        }
+        PdfPageSource source = new PdfPageSource(data);
+        temporary = source.temporaryFile();
+        assertEquals(12, source.pageCount());
+        assertTrue(Files.exists(temporary));
+        assertTrue(source.renderPage(0, 72).getWidth() > 0);
+        assertTrue(source.renderPage(11, 72).getHeight() > 0);
+        source.close();
+
+        assertEquals(12, source.pageCount());
         assertFalse(Files.exists(temporary));
     }
 }
