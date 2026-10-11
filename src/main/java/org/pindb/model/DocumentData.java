@@ -81,7 +81,24 @@ public final class DocumentData {
     }
 
     public void writeTo(OutputStream output) throws IOException {
-        Objects.requireNonNull(output, "output").write(data);
+        writeTo(output, (completed, total) -> { }, () -> Thread.currentThread().isInterrupted());
+    }
+
+    public void writeTo(OutputStream output, ProgressListener progress,
+                        BooleanSupplier cancelled) throws IOException {
+        Objects.requireNonNull(output, "output");
+        Objects.requireNonNull(progress, "progress");
+        Objects.requireNonNull(cancelled, "cancelled");
+        int offset = 0;
+        while (offset < data.length) {
+            if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) {
+                throw new InterruptedIOException("Document writing was cancelled.");
+            }
+            int count = Math.min(COPY_BUFFER_SIZE, data.length - offset);
+            output.write(data, offset, count);
+            offset += count;
+            progress.update(offset, data.length);
+        }
     }
 
     public void writeTo(Path destination) throws IOException {
