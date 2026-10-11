@@ -20,6 +20,7 @@
 - Bounded embedded documents to 50 MiB per file, moved attachment loading/copying and document preview work off the JavaFX thread, and switched document BLOB writes to streams (Issue #43).
 - Reworked PDF previewing to virtualize pages with a five-page cache and render pages lazily, with progress and cancellation for preview/copy/print operations (Issue #43).
 - Fixed the Java/CUPS print fallback pre-rendering every page into memory; fallback pages are now rendered only when requested by the printer, with cancellable progress and multipage regression coverage (Issue #43).
+- Made document Save Copy cancellation safe by writing to a sibling temporary file before replacing the selected destination, and made PDF-source shutdown non-blocking while a page render is still active (Issue #43).
 
 ## 0.3
 
