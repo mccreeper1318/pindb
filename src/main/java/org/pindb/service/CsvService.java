@@ -66,6 +66,7 @@ public final class CsvService {
                 if (!service.integrityCheck()) {
                     throw new DatabaseException("The imported database failed its integrity check.");
                 }
+                service.checkpointWal();
             }
 
             publishAtomically(temporary, target);
