@@ -111,11 +111,10 @@ public final class DocumentStore implements AutoCloseable {
                     insert.setString(3, document.fileName());
                     insert.setString(4, document.mimeType());
                     insert.setLong(5, document.size());
-                    try (InputStream input = document.openStream()) {
-                        insert.setBinaryStream(6, input, document.size());
-                        insert.setString(7, LocalDateTime.now().toString());
-                        insert.executeUpdate();
-                    }
+                    InputStream input = document.openStream();
+                    insert.setBinaryStream(6, input, document.size());
+                    insert.setString(7, LocalDateTime.now().toString());
+                    insert.executeUpdate();
                 }
             }
             connection.commit();
