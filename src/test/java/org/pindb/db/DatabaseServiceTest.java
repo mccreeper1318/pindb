@@ -140,6 +140,27 @@ class DatabaseServiceTest {
     }
 
     @Test
+    void failedBulkImportRollsBackInsertedRowsAndImportSnapshot() {
+        Path file = tempDirectory.resolve("failed-import.pindb");
+        try (DatabaseService database = DatabaseService.create(file, "Import Rollback", "",
+                List.of(field("Date", FieldType.DATE, 0)), DatabaseView.TABLE, 10)) {
+            long fieldId = database.fields().getFirst().id();
+            int snapshotCount = database.backupSnapshots().size();
+
+            DatabaseException failure = assertThrows(DatabaseException.class, () ->
+                    database.importRecords(consumer -> {
+                        consumer.accept(Map.of(fieldId, "2026-10-10"));
+                        consumer.accept(Map.of(fieldId, "not-a-date"));
+                    }, "CSV import completed"));
+
+            assertTrue(failure.getMessage().contains("invalid date"));
+            assertEquals(0, database.countActiveRecords());
+            assertEquals(snapshotCount, database.backupSnapshots().size());
+            assertTrue(database.integrityCheck());
+        }
+    }
+
+    @Test
     void rejectsSnapshotWithMissingRequiredMetadataBeforeChangingActiveDatabase() throws Exception {
         Path file = tempDirectory.resolve("incomplete-snapshot.pindb");
         try (DatabaseService database = DatabaseService.create(file, "Incomplete Snapshot", "Snapshot description",
