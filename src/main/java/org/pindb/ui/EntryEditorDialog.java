@@ -1,6 +1,7 @@
 package org.pindb.ui;
 
 import javafx.collections.FXCollections;
+import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -12,6 +13,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
@@ -43,6 +45,7 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
     private final List<FieldDefinition> fields;
     private final Map<Long, ValueEditor> editors = new LinkedHashMap<>();
     private final Map<Long, DocumentData> documents = new LinkedHashMap<>();
+    private final Map<Long, Task<DocumentData>> documentLoads = new LinkedHashMap<>();
     private final Label error = new Label();
 
     public EntryEditorDialog(Window owner, SettingsService settings, List<FieldDefinition> fields, RecordData existing) {
@@ -119,6 +122,10 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             }
         });
         setOnShown(event -> hidePlatformButtonBar(hiddenCancelType));
+        setOnHidden(event -> {
+            documentLoads.values().forEach(task -> task.cancel(true));
+            documentLoads.clear();
+        });
     }
 
     static String initialValue(FieldDefinition field, RecordData existing) {
@@ -304,6 +311,24 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         Button choose = new Button(existing == null ? "Choose…" : "Replace…");
         Button remove = new Button("Remove");
         remove.setDisable(existing == null);
+        ProgressBar progress = new ProgressBar(0);
+        progress.setPrefWidth(120);
+        progress.setVisible(false);
+        progress.setManaged(false);
+        Button cancelLoad = new Button("Cancel Load");
+        cancelLoad.setVisible(false);
+        cancelLoad.setManaged(false);
+
+        Runnable resetLoadUi = () -> {
+            progress.progressProperty().unbind();
+            progress.setVisible(false);
+            progress.setManaged(false);
+            cancelLoad.setVisible(false);
+            cancelLoad.setManaged(false);
+            choose.setDisable(false);
+            remove.setDisable(!documents.containsKey(field.id()));
+        };
+
         choose.setOnAction(event -> {
             FileChooser chooser = new FileChooser();
             chooser.setTitle("Choose a Document for " + field.name());
@@ -311,34 +336,90 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             if (selected == null) {
                 return;
             }
+
+            String mimeType;
             try {
-                byte[] data = Files.readAllBytes(selected.toPath());
-                String mimeType = Files.probeContentType(selected.toPath());
-                DocumentData document = new DocumentData(selected.getName(), mimeType, data);
-                documents.put(field.id(), document);
-                fileName.setText(document.fileName());
-                choose.setText("Replace…");
-                remove.setDisable(false);
-                error.setText("");
-            } catch (IOException exception) {
-                error.setText("Could not read " + selected.getName() + ": " + exception.getMessage());
+                DocumentData.requireSupportedSize(Files.size(selected.toPath()));
+                mimeType = Files.probeContentType(selected.toPath());
+            } catch (IOException | IllegalArgumentException exception) {
+                error.setText("Could not attach " + selected.getName() + ": " + exception.getMessage());
+                return;
             }
+
+            Task<DocumentData> load = new Task<>() {
+                @Override
+                protected DocumentData call() throws Exception {
+                    return DocumentData.read(selected.toPath(), mimeType,
+                            (completed, total) -> updateProgress(completed, total),
+                            this::isCancelled);
+                }
+            };
+            Task<DocumentData> previous = documentLoads.put(field.id(), load);
+            if (previous != null) {
+                previous.cancel(true);
+            }
+            progress.progressProperty().bind(load.progressProperty());
+            progress.setVisible(true);
+            progress.setManaged(true);
+            cancelLoad.setVisible(true);
+            cancelLoad.setManaged(true);
+            choose.setDisable(true);
+            remove.setDisable(true);
+            fileName.setText("Loading " + selected.getName() + "…");
+            error.setText("");
+
+            load.setOnSucceeded(done -> {
+                if (documentLoads.remove(field.id(), load)) {
+                    DocumentData document = load.getValue();
+                    documents.put(field.id(), document);
+                    fileName.setText(document.fileName());
+                    choose.setText("Replace…");
+                    resetLoadUi.run();
+                    error.setText("");
+                }
+            });
+            load.setOnFailed(done -> {
+                if (documentLoads.remove(field.id(), load)) {
+                    Throwable failure = load.getException();
+                    fileName.setText(documents.containsKey(field.id())
+                            ? documents.get(field.id()).fileName() : "No document selected");
+                    resetLoadUi.run();
+                    error.setText("Could not read " + selected.getName() + ": "
+                            + (failure == null ? "Unknown error" : failure.getMessage()));
+                }
+            });
+            load.setOnCancelled(done -> {
+                if (documentLoads.remove(field.id(), load)) {
+                    fileName.setText(documents.containsKey(field.id())
+                            ? documents.get(field.id()).fileName() : "No document selected");
+                    resetLoadUi.run();
+                    error.setText("Document loading cancelled.");
+                }
+            });
+            cancelLoad.setOnAction(cancel -> load.cancel(true));
+            Thread.ofVirtual().name("pindb-document-load").start(load);
         });
+
         remove.setOnAction(event -> {
+            Task<DocumentData> load = documentLoads.remove(field.id());
+            if (load != null) {
+                load.cancel(true);
+            }
             documents.remove(field.id());
             fileName.setText("No document selected");
             choose.setText("Choose…");
-            remove.setDisable(true);
+            resetLoadUi.run();
         });
 
-        HBox box = new HBox(10, fileName, choose, remove);
+        HBox box = new HBox(10, fileName, progress, cancelLoad, choose, remove);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setMaxWidth(Double.MAX_VALUE);
         return new ValueEditor(box,
                 () -> {
                     DocumentData document = documents.get(field.id());
                     return document == null ? "" : document.fileName();
-                }, () -> "");
+                }, () -> documentLoads.containsKey(field.id())
+                ? "Wait for the selected document to finish loading or cancel it." : "");
     }
 
     private String validateEditors() {
