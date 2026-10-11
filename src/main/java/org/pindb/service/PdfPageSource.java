@@ -18,6 +18,7 @@ public final class PdfPageSource implements AutoCloseable {
     private final Path temporaryFile;
     private final PDDocument document;
     private final PDFRenderer renderer;
+    private final int pageCount;
     private final ReentrantLock access = new ReentrantLock();
     private volatile boolean closeRequested;
     private boolean closed;
@@ -31,6 +32,7 @@ public final class PdfPageSource implements AutoCloseable {
             }
             document = Loader.loadPDF(temporaryFile.toFile());
             renderer = new PDFRenderer(document);
+            pageCount = document.getNumberOfPages();
         } catch (IOException | RuntimeException exception) {
             Files.deleteIfExists(temporaryFile);
             throw exception;
@@ -38,14 +40,7 @@ public final class PdfPageSource implements AutoCloseable {
     }
 
     public int pageCount() {
-        access.lock();
-        try {
-            ensureOpen();
-            return document.getNumberOfPages();
-        } finally {
-            finishCloseIfRequested();
-            access.unlock();
-        }
+        return pageCount;
     }
 
     public BufferedImage renderPage(int pageIndex, float dpi) throws IOException {
@@ -57,7 +52,7 @@ public final class PdfPageSource implements AutoCloseable {
         }
         try {
             ensureOpen();
-            if (pageIndex < 0 || pageIndex >= document.getNumberOfPages()) {
+            if (pageIndex < 0 || pageIndex >= pageCount) {
                 throw new IndexOutOfBoundsException("PDF page index " + pageIndex + " is out of range.");
             }
             return renderer.renderImageWithDPI(pageIndex, dpi);
