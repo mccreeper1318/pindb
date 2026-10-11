@@ -7,15 +7,19 @@ import org.pindb.model.DocumentData;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.locks.ReentrantLock;
 
 public final class PdfPageSource implements AutoCloseable {
     private final Path temporaryFile;
     private final PDDocument document;
     private final PDFRenderer renderer;
+    private final ReentrantLock access = new ReentrantLock();
+    private volatile boolean closeRequested;
     private boolean closed;
 
     public PdfPageSource(DocumentData data) throws IOException {
@@ -33,21 +37,64 @@ public final class PdfPageSource implements AutoCloseable {
         }
     }
 
-    public synchronized int pageCount() {
-        ensureOpen();
-        return document.getNumberOfPages();
+    public int pageCount() {
+        access.lock();
+        try {
+            ensureOpen();
+            return document.getNumberOfPages();
+        } finally {
+            finishCloseIfRequested();
+            access.unlock();
+        }
     }
 
-    public synchronized BufferedImage renderPage(int pageIndex, float dpi) throws IOException {
-        ensureOpen();
-        if (pageIndex < 0 || pageIndex >= document.getNumberOfPages()) {
-            throw new IndexOutOfBoundsException("PDF page index " + pageIndex + " is out of range.");
+    public BufferedImage renderPage(int pageIndex, float dpi) throws IOException {
+        try {
+            access.lockInterruptibly();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new InterruptedIOException("PDF rendering was cancelled.");
         }
-        return renderer.renderImageWithDPI(pageIndex, dpi);
+        try {
+            ensureOpen();
+            if (pageIndex < 0 || pageIndex >= document.getNumberOfPages()) {
+                throw new IndexOutOfBoundsException("PDF page index " + pageIndex + " is out of range.");
+            }
+            return renderer.renderImageWithDPI(pageIndex, dpi);
+        } finally {
+            finishCloseIfRequested();
+            access.unlock();
+        }
     }
 
     @Override
-    public synchronized void close() {
+    public void close() {
+        closeRequested = true;
+        if (!access.tryLock()) {
+            return;
+        }
+        try {
+            closeInternal();
+        } finally {
+            access.unlock();
+        }
+    }
+
+    Path temporaryFile() {
+        return temporaryFile;
+    }
+
+    boolean closeRequested() {
+        return closeRequested;
+    }
+
+    private void finishCloseIfRequested() {
+        if (closeRequested) {
+            closeInternal();
+        }
+    }
+
+    private void closeInternal() {
         if (closed) {
             return;
         }
@@ -64,12 +111,8 @@ public final class PdfPageSource implements AutoCloseable {
         }
     }
 
-    Path temporaryFile() {
-        return temporaryFile;
-    }
-
     private void ensureOpen() {
-        if (closed) {
+        if (closed || closeRequested) {
             throw new IllegalStateException("PDF page source is closed.");
         }
     }
