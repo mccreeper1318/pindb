@@ -14,6 +14,9 @@
 - Fixed field edits so type, required, unique, numeric-limit, character-limit, and dropdown changes are preflighted against every active and Recently Deleted entry before metadata is changed (Issue #41).
 - Added field-definition validation for defaults, numeric minimum/maximum ordering, dropdown membership, and required fields added to databases that already contain entries (Issue #41).
 - Blocked unsafe transitions to or from Document fields when they would create filename-only documents or silently orphan embedded BLOBs, with regression coverage for document and constraint changes (Issue #41).
+- Fixed CSV imports to stream rows instead of retaining the full file in memory and to insert all imported records in one transaction without per-record backup snapshots (Issue #42).
+- CSV imports now build into a temporary database, checkpoint and validate it, then atomically publish the completed `.pindb` so failures never leave a partial destination file (Issue #42).
+- Added duplicate-header rejection plus large-import and mid-import rollback regression coverage for CSV imports (Issue #42).
 
 ## 0.3
 

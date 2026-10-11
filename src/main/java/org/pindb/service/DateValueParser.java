@@ -39,22 +39,49 @@ public final class DateValueParser {
     }
 
     public static FieldType inferType(List<String> values) {
-        List<String> nonBlank = values.stream()
-                .map(value -> value == null ? "" : value.trim())
-                .filter(value -> !value.isBlank())
-                .toList();
-        if (nonBlank.isEmpty()) {
+        TypeInference inference = new TypeInference();
+        values.forEach(inference::accept);
+        return inference.result();
+    }
+
+    public static TypeInference typeInference() {
+        return new TypeInference();
+    }
+
+    public static final class TypeInference {
+        private boolean sawValue;
+        private boolean allDates = true;
+        private boolean allDateTimes = true;
+
+        private TypeInference() {
+        }
+
+        public void accept(String value) {
+            String safe = value == null ? "" : value.trim();
+            if (safe.isBlank()) {
+                return;
+            }
+            sawValue = true;
+            if (!looksLikeDateTime(safe) || parseDateTime(safe).isEmpty()) {
+                allDateTimes = false;
+            }
+            if (!looksLikeDate(safe) || parseDate(safe).isEmpty()) {
+                allDates = false;
+            }
+        }
+
+        public FieldType result() {
+            if (!sawValue) {
+                return FieldType.TEXT;
+            }
+            if (allDateTimes) {
+                return FieldType.DATE_TIME;
+            }
+            if (allDates) {
+                return FieldType.DATE;
+            }
             return FieldType.TEXT;
         }
-        if (nonBlank.stream().allMatch(DateValueParser::looksLikeDateTime)
-                && nonBlank.stream().allMatch(value -> parseDateTime(value).isPresent())) {
-            return FieldType.DATE_TIME;
-        }
-        if (nonBlank.stream().allMatch(DateValueParser::looksLikeDate)
-                && nonBlank.stream().allMatch(value -> parseDate(value).isPresent())) {
-            return FieldType.DATE;
-        }
-        return FieldType.TEXT;
     }
 
     public static String normalize(FieldType type, String value) {
