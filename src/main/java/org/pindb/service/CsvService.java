@@ -54,14 +54,15 @@ public final class CsvService {
             throw new DatabaseException("A file already exists at " + target);
         }
 
-        ImportPlan plan = inspectCsv(source);
+        Path sourceSnapshot = snapshotCsvSource(source);
         Path temporary = temporaryImportPath(target);
         boolean published = false;
         try {
+            ImportPlan plan = inspectCsv(sourceSnapshot);
             try (DatabaseService service = DatabaseService.create(temporary, databaseName,
                     "Imported from " + source.getFileName(), plan.fields(), DatabaseView.TABLE, 10)) {
                 List<FieldDefinition> createdFields = service.fields();
-                service.importRecords(consumer -> streamImportRows(source, createdFields, consumer),
+                service.importRecords(consumer -> streamImportRows(sourceSnapshot, createdFields, consumer),
                         "CSV import completed");
                 if (!service.integrityCheck()) {
                     throw new DatabaseException("The imported database failed its integrity check.");
@@ -69,11 +70,12 @@ public final class CsvService {
                 service.checkpointWal();
             }
 
-            publishAtomically(temporary, target);
+            publishAtomicallyNoClobber(temporary, target);
             cleanupTemporaryDatabase(temporary);
             published = true;
             return DatabaseService.open(target);
         } finally {
+            deleteQuietly(sourceSnapshot);
             if (!published) {
                 cleanupTemporaryDatabase(temporary);
             }
@@ -162,6 +164,43 @@ public final class CsvService {
         }
     }
 
+    static Path snapshotCsvSource(Path source) {
+        Path snapshot = null;
+        try {
+            BasicFileAttributes before = Files.readAttributes(source, BasicFileAttributes.class,
+                    LinkOption.NOFOLLOW_LINKS);
+            if (!before.isRegularFile()) {
+                throw new DatabaseException("The selected CSV source is not a regular file.");
+            }
+
+            snapshot = Files.createTempFile("pindb-csv-source-", ".tmp");
+            Files.copy(source, snapshot, StandardCopyOption.REPLACE_EXISTING);
+
+            BasicFileAttributes after = Files.readAttributes(source, BasicFileAttributes.class,
+                    LinkOption.NOFOLLOW_LINKS);
+            if (!sameSourceVersion(before, after)) {
+                throw new DatabaseException("The CSV file changed while PinDB was preparing the import. "
+                        + "Try again after the file is no longer being edited.");
+            }
+            return snapshot;
+        } catch (DatabaseException exception) {
+            deleteQuietly(snapshot);
+            throw exception;
+        } catch (IOException exception) {
+            deleteQuietly(snapshot);
+            throw new DatabaseException("Could not create a stable snapshot of the CSV file.", exception);
+        }
+    }
+
+    private static boolean sameSourceVersion(BasicFileAttributes before, BasicFileAttributes after) {
+        if (before.size() != after.size() || !before.lastModifiedTime().equals(after.lastModifiedTime())) {
+            return false;
+        }
+        Object beforeKey = before.fileKey();
+        Object afterKey = after.fileKey();
+        return beforeKey == null || afterKey == null || beforeKey.equals(afterKey);
+    }
+
     private static Path temporaryImportPath(Path destination) {
         Path parent = destination.getParent();
         if (parent == null) {
@@ -175,13 +214,28 @@ public final class CsvService {
         return candidate;
     }
 
-    private static void publishAtomically(Path temporary, Path destination) {
+    static void publishAtomicallyNoClobber(Path temporary, Path destination) {
         try {
-            Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException exception) {
-            throw new DatabaseException("Could not atomically publish the imported database on this filesystem.", exception);
+            Files.createLink(destination, temporary);
+        } catch (FileAlreadyExistsException exception) {
+            throw new DatabaseException("A file was created at " + destination
+                    + " while the CSV import was running. The imported database was not published.", exception);
+        } catch (UnsupportedOperationException exception) {
+            throw new DatabaseException("This filesystem does not support safe atomic CSV import publication.", exception);
         } catch (IOException exception) {
-            throw new DatabaseException("Could not publish the imported database.", exception);
+            throw new DatabaseException("Could not atomically publish the imported database without overwriting "
+                    + "an existing file.", exception);
+        }
+    }
+
+    private static void deleteQuietly(Path path) {
+        if (path == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ignored) {
+            // Preserve the original import result or failure.
         }
     }
 
