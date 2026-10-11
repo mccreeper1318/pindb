@@ -545,6 +545,17 @@ public final class DatabaseService implements AutoCloseable {
         }
     }
 
+    public void checkpointWal() {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(TRUNCATE)")) {
+            if (result.next() && result.getInt(1) != 0) {
+                throw new DatabaseException("SQLite could not checkpoint pending WAL data.");
+            }
+        } catch (SQLException exception) {
+            throw new DatabaseException("Could not checkpoint pending SQLite WAL data.", exception);
+        }
+    }
+
     public void createSnapshot(String reason) {
         transaction(() -> {
             createSnapshotInternal(reason);
