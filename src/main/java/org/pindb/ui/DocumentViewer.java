@@ -141,10 +141,17 @@ public final class DocumentViewer {
     }
 
     private void loadPdf(Button printButton) {
+        AtomicReference<PdfPageSource> preparedSource = new AtomicReference<>();
         Task<PdfPageSource> task = new Task<>() {
             @Override
             protected PdfPageSource call() throws Exception {
-                return new PdfPageSource(document);
+                PdfPageSource source = new PdfPageSource(document);
+                preparedSource.set(source);
+                if (isCancelled()) {
+                    closePreparedPdf(preparedSource);
+                    return null;
+                }
+                return source;
             }
         };
         showWorking("Preparing PDF preview…", task);
@@ -152,15 +159,33 @@ public final class DocumentViewer {
             if (currentPreviewTask == task) {
                 currentPreviewTask = null;
             }
-            pdfSource = task.getValue();
-            int pageCount = pdfSource.pageCount();
+            PdfPageSource source = preparedSource.getAndSet(null);
+            if (source == null) {
+                showCancelledPreview(printButton);
+                return;
+            }
+            pdfSource = source;
+            int pageCount = source.pageCount();
             showPdfPages(pageCount);
             printable = pageCount > 0;
             printButton.setDisable(!printable);
         });
-        task.setOnFailed(event -> showPreviewFailure(task.getException(), printButton));
-        task.setOnCancelled(event -> showCancelledPreview(printButton));
+        task.setOnFailed(event -> {
+            closePreparedPdf(preparedSource);
+            showPreviewFailure(task.getException(), printButton);
+        });
+        task.setOnCancelled(event -> {
+            closePreparedPdf(preparedSource);
+            showCancelledPreview(printButton);
+        });
         worker.submit(task);
+    }
+
+    private static void closePreparedPdf(AtomicReference<PdfPageSource> preparedSource) {
+        PdfPageSource source = preparedSource.getAndSet(null);
+        if (source != null) {
+            source.close();
+        }
     }
 
     private void showPdfPages(int pageCount) {
@@ -513,17 +538,16 @@ public final class DocumentViewer {
         });
         task.setOnFailed(event -> {
             progressStage.close();
+            if (openAfter) {
+                cleanupTemporaryCopy(destination);
+            }
             UiUtil.error(stage, openAfter ? "Could Not Open Document" : "Could Not Save Document",
                     "PinDB could not write the selected document copy.", task.getException());
         });
         task.setOnCancelled(event -> {
             progressStage.close();
             if (openAfter) {
-                try {
-                    Files.deleteIfExists(destination);
-                } catch (IOException ignored) {
-                    destination.toFile().deleteOnExit();
-                }
+                cleanupTemporaryCopy(destination);
             }
         });
         progressStage.setOnCloseRequest(event -> {
@@ -532,6 +556,14 @@ public final class DocumentViewer {
         });
         progressStage.show();
         worker.submit(task);
+    }
+
+    private static void cleanupTemporaryCopy(Path destination) {
+        try {
+            Files.deleteIfExists(destination);
+        } catch (IOException ignored) {
+            destination.toFile().deleteOnExit();
+        }
     }
 
     private void closeResources() {
