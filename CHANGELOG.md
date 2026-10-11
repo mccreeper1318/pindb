@@ -17,6 +17,11 @@
 - Fixed CSV imports to stream rows instead of retaining the full file in memory and to insert all imported records in one transaction without per-record backup snapshots (Issue #42).
 - CSV imports now build into a temporary database, checkpoint and validate it, then atomically publish the completed `.pindb` so failures never leave a partial destination file (Issue #42).
 - Added duplicate-header rejection plus large-import and mid-import rollback regression coverage for CSV imports (Issue #42).
+- Bounded embedded documents to 50 MiB per file, moved attachment loading/copying and document preview work off the JavaFX thread, and switched document BLOB writes to streams (Issue #43).
+- Reworked PDF previewing to virtualize pages with a five-page cache and render pages lazily, with progress and cancellation for preview/copy/print operations (Issue #43).
+- Fixed the Java/CUPS print fallback pre-rendering every page into memory; fallback pages are now rendered only when requested by the printer, with cancellable progress and multipage regression coverage (Issue #43).
+- Made document Save Copy cancellation safe by writing to a sibling temporary file before replacing the selected destination, and made PDF-source shutdown non-blocking while a page render is still active (Issue #43).
+- Hardened document loading against understated oversized SQLite BLOBs, late-completing cancelled PDF previews, render-lock page-count stalls, and failed external-open temporary copies (Issue #43).
 
 ## 0.3
 
