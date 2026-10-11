@@ -70,6 +70,37 @@ class CsvServiceTest {
     }
 
     @Test
+    void atomicPublicationNeverOverwritesLateCreatedDestination() throws Exception {
+        Path temporary = tempDirectory.resolve("completed-import.tmp");
+        Path destination = tempDirectory.resolve("late-created.pindb");
+        Files.writeString(temporary, "completed import");
+        Files.writeString(destination, "keep me");
+
+        DatabaseException failure = assertThrows(DatabaseException.class,
+                () -> CsvService.publishAtomicallyNoClobber(temporary, destination));
+
+        assertTrue(failure.getMessage().contains("while the CSV import was running"));
+        assertEquals("keep me", Files.readString(destination));
+        assertEquals("completed import", Files.readString(temporary));
+    }
+
+    @Test
+    void sourceSnapshotKeepsBothImportPassesOnOneCsvVersion() throws Exception {
+        Path csv = tempDirectory.resolve("changing.csv");
+        Files.writeString(csv, "Name,Date\nAlex,10/10/2026\n");
+
+        Path snapshot = CsvService.snapshotCsvSource(csv);
+        try {
+            Files.writeString(csv, "Different,Columns\nSam,Changed\n");
+
+            assertEquals("Name,Date\nAlex,10/10/2026\n", Files.readString(snapshot));
+            assertEquals("Different,Columns\nSam,Changed\n", Files.readString(csv));
+        } finally {
+            Files.deleteIfExists(snapshot);
+        }
+    }
+
+    @Test
     void preservesQuotedNewlinesDuringStreamingImport() throws Exception {
         Path csv = tempDirectory.resolve("streamed-quotes.csv");
         Path destination = tempDirectory.resolve("streamed-quotes.pindb");
