@@ -31,6 +31,7 @@ import javafx.stage.Window;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.pindb.model.DocumentData;
+import org.pindb.service.DocumentCopyService;
 import org.pindb.service.PdfPageSource;
 import org.pindb.service.SettingsService;
 
@@ -471,8 +472,14 @@ public final class DocumentViewer {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                try (var output = Files.newOutputStream(destination)) {
-                    document.writeTo(output,
+                if (openAfter) {
+                    try (var output = Files.newOutputStream(destination)) {
+                        document.writeTo(output,
+                                (completed, total) -> updateProgress(completed, total),
+                                this::isCancelled);
+                    }
+                } else {
+                    DocumentCopyService.saveAtomically(document, destination,
                             (completed, total) -> updateProgress(completed, total),
                             this::isCancelled);
                 }
@@ -533,9 +540,10 @@ public final class DocumentViewer {
             task.cancel(true);
         }
         worker.shutdownNow();
-        if (pdfSource != null) {
-            pdfSource.close();
-            pdfSource = null;
+        PdfPageSource source = pdfSource;
+        pdfSource = null;
+        if (source != null) {
+            source.close();
         }
         synchronized (pdfCache) {
             pdfCache.clear();
