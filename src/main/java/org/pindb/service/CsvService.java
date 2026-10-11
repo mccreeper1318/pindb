@@ -70,6 +70,7 @@ public final class CsvService {
             }
 
             publishAtomically(temporary, target);
+            cleanupTemporaryDatabase(temporary);
             published = true;
             return DatabaseService.open(target);
         } finally {
