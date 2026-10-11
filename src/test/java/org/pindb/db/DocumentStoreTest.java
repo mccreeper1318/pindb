@@ -152,6 +152,35 @@ class DocumentStoreTest {
     }
 
     @Test
+    void rejectsOversizedStoredDocumentBeforeAllocatingBlob() throws Exception {
+        Path databasePath = tempDirectory.resolve("oversized-document.pindb");
+        try (DatabaseService database = DatabaseService.create(databasePath, "Oversized", "",
+                List.of(documentField()), DatabaseView.TABLE, 10);
+             DocumentStore documents = new DocumentStore(databasePath)) {
+            long fieldId = database.fields().getFirst().id();
+            long recordId = database.addRecord(Map.of(fieldId, "oversized.bin"));
+
+            try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + databasePath.toAbsolutePath());
+                 PreparedStatement statement = connection.prepareStatement(
+                         "INSERT INTO document_values(record_id,field_id,file_name,mime_type,file_size,data,created_at) "
+                                 + "VALUES(?,?,?,?,?,?,?)")) {
+                statement.setLong(1, recordId);
+                statement.setLong(2, fieldId);
+                statement.setString(3, "oversized.bin");
+                statement.setString(4, "application/octet-stream");
+                statement.setLong(5, DocumentData.MAX_EMBEDDED_BYTES + 1);
+                statement.setBytes(6, new byte[] {1});
+                statement.setString(7, "2026-10-10T00:00:00");
+                statement.executeUpdate();
+            }
+
+            DatabaseException failure = assertThrows(DatabaseException.class,
+                    () -> documents.document(recordId, fieldId));
+            assertTrue(failure.getMessage().contains("50 MiB"));
+        }
+    }
+
+    @Test
     void normalCloseLeavesMainDatabaseSelfContainedForCopying() throws Exception {
         Path databasePath = tempDirectory.resolve("portable.pindb");
         long fieldId;

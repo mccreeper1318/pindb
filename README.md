@@ -115,7 +115,7 @@ PinDB supports text, multiline text, number, currency, date, date/time, yes/no, 
 
 ### Embedded documents
 
-Document fields store the original file inside the `.pindb` database. PinDB can preview PDF, DOCX, plain-text/common text files, and common image formats. Stored documents can also be printed, saved as copies, or opened with the system application.
+Document fields store the original file inside the `.pindb` database. Embedded documents are limited to **50 MiB per file** so document operations remain bounded. PinDB can preview PDF, DOCX, plain-text/common text files, and common image formats. PDF pages are rendered lazily as they are viewed rather than all at once. Stored documents can also be printed, saved as copies, or opened with the system application.
 
 ### Summaries, printing, and CSV
 

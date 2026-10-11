@@ -2,6 +2,7 @@ package org.pindb.db;
 
 import org.pindb.model.DocumentData;
 
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -56,12 +57,11 @@ public final class DocumentStore implements AutoCloseable {
     public Map<Long, DocumentData> documentsForRecord(long recordId) {
         LinkedHashMap<Long, DocumentData> documents = new LinkedHashMap<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT field_id,file_name,mime_type,data FROM document_values WHERE record_id=? ORDER BY field_id")) {
+                "SELECT field_id,file_name,mime_type,file_size,data FROM document_values WHERE record_id=? ORDER BY field_id")) {
             statement.setLong(1, recordId);
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
-                    documents.put(result.getLong("field_id"), new DocumentData(
-                            result.getString("file_name"), result.getString("mime_type"), result.getBytes("data")));
+                    documents.put(result.getLong("field_id"), readDocument(result));
                 }
             }
             return Map.copyOf(documents);
@@ -72,15 +72,14 @@ public final class DocumentStore implements AutoCloseable {
 
     public Optional<DocumentData> document(long recordId, long fieldId) {
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT file_name,mime_type,data FROM document_values WHERE record_id=? AND field_id=?")) {
+                "SELECT file_name,mime_type,file_size,data FROM document_values WHERE record_id=? AND field_id=?")) {
             statement.setLong(1, recordId);
             statement.setLong(2, fieldId);
             try (ResultSet result = statement.executeQuery()) {
                 if (!result.next()) {
                     return Optional.empty();
                 }
-                return Optional.of(new DocumentData(result.getString("file_name"),
-                        result.getString("mime_type"), result.getBytes("data")));
+                return Optional.of(readDocument(result));
             }
         } catch (SQLException exception) {
             throw new DatabaseException("Could not load the selected document.", exception);
@@ -103,19 +102,20 @@ public final class DocumentStore implements AutoCloseable {
                             + "VALUES(?,?,?,?,?,?,?)")) {
                 for (Map.Entry<Long, DocumentData> entry : documents.entrySet()) {
                     DocumentData document = entry.getValue();
-                    if (document == null || document.data().length == 0) {
+                    if (document == null || document.isEmpty()) {
                         continue;
                     }
+                    DocumentData.requireSupportedSize(document.size());
                     insert.setLong(1, recordId);
                     insert.setLong(2, entry.getKey());
                     insert.setString(3, document.fileName());
                     insert.setString(4, document.mimeType());
                     insert.setLong(5, document.size());
-                    insert.setBytes(6, document.data());
+                    InputStream input = document.openStream();
+                    insert.setBinaryStream(6, input, document.size());
                     insert.setString(7, LocalDateTime.now().toString());
-                    insert.addBatch();
+                    insert.executeUpdate();
                 }
-                insert.executeBatch();
             }
             connection.commit();
             connection.setAutoCommit(previousAutoCommit);
@@ -138,6 +138,23 @@ public final class DocumentStore implements AutoCloseable {
             }
             throw failure;
         }
+    }
+
+    private static DocumentData readDocument(ResultSet result) throws SQLException {
+        long storedSize = result.getLong("file_size");
+        try {
+            DocumentData.requireSupportedSize(storedSize);
+        } catch (IllegalArgumentException exception) {
+            throw new DatabaseException("Embedded document “" + result.getString("file_name")
+                    + "” exceeds the supported " + DocumentData.MAX_EMBEDDED_MIB
+                    + " MiB per-file limit. The database was not modified.", exception);
+        }
+        byte[] data = result.getBytes("data");
+        if (data.length != storedSize) {
+            throw new DatabaseException("Embedded document “" + result.getString("file_name")
+                    + "” has inconsistent stored size metadata.");
+        }
+        return new DocumentData(result.getString("file_name"), result.getString("mime_type"), data);
     }
 
     public void restoreSnapshot(long snapshotId) {
