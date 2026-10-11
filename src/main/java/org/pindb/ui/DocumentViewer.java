@@ -77,6 +77,7 @@ public final class DocumentViewer {
     private String printableText;
     private Image printableImage;
     private boolean printable;
+    private boolean viewerClosed;
 
     public DocumentViewer(Window owner, SettingsService settings, DocumentData document) {
         this.document = document;
@@ -161,7 +162,13 @@ public final class DocumentViewer {
             }
             PdfPageSource source = preparedSource.getAndSet(null);
             if (source == null) {
-                showCancelledPreview(printButton);
+                if (!viewerClosed) {
+                    showCancelledPreview(printButton);
+                }
+                return;
+            }
+            if (viewerClosed) {
+                source.close();
                 return;
             }
             pdfSource = source;
@@ -567,6 +574,7 @@ public final class DocumentViewer {
     }
 
     private void closeResources() {
+        viewerClosed = true;
         Task<?> task = currentPreviewTask;
         if (task != null) {
             task.cancel(true);
