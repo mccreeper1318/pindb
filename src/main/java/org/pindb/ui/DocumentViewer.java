@@ -471,7 +471,11 @@ public final class DocumentViewer {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                document.writeTo(destination);
+                try (var output = Files.newOutputStream(destination)) {
+                    document.writeTo(output,
+                            (completed, total) -> updateProgress(completed, total),
+                            this::isCancelled);
+                }
                 return null;
             }
         };
@@ -479,7 +483,9 @@ public final class DocumentViewer {
         progressStage.initOwner(stage);
         progressStage.initModality(Modality.WINDOW_MODAL);
         progressStage.setTitle(message);
-        ProgressIndicator indicator = new ProgressIndicator();
+        ProgressBar indicator = new ProgressBar(0);
+        indicator.setPrefWidth(280);
+        indicator.progressProperty().bind(task.progressProperty());
         Button cancel = new Button("Cancel");
         cancel.setOnAction(event -> task.cancel(true));
         VBox box = new VBox(12, new Label(message), indicator, cancel);
