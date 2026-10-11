@@ -268,24 +268,25 @@ public final class DatabaseService implements AutoCloseable {
     public long addRecord(Map<Long, String> values) {
         ensureValidValues(values, null);
         createSnapshot("Before adding entry");
-        return transaction(() -> {
-            LocalDateTime now = LocalDateTime.now();
-            long recordId;
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO records(created_at,updated_at,deleted_at) VALUES(?,?,NULL)",
-                    Statement.RETURN_GENERATED_KEYS)) {
-                statement.setString(1, now.toString());
-                statement.setString(2, now.toString());
-                statement.executeUpdate();
-                try (ResultSet keys = statement.getGeneratedKeys()) {
-                    if (!keys.next()) {
-                        throw new SQLException("SQLite did not return a record ID.");
-                    }
-                    recordId = keys.getLong(1);
+        return transaction(() -> insertRecordInternal(values, fields()));
+    }
+
+    public void importRecords(RecordImportSource source, String snapshotReason) {
+        Objects.requireNonNull(source, "source");
+        List<FieldDefinition> importFields = fields();
+        transaction(() -> {
+            source.writeTo(values -> {
+                Map<Long, String> safeValues = Objects.requireNonNull(values, "values");
+                ensureValidValues(safeValues, null, importFields);
+                try {
+                    insertRecordInternal(safeValues, importFields);
+                } catch (SQLException exception) {
+                    throw new DatabaseException("Could not insert an imported CSV row.", exception);
                 }
-            }
-            writeValues(recordId, values);
-            return recordId;
+            });
+            createSnapshotInternal(Objects.requireNonNullElse(snapshotReason, "CSV import completed"));
+            pruneSnapshotsInternal(info().backupLimit());
+            return null;
         });
     }
 
@@ -475,8 +476,13 @@ public final class DatabaseService implements AutoCloseable {
     }
 
     public List<String> validateValues(Map<Long, String> values, Long currentRecordId) {
+        return validateValues(fields(), values, currentRecordId);
+    }
+
+    private List<String> validateValues(List<FieldDefinition> fieldDefinitions,
+                                        Map<Long, String> values, Long currentRecordId) {
         List<String> errors = new ArrayList<>();
-        for (FieldDefinition field : fields()) {
+        for (FieldDefinition field : fieldDefinitions) {
             String raw = Objects.requireNonNullElse(values.get(field.id()), "").trim();
             if (field.required() && raw.isBlank()) {
                 errors.add(field.name() + " is required.");
@@ -518,9 +524,13 @@ public final class DatabaseService implements AutoCloseable {
         return errors;
     }
 
-
     private void ensureValidValues(Map<Long, String> values, Long currentRecordId) {
-        List<String> errors = validateValues(values, currentRecordId);
+        ensureValidValues(values, currentRecordId, fields());
+    }
+
+    private void ensureValidValues(Map<Long, String> values, Long currentRecordId,
+                                   List<FieldDefinition> fieldDefinitions) {
+        List<String> errors = validateValues(fieldDefinitions, values, currentRecordId);
         if (!errors.isEmpty()) {
             throw new DatabaseException(String.join("\n", errors));
         }
@@ -801,10 +811,36 @@ public final class DatabaseService implements AutoCloseable {
         );
     }
 
+    private long insertRecordInternal(Map<Long, String> values,
+                                      List<FieldDefinition> fieldDefinitions) throws SQLException {
+        LocalDateTime now = LocalDateTime.now();
+        long recordId;
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO records(created_at,updated_at,deleted_at) VALUES(?,?,NULL)",
+                Statement.RETURN_GENERATED_KEYS)) {
+            statement.setString(1, now.toString());
+            statement.setString(2, now.toString());
+            statement.executeUpdate();
+            try (ResultSet keys = statement.getGeneratedKeys()) {
+                if (!keys.next()) {
+                    throw new SQLException("SQLite did not return a record ID.");
+                }
+                recordId = keys.getLong(1);
+            }
+        }
+        writeValues(recordId, values, fieldDefinitions);
+        return recordId;
+    }
+
     private void writeValues(long recordId, Map<Long, String> values) throws SQLException {
+        writeValues(recordId, values, fields());
+    }
+
+    private void writeValues(long recordId, Map<Long, String> values,
+                             List<FieldDefinition> fieldDefinitions) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO record_values(record_id,field_id,value) VALUES(?,?,?)")) {
-            for (FieldDefinition field : fields()) {
+            for (FieldDefinition field : fieldDefinitions) {
                 statement.setLong(1, recordId);
                 statement.setLong(2, field.id());
                 statement.setString(3, Objects.requireNonNullElse(values.get(field.id()), "").trim());
@@ -923,6 +959,16 @@ public final class DatabaseService implements AutoCloseable {
                 connection = null;
             }
         }
+    }
+
+    @FunctionalInterface
+    public interface RecordImportSource {
+        void writeTo(RecordImportConsumer consumer);
+    }
+
+    @FunctionalInterface
+    public interface RecordImportConsumer {
+        void accept(Map<Long, String> values);
     }
 
     @FunctionalInterface
