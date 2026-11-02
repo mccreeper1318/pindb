@@ -265,7 +265,7 @@ public final class UpdateInstaller {
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
-                "Start-Process -FilePath $env:PINDB_UPDATE_INSTALLER -Verb RunAs");
+                "Start-Process -FilePath $env:PINDB_UPDATE_INSTALLER");
     }
 
     private static Path stageMacInstaller(Path packageFile, String digest) throws Exception {
