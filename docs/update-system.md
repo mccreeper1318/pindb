@@ -2,7 +2,7 @@
 
 PinDB checks the GitHub Releases API for `mccreeper1318/pindb`. Draft releases are ignored. Pre-releases are ignored unless the user enables them in Settings.
 
-Supported tag forms include `0.3`, `v0.3.1`, `v.0.3.1`, and `0.3-beta.3`. Numeric components are compared numerically and pre-release identifiers use semantic-version ordering.
+Supported tag forms include `0.3`, `v0.3.1`, `v.0.3.1`, `0.3.1.1`, and `0.3-beta.3`. Releases may use two to four numeric components; numeric components are compared numerically and pre-release identifiers use semantic-version ordering.
 
 ## Platform and package selection
 

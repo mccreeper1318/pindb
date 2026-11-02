@@ -30,6 +30,8 @@ class ReleaseWorkflowRegressionTest {
         assertTrue(workflow.contains("gh release edit \"$RAW_TAG\" --repo \"$GITHUB_REPOSITORY\" --draft"));
         assertTrue(workflow.contains("RELEASE_ASSET_COUNT"));
         assertTrue(workflow.contains("RELEASE_IS_IMMUTABLE"));
+        assertTrue(workflow.contains("(\\.[0-9]+){0,2}"),
+                "The coordinator must accept four-part hotfix tags such as 0.3.1.1.");
 
         int platformRuns = workflow.indexOf("Require dispatched platform builds to succeed");
         int assetGate = workflow.indexOf("Wait for complete cross-platform release assets");
@@ -50,6 +52,10 @@ class ReleaseWorkflowRegressionTest {
         assertTrue(macos.contains("workflow_dispatch:"));
         assertTrue(windows.contains("run_key:"));
         assertTrue(macos.contains("run_key:"));
+        assertTrue(windows.contains("(\\.\\d+){0,2}"),
+                "Windows releases must accept four-part hotfix tags.");
+        assertTrue(macos.contains("(\\.[0-9]+){0,2}"),
+                "macOS releases must accept four-part hotfix tags.");
         assertTrue(windows.contains("--json databaseId"));
         assertTrue(macos.contains("--json databaseId"));
         assertFalse(windows.contains("releases/tags/$TAG"));

@@ -11,12 +11,15 @@ class VersionTest {
         assertEquals("0.1", Version.parse("v0.1").normalized());
         assertEquals("0.1", Version.parse("v.0.1").normalized());
         assertEquals("1.3.65", Version.parse("1.3.65").normalized());
+        assertEquals("0.3.1.1", Version.parse("0.3.1.1").normalized());
     }
 
     @Test
     void comparesNumericPartsNumerically() {
         assertTrue(Version.parse("0.10").compareTo(Version.parse("0.9")) > 0);
         assertEquals(0, Version.parse("1.2").compareTo(Version.parse("1.2.0")));
+        assertTrue(Version.parse("0.3.1.1").compareTo(Version.parse("0.3.1")) > 0);
+        assertTrue(Version.parse("0.3.1.1").compareTo(Version.parse("0.3.2")) < 0);
     }
 
     @Test

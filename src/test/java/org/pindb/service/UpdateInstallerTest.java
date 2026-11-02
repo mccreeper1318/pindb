@@ -47,6 +47,17 @@ class UpdateInstallerTest {
     }
 
     @Test
+    void windowsInstallerUsesShellLaunchWithoutChangingUserIdentity() {
+        List<String> command = UpdateInstaller.windowsInstallerCommand();
+
+        assertEquals("powershell.exe", command.getFirst());
+        assertTrue(command.contains("-NonInteractive"));
+        assertTrue(command.contains("Start-Process -FilePath $env:PINDB_UPDATE_INSTALLER"));
+        assertFalse(command.stream().anyMatch(value -> value.contains("-Verb RunAs")));
+        assertTrue(command.stream().noneMatch(value -> value.contains("PinDB-0.3.1-windows-x64.exe")));
+    }
+
+    @Test
     void acceptsMacPkgChecksum() throws IOException {
         String checksum = HASH + "  PinDB-0.3-beta.1-macos-arm64.pkg\n";
         assertEquals(HASH, UpdateInstaller.parseExpectedChecksum(
