@@ -71,7 +71,7 @@ jobs:
             TAG_IS_PRERELEASE=false
           fi
 
-          if ! git ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY.git" "refs/tags/$RAW_TAG" >/dev/null 2>&1; then
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RAW_TAG" >/dev/null 2>&1; then
             echo "Release tag does not exist: $RAW_TAG"
             exit 1
           fi
