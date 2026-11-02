@@ -239,8 +239,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PACKAGE="${{ steps.package.outputs.package }}"
-          sudo dpkg -i "$PACKAGE"
+          PACKAGE="$(realpath "${{ steps.package.outputs.package }}")"
+          sudo apt-get install -y "$PACKAGE"
 
           INSTALLED_VERSION="$(dpkg-query -W -f='${Version}' pindb)"
           EXPECTED_VERSION="${{ needs.prepare.outputs.deb_package_version }}"
