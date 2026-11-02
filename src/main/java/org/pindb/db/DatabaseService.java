@@ -45,6 +45,14 @@ public final class DatabaseService implements AutoCloseable {
                                          List<FieldDefinition> fields, DatabaseView defaultView,
                                          int backupLimit) {
         Objects.requireNonNull(path, "path");
+        List<FieldDefinition> validatedFields = new ArrayList<>();
+        int position = 0;
+        for (FieldDefinition definition : Objects.requireNonNull(fields, "fields")) {
+            FieldDefinition copy = Objects.requireNonNull(definition, "field definition").copy();
+            copy.setPosition(position++);
+            FieldDefinitionChangeValidator.validateDefinition(copy);
+            validatedFields.add(copy);
+        }
         try {
             Path parent = path.toAbsolutePath().getParent();
             if (parent != null) {
@@ -66,10 +74,7 @@ public final class DatabaseService implements AutoCloseable {
                 service.setMetaInternal("backup_limit", String.valueOf(Math.max(1, backupLimit)));
                 service.setMetaInternal("print_layout", "COLUMNS");
                 service.setMetaInternal("print_orientation", "LANDSCAPE");
-                int position = 0;
-                for (FieldDefinition definition : fields) {
-                    FieldDefinition copy = definition.copy();
-                    copy.setPosition(position++);
+                for (FieldDefinition copy : validatedFields) {
                     service.insertFieldInternal(copy);
                 }
                 return null;
@@ -263,24 +268,25 @@ public final class DatabaseService implements AutoCloseable {
     public long addRecord(Map<Long, String> values) {
         ensureValidValues(values, null);
         createSnapshot("Before adding entry");
-        return transaction(() -> {
-            LocalDateTime now = LocalDateTime.now();
-            long recordId;
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO records(created_at,updated_at,deleted_at) VALUES(?,?,NULL)",
-                    Statement.RETURN_GENERATED_KEYS)) {
-                statement.setString(1, now.toString());
-                statement.setString(2, now.toString());
-                statement.executeUpdate();
-                try (ResultSet keys = statement.getGeneratedKeys()) {
-                    if (!keys.next()) {
-                        throw new SQLException("SQLite did not return a record ID.");
-                    }
-                    recordId = keys.getLong(1);
+        return transaction(() -> insertRecordInternal(values, fields()));
+    }
+
+    public void importRecords(RecordImportSource source, String snapshotReason) {
+        Objects.requireNonNull(source, "source");
+        List<FieldDefinition> importFields = fields();
+        transaction(() -> {
+            source.writeTo(values -> {
+                Map<Long, String> safeValues = Objects.requireNonNull(values, "values");
+                ensureValidValues(safeValues, null, importFields);
+                try {
+                    insertRecordInternal(safeValues, importFields);
+                } catch (SQLException exception) {
+                    throw new DatabaseException("Could not insert an imported CSV row.", exception);
                 }
-            }
-            writeValues(recordId, values);
-            return recordId;
+            });
+            createSnapshotInternal(Objects.requireNonNullElse(snapshotReason, "CSV import completed"));
+            pruneSnapshotsInternal(info().backupLimit());
+            return null;
         });
     }
 
@@ -357,10 +363,12 @@ public final class DatabaseService implements AutoCloseable {
     }
 
     public FieldDefinition addField(FieldDefinition definition) {
-        createSnapshot("Before adding field " + definition.name());
         return transaction(() -> {
             FieldDefinition copy = definition.copy();
             copy.setPosition(fields().size());
+            FieldDefinitionChangeValidator.validateAddition(connection, copy);
+            createSnapshotInternal("Before adding field " + copy.name());
+            pruneSnapshotsInternal(info().backupLimit());
             long id = insertFieldInternal(copy);
             copy.setId(id);
             return copy;
@@ -368,15 +376,24 @@ public final class DatabaseService implements AutoCloseable {
     }
 
     public void updateField(FieldDefinition definition) {
-        createSnapshot("Before editing field " + definition.name());
         transaction(() -> {
+            FieldDefinition current = fields().stream()
+                    .filter(value -> value.id() == definition.id())
+                    .findFirst()
+                    .orElseThrow(() -> new DatabaseException("The selected field no longer exists."));
+            FieldDefinitionChangeValidator.validateUpdate(connection, current, definition);
+            createSnapshotInternal("Before editing field " + current.name());
+            pruneSnapshotsInternal(info().backupLimit());
             String sql = "UPDATE field_definitions SET name=?,field_type=?,position=?,required=?,default_value=?,"
                     + "min_value=?,max_value=?,unique_value=?,char_limit=?,dropdown_options=?,summary_type=? WHERE id=?";
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 bindField(statement, definition, false);
                 statement.setLong(12, definition.id());
-                statement.executeUpdate();
+                if (statement.executeUpdate() == 0) {
+                    throw new DatabaseException("The selected field no longer exists.");
+                }
             }
+            FieldDefinitionChangeValidator.cleanupAfterUpdate(connection, current, definition);
             return null;
         });
     }
@@ -459,8 +476,13 @@ public final class DatabaseService implements AutoCloseable {
     }
 
     public List<String> validateValues(Map<Long, String> values, Long currentRecordId) {
+        return validateValues(fields(), values, currentRecordId);
+    }
+
+    private List<String> validateValues(List<FieldDefinition> fieldDefinitions,
+                                        Map<Long, String> values, Long currentRecordId) {
         List<String> errors = new ArrayList<>();
-        for (FieldDefinition field : fields()) {
+        for (FieldDefinition field : fieldDefinitions) {
             String raw = Objects.requireNonNullElse(values.get(field.id()), "").trim();
             if (field.required() && raw.isBlank()) {
                 errors.add(field.name() + " is required.");
@@ -502,9 +524,13 @@ public final class DatabaseService implements AutoCloseable {
         return errors;
     }
 
-
     private void ensureValidValues(Map<Long, String> values, Long currentRecordId) {
-        List<String> errors = validateValues(values, currentRecordId);
+        ensureValidValues(values, currentRecordId, fields());
+    }
+
+    private void ensureValidValues(Map<Long, String> values, Long currentRecordId,
+                                   List<FieldDefinition> fieldDefinitions) {
+        List<String> errors = validateValues(fieldDefinitions, values, currentRecordId);
         if (!errors.isEmpty()) {
             throw new DatabaseException(String.join("\n", errors));
         }
@@ -516,6 +542,17 @@ public final class DatabaseService implements AutoCloseable {
             return result.next() && "ok".equalsIgnoreCase(result.getString(1));
         } catch (SQLException exception) {
             throw new DatabaseException("Could not check database integrity.", exception);
+        }
+    }
+
+    public void checkpointWal() {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(TRUNCATE)")) {
+            if (result.next() && result.getInt(1) != 0) {
+                throw new DatabaseException("SQLite could not checkpoint pending WAL data.");
+            }
+        } catch (SQLException exception) {
+            throw new DatabaseException("Could not checkpoint pending SQLite WAL data.", exception);
         }
     }
 
@@ -785,10 +822,36 @@ public final class DatabaseService implements AutoCloseable {
         );
     }
 
+    private long insertRecordInternal(Map<Long, String> values,
+                                      List<FieldDefinition> fieldDefinitions) throws SQLException {
+        LocalDateTime now = LocalDateTime.now();
+        long recordId;
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO records(created_at,updated_at,deleted_at) VALUES(?,?,NULL)",
+                Statement.RETURN_GENERATED_KEYS)) {
+            statement.setString(1, now.toString());
+            statement.setString(2, now.toString());
+            statement.executeUpdate();
+            try (ResultSet keys = statement.getGeneratedKeys()) {
+                if (!keys.next()) {
+                    throw new SQLException("SQLite did not return a record ID.");
+                }
+                recordId = keys.getLong(1);
+            }
+        }
+        writeValues(recordId, values, fieldDefinitions);
+        return recordId;
+    }
+
     private void writeValues(long recordId, Map<Long, String> values) throws SQLException {
+        writeValues(recordId, values, fields());
+    }
+
+    private void writeValues(long recordId, Map<Long, String> values,
+                             List<FieldDefinition> fieldDefinitions) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO record_values(record_id,field_id,value) VALUES(?,?,?)")) {
-            for (FieldDefinition field : fields()) {
+            for (FieldDefinition field : fieldDefinitions) {
                 statement.setLong(1, recordId);
                 statement.setLong(2, field.id());
                 statement.setString(3, Objects.requireNonNullElse(values.get(field.id()), "").trim());
@@ -907,6 +970,16 @@ public final class DatabaseService implements AutoCloseable {
                 connection = null;
             }
         }
+    }
+
+    @FunctionalInterface
+    public interface RecordImportSource {
+        void writeTo(RecordImportConsumer consumer);
+    }
+
+    @FunctionalInterface
+    public interface RecordImportConsumer {
+        void accept(Map<Long, String> values);
     }
 
     @FunctionalInterface

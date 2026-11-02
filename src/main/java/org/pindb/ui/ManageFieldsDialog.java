@@ -18,6 +18,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.pindb.db.DatabaseException;
 import org.pindb.db.DatabaseService;
 import org.pindb.model.FieldDefinition;
 import org.pindb.service.SettingsService;
@@ -62,8 +63,12 @@ public final class ManageFieldsDialog {
         down.disableProperty().bind(edit.disableProperty());
 
         add.setOnAction(event -> new FieldEditorDialog(stage, settings, null).showAndWait().ifPresent(field -> {
-            database.addField(field);
-            changed();
+            try {
+                database.addField(field);
+                changed();
+            } catch (DatabaseException exception) {
+                UiUtil.warning(stage, "Field Could Not Be Added", exception.getMessage());
+            }
         }));
         edit.setOnAction(event -> editSelected());
         list.setOnMouseClicked(event -> {
@@ -96,9 +101,13 @@ public final class ManageFieldsDialog {
             return;
         }
         new FieldEditorDialog(stage, settings, selected).showAndWait().ifPresent(updated -> {
-            database.updateField(updated);
-            changed();
-            list.getSelectionModel().select(updated);
+            try {
+                database.updateField(updated);
+                changed();
+                list.getSelectionModel().select(updated);
+            } catch (DatabaseException exception) {
+                UiUtil.warning(stage, "Field Change Blocked", exception.getMessage());
+            }
         });
     }
 

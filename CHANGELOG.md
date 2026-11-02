@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.1
+
+### Fixed
+- Fixed editing an existing entry from replacing blank dates with today, blank date-times with the current time, blank dropdowns with configured defaults, and blank optional Boolean values with `false` (Issue #37).
+- Added regression coverage to ensure blank editor values remain blank during unrelated edits while configured defaults continue to apply to new entries (Issue #37).
+- Fixed automatic Linux update restarts so every open database is closed and its pending SQLite WAL data is checkpointed before the replacement PinDB process is launched (Issue #38).
+- Fixed database shutdown stopping at the first close failure; shutdown now attempts every resource, aggregates failures, keeps close operations idempotent, and blocks automatic restart when cleanup is not clean (Issue #38).
+- Added defensive application-stop cleanup and regression coverage for aggregated shutdown failures (Issue #38).
+- Fixed automatic updates being offered or started when the selected package has no published SHA-256 checksum asset (Issue #40).
+- Tightened checksum verification so manifests must contain an exact, case-sensitive entry for the downloaded package filename; bare hashes, path-prefixed names, normalized near-matches, and unrelated single entries are rejected (Issue #40).
+- Added regression coverage for checksum-less releases, exact checksum asset matching, aggregate manifests, and malformed or mismatched checksum entries (Issue #40).
+- Fixed field edits so type, required, unique, numeric-limit, character-limit, and dropdown changes are preflighted against every active and Recently Deleted entry before metadata is changed (Issue #41).
+- Added field-definition validation for defaults, numeric minimum/maximum ordering, dropdown membership, and required fields added to databases that already contain entries (Issue #41).
+- Blocked unsafe transitions to or from Document fields when they would create filename-only documents or silently orphan embedded BLOBs, with regression coverage for document and constraint changes (Issue #41).
+- Fixed CSV imports to stream rows instead of retaining the full file in memory and to insert all imported records in one transaction without per-record backup snapshots (Issue #42).
+- CSV imports now build into a temporary database, checkpoint and validate it, then atomically publish the completed `.pindb` so failures never leave a partial destination file (Issue #42).
+- Added duplicate-header rejection plus large-import and mid-import rollback regression coverage for CSV imports (Issue #42).
+- Bounded embedded documents to 50 MiB per file, moved attachment loading/copying and document preview work off the JavaFX thread, and switched document BLOB writes to streams (Issue #43).
+- Reworked PDF previewing to virtualize pages with a five-page cache and render pages lazily, with progress and cancellation for preview/copy/print operations (Issue #43).
+- Fixed the Java/CUPS print fallback pre-rendering every page into memory; fallback pages are now rendered only when requested by the printer, with cancellable progress and multipage regression coverage (Issue #43).
+- Made document Save Copy cancellation safe by writing to a sibling temporary file before replacing the selected destination, and made PDF-source shutdown non-blocking while a page render is still active (Issue #43).
+- Hardened document loading against understated oversized SQLite BLOBs, late-completing cancelled PDF previews, render-lock page-count stalls, and failed external-open temporary copies (Issue #43).
+- Fixed pre-migration safety copies so committed SQLite WAL data is fully checkpointed and verified before the untouched database copy is created (Issue #44).
+- Changed release automation to build against a tag/draft release, run Debian/Fedora install smoke tests, verify all Linux/Windows/macOS packages and checksums, and publish only after the complete asset set succeeds (Issue #45).
+- Fixed failed document-store shutdowns leaving a visible database window with its main database already closed.
+
 ## 0.3
 
 ### Added

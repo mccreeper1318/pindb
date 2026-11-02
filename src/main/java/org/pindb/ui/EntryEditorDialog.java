@@ -1,6 +1,7 @@
 package org.pindb.ui;
 
 import javafx.collections.FXCollections;
+import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -12,6 +13,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
@@ -43,6 +45,7 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
     private final List<FieldDefinition> fields;
     private final Map<Long, ValueEditor> editors = new LinkedHashMap<>();
     private final Map<Long, DocumentData> documents = new LinkedHashMap<>();
+    private final Map<Long, Task<DocumentData>> documentLoads = new LinkedHashMap<>();
     private final Label error = new Label();
 
     public EntryEditorDialog(Window owner, SettingsService settings, List<FieldDefinition> fields, RecordData existing) {
@@ -69,7 +72,7 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             String labelText = field.name() + (field.required() ? " *" : "");
             Label label = new Label(labelText + ":");
             label.setWrapText(true);
-            String value = existing == null ? UiUtil.resolvedDefault(field) : existing.value(field.id());
+            String value = initialValue(field, existing);
             ValueEditor editor = createEditor(field, value);
             editors.put(field.id(), editor);
             grid.add(label, 0, row);
@@ -119,6 +122,43 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             }
         });
         setOnShown(event -> hidePlatformButtonBar(hiddenCancelType));
+        setOnHidden(event -> {
+            documentLoads.values().forEach(task -> task.cancel(true));
+            documentLoads.clear();
+        });
+    }
+
+    static String initialValue(FieldDefinition field, RecordData existing) {
+        return existing == null ? UiUtil.resolvedDefault(field) : existing.value(field.id());
+    }
+
+    static LocalDateTime parseDateTime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(value);
+        } catch (DateTimeParseException exception) {
+            return null;
+        }
+    }
+
+    static Boolean parseBoolean(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return Boolean.parseBoolean(value);
+    }
+
+    static String serializeBoolean(boolean indeterminate, boolean selected) {
+        return indeterminate ? "" : Boolean.toString(selected);
+    }
+
+    static String initialDropdownValue(FieldDefinition field, String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value;
     }
 
     private void hidePlatformButtonBar(ButtonType hiddenCancelType) {
@@ -201,16 +241,9 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
     }
 
     private ValueEditor dateTimeEditor(String value) {
-        LocalDateTime parsed;
-        try {
-            parsed = value == null || value.isBlank()
-                    ? LocalDateTime.now().withSecond(0).withNano(0)
-                    : LocalDateTime.parse(value);
-        } catch (DateTimeParseException exception) {
-            parsed = LocalDateTime.now().withSecond(0).withNano(0);
-        }
-        DatePicker date = new DatePicker(parsed.toLocalDate());
-        TextField time = new TextField(TIME_FORMAT.format(parsed.toLocalTime()));
+        LocalDateTime parsed = parseDateTime(value);
+        DatePicker date = new DatePicker(parsed == null ? null : parsed.toLocalDate());
+        TextField time = new TextField(parsed == null ? "" : TIME_FORMAT.format(parsed.toLocalTime()));
         time.setPromptText("14:30");
         time.setPrefColumnCount(7);
         HBox box = new HBox(8, date, time);
@@ -243,21 +276,28 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
 
     private ValueEditor booleanEditor(String value) {
         CheckBox check = new CheckBox("Yes");
-        check.setSelected(Boolean.parseBoolean(value));
-        return new ValueEditor(check, () -> Boolean.toString(check.isSelected()), () -> "");
+        check.setAllowIndeterminate(true);
+        Boolean parsed = parseBoolean(value);
+        if (parsed == null) {
+            check.setIndeterminate(true);
+        } else {
+            check.setSelected(parsed);
+        }
+        return new ValueEditor(check,
+                () -> serializeBoolean(check.isIndeterminate(), check.isSelected()),
+                () -> "");
     }
 
     private ValueEditor dropdownEditor(FieldDefinition field, String value) {
         ComboBox<String> combo = new ComboBox<>(FXCollections.observableArrayList(field.dropdownOptions()));
         combo.setEditable(false);
         combo.setMaxWidth(Double.MAX_VALUE);
-        if (field.dropdownOptions().contains(value)) {
-            combo.setValue(value);
-        } else if (!value.isBlank()) {
-            combo.getItems().add(value);
-            combo.setValue(value);
-        } else if (!field.defaultValue().isBlank() && field.dropdownOptions().contains(field.defaultValue())) {
-            combo.setValue(field.defaultValue());
+        String initial = initialDropdownValue(field, value);
+        if (initial != null) {
+            if (!combo.getItems().contains(initial)) {
+                combo.getItems().add(initial);
+            }
+            combo.setValue(initial);
         }
         return new ValueEditor(combo, () -> combo.getValue() == null ? "" : combo.getValue(), () -> "");
     }
@@ -271,6 +311,24 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
         Button choose = new Button(existing == null ? "Choose…" : "Replace…");
         Button remove = new Button("Remove");
         remove.setDisable(existing == null);
+        ProgressBar progress = new ProgressBar(0);
+        progress.setPrefWidth(120);
+        progress.setVisible(false);
+        progress.setManaged(false);
+        Button cancelLoad = new Button("Cancel Load");
+        cancelLoad.setVisible(false);
+        cancelLoad.setManaged(false);
+
+        Runnable resetLoadUi = () -> {
+            progress.progressProperty().unbind();
+            progress.setVisible(false);
+            progress.setManaged(false);
+            cancelLoad.setVisible(false);
+            cancelLoad.setManaged(false);
+            choose.setDisable(false);
+            remove.setDisable(!documents.containsKey(field.id()));
+        };
+
         choose.setOnAction(event -> {
             FileChooser chooser = new FileChooser();
             chooser.setTitle("Choose a Document for " + field.name());
@@ -278,34 +336,90 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             if (selected == null) {
                 return;
             }
+
+            String mimeType;
             try {
-                byte[] data = Files.readAllBytes(selected.toPath());
-                String mimeType = Files.probeContentType(selected.toPath());
-                DocumentData document = new DocumentData(selected.getName(), mimeType, data);
-                documents.put(field.id(), document);
-                fileName.setText(document.fileName());
-                choose.setText("Replace…");
-                remove.setDisable(false);
-                error.setText("");
-            } catch (IOException exception) {
-                error.setText("Could not read " + selected.getName() + ": " + exception.getMessage());
+                DocumentData.requireSupportedSize(Files.size(selected.toPath()));
+                mimeType = Files.probeContentType(selected.toPath());
+            } catch (IOException | IllegalArgumentException exception) {
+                error.setText("Could not attach " + selected.getName() + ": " + exception.getMessage());
+                return;
             }
+
+            Task<DocumentData> load = new Task<>() {
+                @Override
+                protected DocumentData call() throws Exception {
+                    return DocumentData.read(selected.toPath(), mimeType,
+                            (completed, total) -> updateProgress(completed, total),
+                            this::isCancelled);
+                }
+            };
+            Task<DocumentData> previous = documentLoads.put(field.id(), load);
+            if (previous != null) {
+                previous.cancel(true);
+            }
+            progress.progressProperty().bind(load.progressProperty());
+            progress.setVisible(true);
+            progress.setManaged(true);
+            cancelLoad.setVisible(true);
+            cancelLoad.setManaged(true);
+            choose.setDisable(true);
+            remove.setDisable(true);
+            fileName.setText("Loading " + selected.getName() + "…");
+            error.setText("");
+
+            load.setOnSucceeded(done -> {
+                if (documentLoads.remove(field.id(), load)) {
+                    DocumentData document = load.getValue();
+                    documents.put(field.id(), document);
+                    fileName.setText(document.fileName());
+                    choose.setText("Replace…");
+                    resetLoadUi.run();
+                    error.setText("");
+                }
+            });
+            load.setOnFailed(done -> {
+                if (documentLoads.remove(field.id(), load)) {
+                    Throwable failure = load.getException();
+                    fileName.setText(documents.containsKey(field.id())
+                            ? documents.get(field.id()).fileName() : "No document selected");
+                    resetLoadUi.run();
+                    error.setText("Could not read " + selected.getName() + ": "
+                            + (failure == null ? "Unknown error" : failure.getMessage()));
+                }
+            });
+            load.setOnCancelled(done -> {
+                if (documentLoads.remove(field.id(), load)) {
+                    fileName.setText(documents.containsKey(field.id())
+                            ? documents.get(field.id()).fileName() : "No document selected");
+                    resetLoadUi.run();
+                    error.setText("Document loading cancelled.");
+                }
+            });
+            cancelLoad.setOnAction(cancel -> load.cancel(true));
+            Thread.ofVirtual().name("pindb-document-load").start(load);
         });
+
         remove.setOnAction(event -> {
+            Task<DocumentData> load = documentLoads.remove(field.id());
+            if (load != null) {
+                load.cancel(true);
+            }
             documents.remove(field.id());
             fileName.setText("No document selected");
             choose.setText("Choose…");
-            remove.setDisable(true);
+            resetLoadUi.run();
         });
 
-        HBox box = new HBox(10, fileName, choose, remove);
+        HBox box = new HBox(10, fileName, progress, cancelLoad, choose, remove);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setMaxWidth(Double.MAX_VALUE);
         return new ValueEditor(box,
                 () -> {
                     DocumentData document = documents.get(field.id());
                     return document == null ? "" : document.fileName();
-                }, () -> "");
+                }, () -> documentLoads.containsKey(field.id())
+                ? "Wait for the selected document to finish loading or cancel it." : "");
     }
 
     private String validateEditors() {

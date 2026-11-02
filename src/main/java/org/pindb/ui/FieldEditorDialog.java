@@ -19,6 +19,7 @@ import org.pindb.model.FieldType;
 import org.pindb.model.SummaryType;
 import org.pindb.service.SettingsService;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
@@ -162,11 +163,10 @@ public final class FieldEditorDialog extends Dialog<FieldDefinition> {
         }
         if (type.getValue().isNumeric()) {
             try {
-                if (!minimum.getText().isBlank()) {
-                    new java.math.BigDecimal(minimum.getText().trim());
-                }
-                if (!maximum.getText().isBlank()) {
-                    new java.math.BigDecimal(maximum.getText().trim());
+                BigDecimal min = minimum.getText().isBlank() ? null : new BigDecimal(minimum.getText().trim());
+                BigDecimal max = maximum.getText().isBlank() ? null : new BigDecimal(maximum.getText().trim());
+                if (min != null && max != null && min.compareTo(max) > 0) {
+                    return "Minimum cannot be greater than maximum.";
                 }
             } catch (NumberFormatException exception) {
                 return "Minimum and maximum values must be valid numbers.";
@@ -181,19 +181,29 @@ public final class FieldEditorDialog extends Dialog<FieldDefinition> {
 
     private FieldDefinition buildResult() {
         FieldDefinition result = original.copy();
+        FieldType selectedType = type.getValue();
+        boolean numeric = selectedType.isNumeric();
+        boolean text = selectedType == FieldType.TEXT || selectedType == FieldType.MULTILINE_TEXT;
+        boolean dropdown = selectedType == FieldType.DROPDOWN;
+        boolean document = selectedType == FieldType.DOCUMENT;
+        boolean date = selectedType == FieldType.DATE || selectedType == FieldType.DATE_TIME;
+
         result.setName(name.getText());
-        result.setType(type.getValue());
+        result.setType(selectedType);
         result.setRequired(required.isSelected());
-        result.setDefaultValue(type.getValue() == FieldType.DOCUMENT ? ""
-                : useCurrentDate.isSelected()
-                ? (type.getValue() == FieldType.DATE ? "${TODAY}" : "${NOW}")
+        result.setDefaultValue(document ? ""
+                : date && useCurrentDate.isSelected()
+                ? (selectedType == FieldType.DATE ? "${TODAY}" : "${NOW}")
                 : defaultValue.getText().trim());
-        result.setMinValue(minimum.getText().trim());
-        result.setMaxValue(maximum.getText().trim());
-        result.setUniqueValue(unique.isSelected());
-        result.setCharacterLimit(characterLimit.getValue() == 0 ? null : characterLimit.getValue());
-        result.setDropdownOptions(dropdownOptions.getText().lines().map(String::trim).filter(value -> !value.isBlank()).toList());
-        result.setSummaryType(summary.getValue() == null ? SummaryType.NONE : summary.getValue());
+        result.setMinValue(numeric ? minimum.getText().trim() : "");
+        result.setMaxValue(numeric ? maximum.getText().trim() : "");
+        result.setUniqueValue(!document && unique.isSelected());
+        result.setCharacterLimit(text && characterLimit.getValue() > 0 ? characterLimit.getValue() : null);
+        result.setDropdownOptions(dropdown
+                ? dropdownOptions.getText().lines().map(String::trim).filter(value -> !value.isBlank()).toList()
+                : List.of());
+        result.setSummaryType(selectedType.supportsSummary() && summary.getValue() != null
+                ? summary.getValue() : SummaryType.NONE);
         return result;
     }
 }

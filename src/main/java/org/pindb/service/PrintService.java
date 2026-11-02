@@ -1,5 +1,7 @@
 package org.pindb.service;
 
+import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -9,7 +11,9 @@ import javafx.print.Printer;
 import javafx.print.PrinterJob;
 import javafx.scene.Node;
 import javafx.scene.SnapshotParameters;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
@@ -20,6 +24,9 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.transform.Scale;
+import javafx.scene.Scene;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.pindb.model.DatabaseInfo;
 import org.pindb.model.FieldDefinition;
@@ -48,6 +55,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class PrintService {
     private static final DateTimeFormatter PRINT_DATE = DateTimeFormatter.ofPattern("MMM d, uuuu h:mm a");
@@ -130,14 +140,35 @@ public final class PrintService {
             pageFormat = awtJob.validatePage(pageFormat);
             PrintArea area = new PrintArea(pageFormat.getImageableWidth(), pageFormat.getImageableHeight());
             List<Node> pages = printablePages(info, allFields, records, options, area);
-            List<BufferedImage> renderedPages = pages.stream().map(PrintService::renderFallbackPage).toList();
+            OnDemandPageSource<Node, BufferedImage> renderedPages =
+                    new OnDemandPageSource<>(pages, PrintService::renderFallbackPageOnFxThread);
             PageFormat finalPageFormat = pageFormat;
 
+            Stage progressStage = new Stage();
+            progressStage.initOwner(owner);
+            progressStage.initModality(Modality.WINDOW_MODAL);
+            progressStage.setTitle("Printing " + info.name());
+            Label status = new Label("Preparing print job…");
+            ProgressBar progress = new ProgressBar(0);
+            progress.setPrefWidth(320);
+            Button cancel = new Button("Cancel");
+            VBox progressBox = new VBox(12, status, progress, cancel);
+            progressBox.setPadding(new Insets(18));
+            progressBox.setAlignment(Pos.CENTER);
+            progressStage.setScene(new Scene(progressBox));
+            progressStage.setResizable(false);
+
+            AtomicBoolean cancelled = new AtomicBoolean();
+            AtomicBoolean completed = new AtomicBoolean();
+            AtomicReference<Throwable> failure = new AtomicReference<>();
             awtJob.setPrintable((graphics, format, pageIndex) -> {
+                if (cancelled.get()) {
+                    return Printable.NO_SUCH_PAGE;
+                }
                 if (pageIndex < 0 || pageIndex >= renderedPages.size()) {
                     return Printable.NO_SUCH_PAGE;
                 }
-                BufferedImage image = renderedPages.get(pageIndex);
+                BufferedImage image = renderedPages.render(pageIndex);
                 Graphics2D graphics2D = (Graphics2D) graphics.create();
                 try {
                     graphics2D.translate(finalPageFormat.getImageableX(), finalPageFormat.getImageableY());
@@ -149,16 +180,83 @@ public final class PrintService {
                 } finally {
                     graphics2D.dispose();
                 }
+                int completedPages = pageIndex + 1;
+                Platform.runLater(() -> {
+                    status.setText("Printing page " + completedPages + " of " + renderedPages.size() + "…");
+                    progress.setProgress(completedPages / (double) renderedPages.size());
+                });
                 return Printable.PAGE_EXISTS;
             }, finalPageFormat);
 
-            awtJob.print();
-            return true;
+            Task<Void> printTask = new Task<>() {
+                @Override
+                protected Void call() throws Exception {
+                    awtJob.print();
+                    return null;
+                }
+            };
+            printTask.setOnSucceeded(event -> {
+                completed.set(true);
+                progressStage.close();
+            });
+            printTask.setOnFailed(event -> {
+                failure.set(printTask.getException());
+                progressStage.close();
+            });
+            printTask.setOnCancelled(event -> progressStage.close());
+            cancel.setOnAction(event -> {
+                cancelled.set(true);
+                awtJob.cancel();
+                printTask.cancel(true);
+            });
+            progressStage.setOnCloseRequest(event -> {
+                event.consume();
+                cancel.fire();
+            });
+
+            Thread.ofVirtual().name("pindb-print-fallback").start(printTask);
+            progressStage.showAndWait();
+
+            if (failure.get() != null) {
+                UiUtil.error(owner, "Printing Failed",
+                        "The system printer was detected, but PinDB could not submit the print job.", failure.get());
+                return false;
+            }
+            return completed.get() && !cancelled.get();
         } catch (PrinterException | RuntimeException exception) {
             UiUtil.error(owner, "Printing Failed",
                     "The system printer was detected, but PinDB could not submit the print job.", exception);
             return false;
         }
+    }
+
+    private static BufferedImage renderFallbackPageOnFxThread(Node page) {
+        if (Platform.isFxApplicationThread()) {
+            return renderFallbackPage(page);
+        }
+
+        CountDownLatch ready = new CountDownLatch(1);
+        AtomicReference<BufferedImage> image = new AtomicReference<>();
+        AtomicReference<RuntimeException> failure = new AtomicReference<>();
+        Platform.runLater(() -> {
+            try {
+                image.set(renderFallbackPage(page));
+            } catch (RuntimeException exception) {
+                failure.set(exception);
+            } finally {
+                ready.countDown();
+            }
+        });
+        try {
+            ready.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Printing was interrupted while rendering a page.", exception);
+        }
+        if (failure.get() != null) {
+            throw failure.get();
+        }
+        return image.get();
     }
 
     private static BufferedImage renderFallbackPage(Node page) {

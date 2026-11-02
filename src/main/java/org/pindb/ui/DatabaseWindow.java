@@ -65,7 +65,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public final class DatabaseWindow {
+public final class DatabaseWindow implements AutoCloseable {
     private static final DateTimeFormatter MODIFIED_FORMAT = DateTimeFormatter.ofPattern("MMM d, uuuu h:mm a");
 
     private final AppContext context;
@@ -157,15 +157,32 @@ public final class DatabaseWindow {
         UiUtil.applyStyles(scene, context.settings());
     }
 
+    @Override
     public void close() {
         if (closed) {
             return;
         }
-        closed = true;
-        documentStore.close();
-        database.close();
-        stage.hide();
-        onClosed.run();
+
+        closeWindowResources(documentStore::close, database::close, () -> {
+            closed = true;
+            stage.hide();
+            onClosed.run();
+        });
+    }
+
+    static void closeWindowResources(Runnable documentClose, Runnable databaseClose, Runnable teardown) {
+        // A document-store close can fail while checkpointing SQLite WAL data.
+        // Keep the main database and window open in that case so the user can
+        // continue working or retry the close later.
+        documentClose.run();
+
+        try {
+            databaseClose.run();
+        } finally {
+            // DatabaseService.close() makes its connection unusable even when it
+            // reports a close failure, so always finish removing this window.
+            teardown.run();
+        }
     }
 
     private InWindowMenuBar menuBar() {

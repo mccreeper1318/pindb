@@ -1,16 +1,16 @@
 name: Build macOS Release
 
-run-name: Build PinDB ${{ github.event.release.tag_name || inputs.tag }} for macOS
+run-name: Build PinDB ${{ inputs.tag }} for macOS [${{ inputs.run_key }}]
 
 on:
-  release:
-    types:
-      - published
-
   workflow_dispatch:
     inputs:
       tag:
         description: Existing GitHub release tag to build
+        required: true
+        type: string
+      run_key:
+        description: Coordinator run key used to correlate this build
         required: true
         type: string
 
@@ -18,11 +18,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: pindb-macos-release-${{ github.event.release.tag_name || inputs.tag }}
+  group: pindb-macos-release-${{ inputs.tag }}
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:
   prepare:
@@ -226,7 +226,10 @@ jobs:
           TAG="${{ needs.prepare.outputs.tag }}"
           VERSION="${{ needs.prepare.outputs.version }}"
           RELEASE_ID="$(
-            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.id'
+            gh release view "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json databaseId \
+              --jq '.databaseId'
           )"
           RUN_KEY="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           STAGE_DIR="$(mktemp -d)"

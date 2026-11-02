@@ -69,7 +69,7 @@ public final class UpdateService {
             String tag = MiniJson.string(release.get("tag_name"));
             Version version = Version.parse(tag);
             List<Map<String, Object>> assets = MiniJson.array(release.get("assets")).stream().map(MiniJson::object).toList();
-            Optional<ReleasePackage> releasePackage = selectPackage(assets, packageType.get(), architecture);
+            Optional<ReleasePackage> releasePackage = selectInstallablePackage(assets, packageType.get(), architecture);
             if (releasePackage.isEmpty()) return Optional.empty();
             String releaseName = MiniJson.string(release.get("name"));
             return Optional.of(new ReleaseInfo(tag, version, releaseName.isBlank() ? "PinDB " + tag : releaseName,
@@ -94,15 +94,41 @@ public final class UpdateService {
         };
     }
 
+    static Optional<ReleasePackage> selectInstallablePackage(List<Map<String, Object>> assets,
+                                                              NativePackageType packageType,
+                                                              SystemArchitecture architecture) {
+        List<ReleasePackage> candidates = packageCandidates(assets, packageType).stream()
+                .filter(releasePackage -> releasePackage.checksumUri() != null)
+                .toList();
+        return selectCandidate(candidates, packageType, architecture);
+    }
+
     static Optional<ReleasePackage> selectPackage(List<Map<String, Object>> assets, NativePackageType packageType,
                                                    SystemArchitecture architecture) {
-        List<ReleasePackage> candidates = assets.stream().map(asset -> toPackage(asset, assets, packageType)).flatMap(Optional::stream).toList();
+        return selectCandidate(packageCandidates(assets, packageType), packageType, architecture);
+    }
+
+    private static List<ReleasePackage> packageCandidates(List<Map<String, Object>> assets,
+                                                          NativePackageType packageType) {
+        return assets.stream()
+                .map(asset -> toPackage(asset, assets, packageType))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    private static Optional<ReleasePackage> selectCandidate(List<ReleasePackage> candidates,
+                                                            NativePackageType packageType,
+                                                            SystemArchitecture architecture) {
         if (architecture == SystemArchitecture.UNKNOWN) {
             return packageType == NativePackageType.MACOS_PKG ? Optional.empty() : candidates.stream().findFirst();
         }
-        Optional<ReleasePackage> exact = candidates.stream().filter(candidate -> candidate.architecture() == architecture).findFirst();
+        Optional<ReleasePackage> exact = candidates.stream()
+                .filter(candidate -> candidate.architecture() == architecture)
+                .findFirst();
         if (exact.isPresent() || packageType == NativePackageType.MACOS_PKG) return exact;
-        return candidates.stream().filter(candidate -> candidate.architecture() == SystemArchitecture.UNKNOWN).findFirst();
+        return candidates.stream()
+                .filter(candidate -> candidate.architecture() == SystemArchitecture.UNKNOWN)
+                .findFirst();
     }
 
     private static Optional<ReleasePackage> toPackage(Map<String, Object> asset, List<Map<String, Object>> allAssets,
@@ -127,9 +153,9 @@ public final class UpdateService {
 
     private static Optional<Map<String, Object>> findChecksum(List<Map<String, Object>> assets, String packageName,
                                                                NativePackageType packageType) {
-        String expected = (packageName + ".sha256").toLowerCase(Locale.ROOT);
+        String expected = packageName + ".sha256";
         Optional<Map<String, Object>> exact = assets.stream()
-                .filter(asset -> MiniJson.string(asset.get("name")).toLowerCase(Locale.ROOT).equals(expected))
+                .filter(asset -> MiniJson.string(asset.get("name")).equals(expected))
                 .findFirst();
         if (exact.isPresent()) return exact;
 
@@ -139,12 +165,12 @@ public final class UpdateService {
             case MACOS_PKG -> "checksums-macos.sha256";
         };
         Optional<Map<String, Object>> platformChecksum = assets.stream()
-                .filter(asset -> MiniJson.string(asset.get("name")).equalsIgnoreCase(platformAggregate))
+                .filter(asset -> MiniJson.string(asset.get("name")).equals(platformAggregate))
                 .findFirst();
         if (platformChecksum.isPresent()) return platformChecksum;
 
         return assets.stream()
-                .filter(asset -> MiniJson.string(asset.get("name")).equalsIgnoreCase("checksums.sha256"))
+                .filter(asset -> MiniJson.string(asset.get("name")).equals("checksums.sha256"))
                 .findFirst();
     }
 

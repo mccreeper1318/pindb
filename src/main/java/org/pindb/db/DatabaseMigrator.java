@@ -69,6 +69,7 @@ public final class DatabaseMigrator {
                         + "Database schema " + version + " is newer than supported schema " + CURRENT_SCHEMA_VERSION + ".");
             }
             if (version < CURRENT_SCHEMA_VERSION) {
+                checkpointWalBeforeMigration(connection);
                 Path untouchedBackup = migrationBackupPath(path);
                 Files.copy(path, untouchedBackup, StandardCopyOption.COPY_ATTRIBUTES);
                 migrate(connection, version);
@@ -118,6 +119,23 @@ public final class DatabaseMigrator {
                 "SELECT value FROM pindb_meta WHERE key='schema_version'")) {
             try (ResultSet result = statement.executeQuery()) {
                 return result.next() ? result.getString(1) : null;
+            }
+        }
+    }
+
+    private static void checkpointWalBeforeMigration(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(FULL)")) {
+            if (!result.next()) {
+                throw new DatabaseException("SQLite did not return a WAL checkpoint result before migration.");
+            }
+
+            int busy = result.getInt(1);
+            int logFrames = result.getInt(2);
+            int checkpointedFrames = result.getInt(3);
+            if (busy != 0 || checkpointedFrames != logFrames) {
+                throw new DatabaseException("PinDB could not fully checkpoint committed WAL data before migration. "
+                        + "The database was not migrated and no pre-migration safety copy was created.");
             }
         }
     }

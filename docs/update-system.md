@@ -15,9 +15,9 @@ Supported tag forms include `0.3`, `v0.3.1`, `v.0.3.1`, and `0.3-beta.3`. Numeri
 - Mac packages with the wrong architecture, unknown architecture, or no canonical architecture suffix are rejected rather than used as a fallback.
 - Package assets must include `pindb` in the filename and match the platform/package rules.
 
-Automatic installation requires a published SHA-256 checksum. Selection prefers the exact `<package>.sha256` asset. If an exact checksum is not present, PinDB can use the matching platform aggregate (`checksums-linux.sha256`, `checksums-windows.sha256`, or `checksums-macos.sha256`) and finally the generic `checksums.sha256`. It never substitutes another platform's aggregate checksum file.
+Automatic installation requires a published SHA-256 checksum. Selection prefers the exact, case-sensitive `<package>.sha256` asset. If an exact checksum is not present, PinDB can use the matching platform aggregate (`checksums-linux.sha256`, `checksums-windows.sha256`, or `checksums-macos.sha256`) and finally the generic `checksums.sha256`. It never substitutes another platform's aggregate checksum file. Regardless of which checksum asset is used, its contents must include an exact, case-sensitive filename entry for the selected package. Bare hashes, path-prefixed names, case-normalized names, and unrelated single entries are rejected.
 
-Linux distribution classification reads `/etc/os-release`, with `/usr/lib/os-release` as a fallback. Windows and macOS are detected from the Java operating-system property. A release without a matching package for the detected platform and architecture is not offered as an installable update.
+Linux distribution classification reads `/etc/os-release`, with `/usr/lib/os-release` as a fallback. Windows and macOS are detected from the Java operating-system property. A release without a matching package and published checksum for the detected platform and architecture is not offered as an installable update.
 
 ## Native data and cache paths
 
