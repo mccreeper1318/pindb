@@ -163,19 +163,25 @@ public final class DatabaseWindow implements AutoCloseable {
             return;
         }
 
-        // A document-store close can fail while checkpointing SQLite WAL data.
-        // Keep the main database and window open in that case so the user can
-        // continue working or retry the close later.
-        documentStore.close();
-
-        try {
-            database.close();
-        } finally {
-            // DatabaseService.close() makes its connection unusable even when it
-            // reports a close failure, so always finish removing this window.
+        closeWindowResources(documentStore::close, database::close, () -> {
             closed = true;
             stage.hide();
             onClosed.run();
+        });
+    }
+
+    static void closeWindowResources(Runnable documentClose, Runnable databaseClose, Runnable teardown) {
+        // A document-store close can fail while checkpointing SQLite WAL data.
+        // Keep the main database and window open in that case so the user can
+        // continue working or retry the close later.
+        documentClose.run();
+
+        try {
+            databaseClose.run();
+        } finally {
+            // DatabaseService.close() makes its connection unusable even when it
+            // reports a close failure, so always finish removing this window.
+            teardown.run();
         }
     }
 
