@@ -215,13 +215,13 @@ jobs:
 
           gh workflow run windows-release.yml \
             --repo "$GITHUB_REPOSITORY" \
-            --ref "$RELEASE_TAG" \
+            --ref "$GITHUB_REF_NAME" \
             -f tag="$RELEASE_TAG" \
             -f run_key="$RUN_KEY"
 
           gh workflow run macos-release.yml \
             --repo "$GITHUB_REPOSITORY" \
-            --ref "$RELEASE_TAG" \
+            --ref "$GITHUB_REF_NAME" \
             -f tag="$RELEASE_TAG" \
             -f run_key="$RUN_KEY"
 
