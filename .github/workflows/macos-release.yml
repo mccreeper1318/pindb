@@ -1,12 +1,16 @@
 name: Build macOS Release
 
-run-name: Build PinDB ${{ inputs.tag }} for macOS
+run-name: Build PinDB ${{ inputs.tag }} for macOS [${{ inputs.run_key }}]
 
 on:
   workflow_dispatch:
     inputs:
       tag:
         description: Existing GitHub release tag to build
+        required: true
+        type: string
+      run_key:
+        description: Coordinator run key used to correlate this build
         required: true
         type: string
 
@@ -222,7 +226,10 @@ jobs:
           TAG="${{ needs.prepare.outputs.tag }}"
           VERSION="${{ needs.prepare.outputs.version }}"
           RELEASE_ID="$(
-            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.id'
+            gh release view "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json databaseId \
+              --jq '.databaseId'
           )"
           RUN_KEY="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           STAGE_DIR="$(mktemp -d)"
