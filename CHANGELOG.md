@@ -24,6 +24,7 @@
 - Hardened document loading against understated oversized SQLite BLOBs, late-completing cancelled PDF previews, render-lock page-count stalls, and failed external-open temporary copies (Issue #43).
 - Fixed pre-migration safety copies so committed SQLite WAL data is fully checkpointed and verified before the untouched database copy is created (Issue #44).
 - Changed release automation to build against a tag/draft release, run Debian/Fedora install smoke tests, verify all Linux/Windows/macOS packages and checksums, and publish only after the complete asset set succeeds (Issue #45).
+- Fixed failed document-store shutdowns leaving a visible database window with its main database already closed.
 
 ## 0.3
 
