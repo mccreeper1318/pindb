@@ -17,6 +17,30 @@ def updaterLauncherProperties = layout.buildDirectory.file('jpackage/pindb-updat
 def debAppRelease = prereleasePart == null ? '1' : "0~${prereleasePart.replace('-', '.')}"
 def rpmAppRelease = prereleasePart == null ? '1' : "0.${prereleasePart.replaceAll(/[^0-9A-Za-z.]+/, '.')}"
 
+def nativeThreePartVersion = { String numericVersion ->
+    def numericParts = numericVersion.tokenize('.')
+    if (numericParts.size() < 2 || numericParts.size() > 4 || numericParts.any { !(it ==~ /\d+/) }) {
+        throw new GradleException("Native package metadata requires two to four numeric version components; got ${numericVersion}")
+    }
+
+    int major = Integer.parseInt(numericParts[0])
+    int minor = Integer.parseInt(numericParts[1])
+    int patch = numericParts.size() >= 3 ? Integer.parseInt(numericParts[2]) : 0
+    int hotfix = numericParts.size() == 4 ? Integer.parseInt(numericParts[3]) : 0
+
+    if (hotfix > 99) {
+        throw new GradleException("The fourth hotfix component must be between 0 and 99; got ${hotfix}")
+    }
+
+    long build = (patch * 100L) + hotfix
+    if (major > 255 || minor > 255 || build > 65535) {
+        throw new GradleException("Version ${numericVersion} cannot be represented safely in native three-part package metadata.")
+    }
+    return "${major}.${minor}.${build}"
+}
+
+def windowsPackageAppVersion = { nativeThreePartVersion(packageAppVersion) }
+
 def javafxVersion = '25.0.3'
 def sqliteVersion = '3.53.2.1'
 def slf4jVersion = '2.0.17'
@@ -34,12 +58,9 @@ def macIconFile = layout.buildDirectory.file('jpackage/macos/PinDB.icns')
 def macDocumentIconFile = layout.buildDirectory.file('jpackage/macos/PinDBDocument.icns')
 def macAssociationsFile = layout.buildDirectory.file('jpackage/macos/pindb-file-associations.properties')
 def macPackageAppVersion = {
-    def numericParts = packageAppVersion.tokenize('.')
-    if (numericParts.isEmpty() || numericParts.size() > 3 || numericParts.any { !(it ==~ /\d+/) }) {
-        throw new GradleException("macOS package metadata requires one to three numeric version components; got ${packageAppVersion}")
-    }
-    int adjustedMajor = Integer.parseInt(numericParts[0]) + 1
-    return ([adjustedMajor.toString()] + numericParts.drop(1)).join('.')
+    def nativeParts = nativeThreePartVersion(packageAppVersion).tokenize('.')
+    int adjustedMajor = Integer.parseInt(nativeParts[0]) + 1
+    return ([adjustedMajor.toString()] + nativeParts.drop(1)).join('.')
 }
 
 repositories { mavenCentral() }
@@ -77,7 +98,24 @@ processResources {
     from('CHANGELOG.md') { into 'org/pindb/app' }
 }
 
-test { useJUnitPlatform(); finalizedBy jacocoTestReport }
+tasks.register('verifyNativePackageVersionMapping') {
+    group = 'verification'
+    description = 'Verifies four-part PinDB versions map monotonically into native three-part package versions.'
+    doLast {
+        if (nativeThreePartVersion('0.3.1.1') != '0.3.101') {
+            throw new GradleException('0.3.1.1 must map to native package version 0.3.101.')
+        }
+        if (nativeThreePartVersion('0.3.2') != '0.3.200') {
+            throw new GradleException('0.3.2 must map above the 0.3.1.x hotfix range.')
+        }
+    }
+}
+
+test {
+    useJUnitPlatform()
+    dependsOn tasks.named('verifyNativePackageVersionMapping')
+    finalizedBy jacocoTestReport
+}
 jacocoTestReport { reports { xml.required = true; html.required = true } }
 
 def preparePackageDirectory = { File packagesDir, String extension ->
@@ -134,7 +172,7 @@ tasks.register('packageWindows', org.gradle.api.tasks.Exec) {
         }
         preparePackageDirectory(packagesDir, '.exe')
     }
-    commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', packageAppVersion, '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--win-menu', '--win-menu-group', 'PinDB', '--win-dir-chooser', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
+    commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', windowsPackageAppVersion(), '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--win-menu', '--win-menu-group', 'PinDB', '--win-dir-chooser', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
 }
 
 tasks.register('prepareMacResources', org.gradle.api.tasks.Exec) {
@@ -213,6 +251,6 @@ tasks.register('verifyReleaseTag') {
     group = 'verification'; description = 'Validates PinDB release tag formats such as 0.1, v0.1, v.0.1 and 0.2-beta.1.'
     doLast {
         def tag = providers.gradleProperty('releaseTag').orNull
-        if (tag == null || !(tag ==~ /^(?:v\.?)?\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?$/)) throw new GradleException("Invalid PinDB release tag: ${tag}")
+        if (tag == null || !(tag ==~ /^(?:v\.?)?\d+\.\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?$/)) throw new GradleException("Invalid PinDB release tag: ${tag}")
     }
 }

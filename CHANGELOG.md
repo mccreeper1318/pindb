@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1.1
+
+### Fixed
+- Fixed Windows automatic updates failing to launch the verified per-user installer.
+
+### Changed
+- Added four-part hotfix version support for releases such as `0.3.1.1`.
+
 ## 0.3.1
 
 ### Fixed
