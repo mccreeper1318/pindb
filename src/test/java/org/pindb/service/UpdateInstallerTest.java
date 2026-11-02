@@ -47,12 +47,13 @@ class UpdateInstallerTest {
     }
 
     @Test
-    void windowsInstallerUsesNativeElevationWithoutEmbeddingPackagePath() {
+    void windowsInstallerUsesShellLaunchWithoutChangingUserIdentity() {
         List<String> command = UpdateInstaller.windowsInstallerCommand();
 
         assertEquals("powershell.exe", command.getFirst());
         assertTrue(command.contains("-NonInteractive"));
-        assertTrue(command.contains("Start-Process -FilePath $env:PINDB_UPDATE_INSTALLER -Verb RunAs"));
+        assertTrue(command.contains("Start-Process -FilePath $env:PINDB_UPDATE_INSTALLER"));
+        assertFalse(command.stream().anyMatch(value -> value.contains("-Verb RunAs")));
         assertTrue(command.stream().noneMatch(value -> value.contains("PinDB-0.3.1-windows-x64.exe")));
     }
 
