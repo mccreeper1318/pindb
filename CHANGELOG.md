@@ -22,6 +22,7 @@
 - Fixed the Java/CUPS print fallback pre-rendering every page into memory; fallback pages are now rendered only when requested by the printer, with cancellable progress and multipage regression coverage (Issue #43).
 - Made document Save Copy cancellation safe by writing to a sibling temporary file before replacing the selected destination, and made PDF-source shutdown non-blocking while a page render is still active (Issue #43).
 - Hardened document loading against understated oversized SQLite BLOBs, late-completing cancelled PDF previews, render-lock page-count stalls, and failed external-open temporary copies (Issue #43).
+- Fixed pre-migration safety copies so committed SQLite WAL data is fully checkpointed and verified before the untouched database copy is created (Issue #44).
 
 ## 0.3
 
