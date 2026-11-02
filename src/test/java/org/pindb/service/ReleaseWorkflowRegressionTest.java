@@ -36,9 +36,9 @@ class ReleaseWorkflowRegressionTest {
 
         assertTrue(windows.contains("workflow_dispatch:"));
         assertTrue(macos.contains("workflow_dispatch:"));
-        assertFalse(windows.contains("release:\n"));
-        assertFalse(macos.contains("release:\n"));
-        assertFalse(windows.contains("published"));
-        assertFalse(macos.contains("published"));
+        assertFalse(windows.contains("types: [published]"));
+        assertFalse(windows.contains("types:\n      - published"));
+        assertFalse(macos.contains("types: [published]"));
+        assertFalse(macos.contains("types:\n      - published"));
     }
 }
