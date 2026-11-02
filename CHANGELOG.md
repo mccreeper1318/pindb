@@ -1,9 +1,12 @@
 # Changelog
 
-## 0.3.2
+## 0.3.1.1
 
 ### Fixed
-- Fixed Windows automatic updates failing to start installers that require administrator approval.
+- Fixed Windows automatic updates failing to launch the verified per-user installer.
+
+### Changed
+- Added four-part hotfix version support for releases such as `0.3.1.1`.
 
 ## 0.3.1
 
