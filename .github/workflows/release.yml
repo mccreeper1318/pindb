@@ -39,6 +39,9 @@ jobs:
       deb_package_version: ${{ steps.version.outputs.deb_package_version }}
       rpm_package_version: ${{ steps.version.outputs.rpm_package_version }}
       tag_is_prerelease: ${{ steps.version.outputs.tag_is_prerelease }}
+      run_key: ${{ steps.dispatch.outputs.run_key }}
+      windows_run_id: ${{ steps.dispatch.outputs.windows_run_id }}
+      macos_run_id: ${{ steps.dispatch.outputs.macos_run_id }}
 
     steps:
       - name: Read and validate version
@@ -144,17 +147,60 @@ jobs:
           echo "RPM version: ${BASE_VERSION}-${RPM_RELEASE}"
 
       - name: Start Windows and macOS package builds
+        id: dispatch
         shell: bash
         run: |
           set -euo pipefail
+          RUN_KEY="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          find_dispatched_run() {
+            local workflow="$1"
+            local key="$2"
+            local run_id=""
+
+            for attempt in {1..20}; do
+              run_id="$(
+                gh run list \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --workflow "$workflow" \
+                  --event workflow_dispatch \
+                  --limit 30 \
+                  --json databaseId,displayTitle \
+                  --jq ".[] | select(.displayTitle | contains(\"[$key]\")) | .databaseId" \
+                  | head -n 1
+              )"
+              if [[ -n "$run_id" ]]; then
+                printf '%s' "$run_id"
+                return 0
+              fi
+              sleep 3
+            done
+
+            echo "Could not resolve dispatched run for $workflow and run key $key." >&2
+            return 1
+          }
+
           gh workflow run windows-release.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref "$RELEASE_TAG" \
-            -f tag="$RELEASE_TAG"
+            -f tag="$RELEASE_TAG" \
+            -f run_key="$RUN_KEY"
+
           gh workflow run macos-release.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref "$RELEASE_TAG" \
-            -f tag="$RELEASE_TAG"
+            -f tag="$RELEASE_TAG" \
+            -f run_key="$RUN_KEY"
+
+          WINDOWS_RUN_ID="$(find_dispatched_run windows-release.yml "$RUN_KEY")"
+          MACOS_RUN_ID="$(find_dispatched_run macos-release.yml "$RUN_KEY")"
+
+          echo "run_key=$RUN_KEY" >> "$GITHUB_OUTPUT"
+          echo "windows_run_id=$WINDOWS_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "macos_run_id=$MACOS_RUN_ID" >> "$GITHUB_OUTPUT"
+
+          echo "Windows release run: $WINDOWS_RUN_ID"
+          echo "macOS release run: $MACOS_RUN_ID"
 
   build-deb:
     name: Build Debian package
@@ -460,6 +506,48 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             "${FILES[@]}" \
             --clobber
+
+      - name: Require dispatched platform builds to succeed
+        shell: bash
+        run: |
+          set -euo pipefail
+          WINDOWS_RUN_ID="${{ needs.prepare.outputs.windows_run_id }}"
+          MACOS_RUN_ID="${{ needs.prepare.outputs.macos_run_id }}"
+
+          if [[ -z "$WINDOWS_RUN_ID" || -z "$MACOS_RUN_ID" ]]; then
+            echo "The coordinator did not capture both dispatched platform run IDs."
+            exit 1
+          fi
+
+          echo "Waiting for Windows release run $WINDOWS_RUN_ID..."
+          gh run watch "$WINDOWS_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --exit-status
+
+          echo "Waiting for macOS release run $MACOS_RUN_ID..."
+          gh run watch "$MACOS_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --exit-status
+
+          WINDOWS_CONCLUSION="$(
+            gh run view "$WINDOWS_RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json conclusion \
+              --jq '.conclusion'
+          )"
+          MACOS_CONCLUSION="$(
+            gh run view "$MACOS_RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json conclusion \
+              --jq '.conclusion'
+          )"
+
+          if [[ "$WINDOWS_CONCLUSION" != "success" || "$MACOS_CONCLUSION" != "success" ]]; then
+            echo "A dispatched platform release build did not complete successfully."
+            echo "Windows: $WINDOWS_CONCLUSION"
+            echo "macOS:   $MACOS_CONCLUSION"
+            exit 1
+          fi
 
       - name: Wait for complete cross-platform release assets
         shell: bash
