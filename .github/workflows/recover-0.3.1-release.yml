@@ -1,0 +1,26 @@
+name: Recover 0.3.1 Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    if: contains(github.event.head_commit.message, '[recover-0.3.1-release]')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch corrected 0.3.1 release workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f tag=0.3.1
