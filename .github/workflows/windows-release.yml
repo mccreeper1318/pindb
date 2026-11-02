@@ -1,12 +1,16 @@
 name: Build Windows Release
 
+run-name: Build PinDB ${{ inputs.tag }} for Windows [${{ inputs.run_key }}]
+
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
         description: Existing GitHub release tag to build
+        required: true
+        type: string
+      run_key:
+        description: Coordinator run key used to correlate this build
         required: true
         type: string
 
@@ -14,11 +18,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: pindb-windows-release-${{ github.event.release.tag_name || inputs.tag }}
+  group: pindb-windows-release-${{ inputs.tag }}
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:
   windows:
@@ -180,7 +184,12 @@ jobs:
 
           TAG="$RELEASE_TAG"
           VERSION="${{ needs.windows.outputs.version }}"
-          RELEASE_ID="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.id')"
+          RELEASE_ID="$(
+            gh release view "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json databaseId \
+              --jq '.databaseId'
+          )"
           RUN_KEY="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           STAGE_DIR="$(mktemp -d)"
           trap 'rm -rf "$STAGE_DIR"' EXIT
