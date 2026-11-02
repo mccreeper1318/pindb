@@ -319,6 +319,10 @@ jobs:
         run: |
           set -euo pipefail
           PACKAGE="$(realpath "${{ steps.package.outputs.package }}")"
+          sudo mkdir -p \
+            /etc/xdg/menus \
+            /usr/local/share/applications \
+            /usr/local/share/desktop-directories
           sudo apt-get install -y "$PACKAGE"
 
           INSTALLED_VERSION="$(dpkg-query -W -f='${Version}' pindb)"
@@ -478,6 +482,10 @@ jobs:
         run: |
           set -euo pipefail
           PACKAGE="${{ steps.package.outputs.package }}"
+          mkdir -p \
+            /etc/xdg/menus \
+            /usr/local/share/applications \
+            /usr/local/share/desktop-directories
           dnf install -y "$PACKAGE"
 
           INSTALLED_VERSION="$(rpm -q --qf '%{VERSION}-%{RELEASE}' pindb)"
