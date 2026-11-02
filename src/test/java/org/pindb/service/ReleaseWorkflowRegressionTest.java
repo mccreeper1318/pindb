@@ -17,14 +17,22 @@ class ReleaseWorkflowRegressionTest {
         assertFalse(workflow.contains("types:\n      - published"));
         assertTrue(workflow.contains("gh workflow run windows-release.yml"));
         assertTrue(workflow.contains("gh workflow run macos-release.yml"));
+        assertTrue(workflow.contains("-f run_key=\"$RUN_KEY\""));
+        assertTrue(workflow.contains("Require dispatched platform builds to succeed"));
+        assertTrue(workflow.contains("gh run watch \"$WINDOWS_RUN_ID\""));
+        assertTrue(workflow.contains("gh run watch \"$MACOS_RUN_ID\""));
         assertTrue(workflow.contains("Smoke-test Debian package installation"));
         assertTrue(workflow.contains("Smoke-test Fedora RPM installation"));
         assertTrue(workflow.contains("Expected exactly 10 release assets before publication"));
         assertTrue(workflow.contains("Expected five checksum files"));
         assertTrue(workflow.contains("--draft=false"));
 
+        int platformRuns = workflow.indexOf("Require dispatched platform builds to succeed");
+        int assetGate = workflow.indexOf("Wait for complete cross-platform release assets");
         int verification = workflow.indexOf("Download and verify every published asset checksum");
         int publication = workflow.indexOf("Publish fully verified release");
+        assertTrue(platformRuns >= 0 && assetGate > platformRuns,
+                "Current platform builds must succeed before existing assets can satisfy the release gate.");
         assertTrue(verification >= 0 && publication > verification,
                 "Checksum verification must happen before the release is published.");
     }
@@ -36,6 +44,12 @@ class ReleaseWorkflowRegressionTest {
 
         assertTrue(windows.contains("workflow_dispatch:"));
         assertTrue(macos.contains("workflow_dispatch:"));
+        assertTrue(windows.contains("run_key:"));
+        assertTrue(macos.contains("run_key:"));
+        assertTrue(windows.contains("--json databaseId"));
+        assertTrue(macos.contains("--json databaseId"));
+        assertFalse(windows.contains("releases/tags/$TAG"));
+        assertFalse(macos.contains("releases/tags/$TAG"));
         assertFalse(windows.contains("types: [published]"));
         assertFalse(windows.contains("types:\n      - published"));
         assertFalse(macos.contains("types: [published]"));
