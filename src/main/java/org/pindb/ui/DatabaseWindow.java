@@ -53,7 +53,6 @@ import org.pindb.model.FilterSpec;
 import org.pindb.model.RecordData;
 import org.pindb.service.CsvService;
 import org.pindb.service.PrintService;
-import org.pindb.util.CloseUtil;
 
 import java.io.File;
 import java.math.BigDecimal;
@@ -163,10 +162,21 @@ public final class DatabaseWindow implements AutoCloseable {
         if (closed) {
             return;
         }
-        CloseUtil.closeAll(documentStore, database);
-        closed = true;
-        stage.hide();
-        onClosed.run();
+
+        // A document-store close can fail while checkpointing SQLite WAL data.
+        // Keep the main database and window open in that case so the user can
+        // continue working or retry the close later.
+        documentStore.close();
+
+        try {
+            database.close();
+        } finally {
+            // DatabaseService.close() makes its connection unusable even when it
+            // reports a close failure, so always finish removing this window.
+            closed = true;
+            stage.hide();
+            onClosed.run();
+        }
     }
 
     private InWindowMenuBar menuBar() {
