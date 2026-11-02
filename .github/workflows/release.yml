@@ -1,24 +1,29 @@
 name: Build Release Packages
 
-run-name: Build PinDB ${{ github.event.release.tag_name || inputs.tag }}
+run-name: Build PinDB ${{ inputs.tag || github.ref_name }}
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "*"
 
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing GitHub release tag to build
+        description: Existing tag to build into a draft GitHub release
         required: true
         type: string
 
 permissions:
+  actions: write
   contents: write
 
+concurrency:
+  group: pindb-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 env:
-  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
   GH_TOKEN: ${{ github.token }}
 
 jobs:
@@ -33,6 +38,7 @@ jobs:
       rpm_release: ${{ steps.version.outputs.rpm_release }}
       deb_package_version: ${{ steps.version.outputs.deb_package_version }}
       rpm_package_version: ${{ steps.version.outputs.rpm_package_version }}
+      tag_is_prerelease: ${{ steps.version.outputs.tag_is_prerelease }}
 
     steps:
       - name: Read and validate version
@@ -65,6 +71,38 @@ jobs:
             TAG_IS_PRERELEASE=false
           fi
 
+          if ! git ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY.git" "refs/tags/$RAW_TAG" >/dev/null 2>&1; then
+            echo "Release tag does not exist: $RAW_TAG"
+            exit 1
+          fi
+
+          if gh release view "$RAW_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            RELEASE_IS_DRAFT="$(
+              gh release view "$RAW_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json isDraft \
+                --jq '.isDraft'
+            )"
+            if [[ "$RELEASE_IS_DRAFT" != "true" ]]; then
+              echo "Refusing to build against an already-published release: $RAW_TAG"
+              echo "Create or retain a draft release so packages can be verified before publication."
+              exit 1
+            fi
+          else
+            CREATE_ARGS=(
+              "$RAW_TAG"
+              --repo "$GITHUB_REPOSITORY"
+              --verify-tag
+              --draft
+              --title "PinDB $VERSION"
+              --generate-notes
+            )
+            if [[ "$TAG_IS_PRERELEASE" == "true" ]]; then
+              CREATE_ARGS+=(--prerelease)
+            fi
+            gh release create "${CREATE_ARGS[@]}"
+          fi
+
           RELEASE_IS_PRERELEASE="$(
             gh release view "$RAW_TAG" \
               --repo "$GITHUB_REPOSITORY" \
@@ -73,26 +111,22 @@ jobs:
           )"
 
           if [[ "$TAG_IS_PRERELEASE" != "$RELEASE_IS_PRERELEASE" ]]; then
-            echo "Correcting GitHub release type to match tag: $RAW_TAG"
+            echo "Correcting draft release type to match tag: $RAW_TAG"
             if [[ "$TAG_IS_PRERELEASE" == "true" ]]; then
               gh release edit "$RAW_TAG" --repo "$GITHUB_REPOSITORY" --prerelease
             else
               gh release edit "$RAW_TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false
             fi
-
-            RELEASE_IS_PRERELEASE="$(
-              gh release view "$RAW_TAG" \
-                --repo "$GITHUB_REPOSITORY" \
-                --json isPrerelease \
-                --jq '.isPrerelease'
-            )"
           fi
 
-          if [[ "$TAG_IS_PRERELEASE" != "$RELEASE_IS_PRERELEASE" ]]; then
-            echo "The tag and GitHub release type still do not match after correction."
-            echo "Tag: $RAW_TAG"
-            echo "Tag indicates prerelease: $TAG_IS_PRERELEASE"
-            echo "GitHub release is prerelease: $RELEASE_IS_PRERELEASE"
+          RELEASE_IS_DRAFT="$(
+            gh release view "$RAW_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isDraft \
+              --jq '.isDraft'
+          )"
+          if [[ "$RELEASE_IS_DRAFT" != "true" ]]; then
+            echo "Release must remain a draft until all packages pass verification."
             exit 1
           fi
 
@@ -103,10 +137,24 @@ jobs:
           echo "rpm_release=$RPM_RELEASE" >> "$GITHUB_OUTPUT"
           echo "deb_package_version=${BASE_VERSION}-${DEB_RELEASE}" >> "$GITHUB_OUTPUT"
           echo "rpm_package_version=${BASE_VERSION}-${RPM_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "tag_is_prerelease=$TAG_IS_PRERELEASE" >> "$GITHUB_OUTPUT"
 
           echo "PinDB version: $VERSION"
           echo "Debian version: ${BASE_VERSION}-${DEB_RELEASE}"
           echo "RPM version: ${BASE_VERSION}-${RPM_RELEASE}"
+
+      - name: Start Windows and macOS package builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run windows-release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$RELEASE_TAG" \
+            -f tag="$RELEASE_TAG"
+          gh workflow run macos-release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$RELEASE_TAG" \
+            -f tag="$RELEASE_TAG"
 
   build-deb:
     name: Build Debian package
@@ -184,7 +232,31 @@ jobs:
           PACKAGE_DIR="$(dirname "$PACKAGE")"
           PACKAGE_NAME="$(basename "$PACKAGE")"
           (cd "$PACKAGE_DIR" && sha256sum "$PACKAGE_NAME") > "$PACKAGE.sha256"
+          (cd "$PACKAGE_DIR" && sha256sum -c "$PACKAGE_NAME.sha256")
           cat "$PACKAGE.sha256"
+
+      - name: Smoke-test Debian package installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE="${{ steps.package.outputs.package }}"
+          sudo dpkg -i "$PACKAGE"
+
+          INSTALLED_VERSION="$(dpkg-query -W -f='${Version}' pindb)"
+          EXPECTED_VERSION="${{ needs.prepare.outputs.deb_package_version }}"
+          if [[ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "Installed Debian version mismatch: expected $EXPECTED_VERSION, got $INSTALLED_VERSION"
+            exit 1
+          fi
+
+          mapfile -t LAUNCHERS < <(find /opt/pindb -type f -path '*/bin/PinDB' -executable)
+          mapfile -t HELPERS < <(find /opt/pindb -type f -path '*/bin/pindb-update-helper' -executable)
+          if [[ "${#LAUNCHERS[@]}" -ne 1 || "${#HELPERS[@]}" -ne 1 ]]; then
+            echo "Installed Debian package is missing the expected executable launcher/helper."
+            printf 'Launchers: %s\n' "${LAUNCHERS[*]:-}"
+            printf 'Helpers: %s\n' "${HELPERS[*]:-}"
+            exit 1
+          fi
 
       - name: Upload Debian release artifact
         uses: actions/upload-artifact@v4
@@ -319,7 +391,31 @@ jobs:
           PACKAGE_DIR="$(dirname "$PACKAGE")"
           PACKAGE_NAME="$(basename "$PACKAGE")"
           (cd "$PACKAGE_DIR" && sha256sum "$PACKAGE_NAME") > "$PACKAGE.sha256"
+          (cd "$PACKAGE_DIR" && sha256sum -c "$PACKAGE_NAME.sha256")
           cat "$PACKAGE.sha256"
+
+      - name: Smoke-test Fedora RPM installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE="${{ steps.package.outputs.package }}"
+          dnf install -y "$PACKAGE"
+
+          INSTALLED_VERSION="$(rpm -q --qf '%{VERSION}-%{RELEASE}' pindb)"
+          EXPECTED_VERSION="${{ needs.prepare.outputs.rpm_package_version }}"
+          if [[ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "Installed RPM version mismatch: expected $EXPECTED_VERSION, got $INSTALLED_VERSION"
+            exit 1
+          fi
+
+          mapfile -t LAUNCHERS < <(find /opt/pindb -type f -path '*/bin/PinDB' -executable)
+          mapfile -t HELPERS < <(find /opt/pindb -type f -path '*/bin/pindb-update-helper' -executable)
+          if [[ "${#LAUNCHERS[@]}" -ne 1 || "${#HELPERS[@]}" -ne 1 ]]; then
+            echo "Installed RPM is missing the expected executable launcher/helper."
+            printf 'Launchers: %s\n' "${LAUNCHERS[*]:-}"
+            printf 'Helpers: %s\n' "${HELPERS[*]:-}"
+            exit 1
+          fi
 
       - name: Upload RPM release artifact
         uses: actions/upload-artifact@v4
@@ -331,7 +427,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Attach Linux packages to release
+    name: Verify assets and publish release
     needs:
       - prepare
       - build-deb
@@ -348,17 +444,148 @@ jobs:
       - name: List release files
         run: find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
 
-      - name: Upload release files
+      - name: Upload verified Linux files to draft release
         shell: bash
         run: |
+          set -euo pipefail
           mapfile -t FILES < <(find release-assets -maxdepth 1 -type f | sort)
           if [[ "${#FILES[@]}" -ne 4 ]]; then
-            echo "Expected two packages and two checksum files; found ${#FILES[@]}."
+            echo "Expected two Linux packages and two checksum files; found ${#FILES[@]}."
             printf '%s\n' "${FILES[@]}"
             exit 1
           fi
+
           gh release upload \
             "${{ needs.prepare.outputs.tag }}" \
             --repo "$GITHUB_REPOSITORY" \
             "${FILES[@]}" \
             --clobber
+
+      - name: Wait for complete cross-platform release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.prepare.outputs.tag }}"
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          DEB_NAME="$(find release-assets -maxdepth 1 -type f -name '*.deb' -printf '%f\n')"
+          RPM_NAME="$(find release-assets -maxdepth 1 -type f -name '*.rpm' -printf '%f\n')"
+          if [[ -z "$DEB_NAME" || -z "$RPM_NAME" ]]; then
+            echo "Could not determine Linux package filenames."
+            exit 1
+          fi
+
+          EXPECTED=(
+            "$DEB_NAME"
+            "$DEB_NAME.sha256"
+            "$RPM_NAME"
+            "$RPM_NAME.sha256"
+            "PinDB-${VERSION}-windows-x64.exe"
+            "PinDB-${VERSION}-windows-x64.exe.sha256"
+            "PinDB-${VERSION}-macos-arm64.pkg"
+            "PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            "PinDB-${VERSION}-macos-x64.pkg"
+            "PinDB-${VERSION}-macos-x64.pkg.sha256"
+          )
+
+          mapfile -t EXPECTED_SORTED < <(printf '%s\n' "${EXPECTED[@]}" | sort)
+
+          for attempt in {1..120}; do
+            mapfile -t ACTUAL < <(
+              gh release view "$TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq '.assets[].name' \
+                | sort
+            )
+
+            if [[ "${#ACTUAL[@]}" -eq "${#EXPECTED_SORTED[@]}" ]] \
+              && diff -u \
+                <(printf '%s\n' "${EXPECTED_SORTED[@]}") \
+                <(printf '%s\n' "${ACTUAL[@]}") >/dev/null; then
+              echo "All expected release assets are present."
+              exit 0
+            fi
+
+            echo "Waiting for Windows/macOS builds and final asset cleanup (attempt $attempt/120)..."
+            sleep 15
+          done
+
+          echo "Timed out waiting for the exact verified release asset set."
+          echo "Expected:"
+          printf '  %s\n' "${EXPECTED_SORTED[@]}"
+          echo "Actual:"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort
+          exit 1
+
+      - name: Download and verify every published asset checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.prepare.outputs.tag }}"
+          VERIFY_DIR="$(mktemp -d)"
+          trap 'rm -rf "$VERIFY_DIR"' EXIT
+
+          mapfile -t ASSETS < <(
+            gh release view "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json assets \
+              --jq '.assets[].name' \
+              | sort
+          )
+
+          if [[ "${#ASSETS[@]}" -ne 10 ]]; then
+            echo "Expected exactly 10 release assets before publication; found ${#ASSETS[@]}."
+            exit 1
+          fi
+
+          for name in "${ASSETS[@]}"; do
+            gh release download "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "$name" \
+              --dir "$VERIFY_DIR"
+          done
+
+          mapfile -t CHECKSUMS < <(find "$VERIFY_DIR" -maxdepth 1 -type f -name '*.sha256' -printf '%f\n' | sort)
+          if [[ "${#CHECKSUMS[@]}" -ne 5 ]]; then
+            echo "Expected five checksum files; found ${#CHECKSUMS[@]}."
+            printf '%s\n' "${CHECKSUMS[@]}"
+            exit 1
+          fi
+
+          (
+            cd "$VERIFY_DIR"
+            for checksum in "${CHECKSUMS[@]}"; do
+              sha256sum -c "$checksum"
+            done
+          )
+
+      - name: Publish fully verified release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.prepare.outputs.tag }}"
+          if [[ "${{ needs.prepare.outputs.tag_is_prerelease }}" == "true" ]]; then
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --prerelease
+          else
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --prerelease=false
+          fi
+
+          IS_DRAFT="$(
+            gh release view "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isDraft \
+              --jq '.isDraft'
+          )"
+          if [[ "$IS_DRAFT" != "false" ]]; then
+            echo "Release was not published successfully."
+            exit 1
+          fi
+
+          echo "Published $TAG only after all package assets and checksums passed verification."
