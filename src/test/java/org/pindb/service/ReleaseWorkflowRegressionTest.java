@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ReleaseWorkflowRegressionTest {
     @Test
     void coordinatorPublishesOnlyAfterAllPlatformAssetsAreVerified() throws Exception {
-        String workflow = Files.readString(Path.of(".github/workflows/release.yml"));
+        String workflow = normalizedWorkflow(".github/workflows/release.yml");
 
         assertTrue(workflow.contains("push:\n    tags:"));
         assertFalse(workflow.contains("types:\n      - published"));
@@ -43,8 +43,8 @@ class ReleaseWorkflowRegressionTest {
 
     @Test
     void platformBuildersAreDispatchedBeforePublicationInsteadOfAfterReleasePublished() throws Exception {
-        String windows = Files.readString(Path.of(".github/workflows/windows-release.yml"));
-        String macos = Files.readString(Path.of(".github/workflows/macos-release.yml"));
+        String windows = normalizedWorkflow(".github/workflows/windows-release.yml");
+        String macos = normalizedWorkflow(".github/workflows/macos-release.yml");
 
         assertTrue(windows.contains("workflow_dispatch:"));
         assertTrue(macos.contains("workflow_dispatch:"));
@@ -58,5 +58,9 @@ class ReleaseWorkflowRegressionTest {
         assertFalse(windows.contains("types:\n      - published"));
         assertFalse(macos.contains("types: [published]"));
         assertFalse(macos.contains("types:\n      - published"));
+    }
+
+    private static String normalizedWorkflow(String path) throws Exception {
+        return Files.readString(Path.of(path)).replace("\r\n", "\n").replace('\r', '\n');
     }
 }
