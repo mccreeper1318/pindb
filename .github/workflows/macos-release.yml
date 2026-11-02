@@ -55,15 +55,8 @@ jobs:
             exit 1
           fi
 
-          RELEASE_TAG_NAME="$(
-            gh release view "$RAW_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --json tagName \
-              --jq '.tagName'
-          )"
-
-          if [[ "$RELEASE_TAG_NAME" != "$RAW_TAG" ]]; then
-            echo "Expected GitHub release tag $RAW_TAG, got $RELEASE_TAG_NAME."
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RAW_TAG" >/dev/null 2>&1; then
+            echo "Release tag does not exist: $RAW_TAG"
             exit 1
           fi
 
