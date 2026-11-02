@@ -229,8 +229,43 @@ public final class UpdateInstaller {
 
     private static void launchWindowsInstaller(Path packageFile) throws IOException {
         Path installer = packageFile.toAbsolutePath().normalize();
-        if (!Files.isRegularFile(installer) || !installer.toString().toLowerCase(Locale.ROOT).endsWith(".exe")) throw new IOException("The downloaded Windows installer is unavailable.");
-        new ProcessBuilder(installer.toString()).directory(installer.getParent().toFile()).start();
+        if (!Files.isRegularFile(installer) || !installer.toString().toLowerCase(Locale.ROOT).endsWith(".exe")) {
+            throw new IOException("The downloaded Windows installer is unavailable.");
+        }
+
+        ProcessBuilder builder = new ProcessBuilder(windowsInstallerCommand())
+                .directory(installer.getParent().toFile())
+                .redirectErrorStream(true);
+        builder.environment().put("PINDB_UPDATE_INSTALLER", installer.toString());
+
+        Process process = builder.start();
+        String output;
+        try (InputStream input = process.getInputStream()) {
+            output = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
+        }
+
+        int status;
+        try {
+            status = process.waitFor();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while requesting Windows administrator approval.", exception);
+        }
+
+        if (status != 0) {
+            throw new IOException("Windows could not start the update installer with administrator approval.\n\n"
+                    + (output.isBlank() ? "No additional launcher output was provided." : output));
+        }
+    }
+
+    static List<String> windowsInstallerCommand() {
+        return List.of(
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Start-Process -FilePath $env:PINDB_UPDATE_INSTALLER -Verb RunAs");
     }
 
     private static Path stageMacInstaller(Path packageFile, String digest) throws Exception {
