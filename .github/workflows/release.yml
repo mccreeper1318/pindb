@@ -322,7 +322,9 @@ jobs:
           sudo mkdir -p \
             /etc/xdg/menus \
             /usr/local/share/applications \
-            /usr/local/share/desktop-directories
+            /usr/local/share/desktop-directories \
+            /usr/local/share/mime/packages \
+            /usr/local/share/icons/hicolor
           sudo apt-get install -y "$PACKAGE"
 
           INSTALLED_VERSION="$(dpkg-query -W -f='${Version}' pindb)"
@@ -485,7 +487,9 @@ jobs:
           mkdir -p \
             /etc/xdg/menus \
             /usr/local/share/applications \
-            /usr/local/share/desktop-directories
+            /usr/local/share/desktop-directories \
+            /usr/local/share/mime/packages \
+            /usr/local/share/icons/hicolor
           dnf install -y "$PACKAGE"
 
           INSTALLED_VERSION="$(rpm -q --qf '%{VERSION}-%{RELEASE}' pindb)"
