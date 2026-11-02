@@ -249,11 +249,11 @@ public final class UpdateInstaller {
             status = process.waitFor();
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while requesting Windows administrator approval.", exception);
+            throw new IOException("Interrupted while starting the Windows update installer.", exception);
         }
 
         if (status != 0) {
-            throw new IOException("Windows could not start the update installer with administrator approval.\n\n"
+            throw new IOException("Windows could not start the verified update installer.\n\n"
                     + (output.isBlank() ? "No additional launcher output was provided." : output));
         }
     }
