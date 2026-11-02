@@ -26,6 +26,10 @@ class ReleaseWorkflowRegressionTest {
         assertTrue(workflow.contains("Expected exactly 10 release assets before publication"));
         assertTrue(workflow.contains("Expected five checksum files"));
         assertTrue(workflow.contains("--draft=false"));
+        assertTrue(workflow.contains("Recovering incomplete published release"));
+        assertTrue(workflow.contains("gh release edit \"$RAW_TAG\" --repo \"$GITHUB_REPOSITORY\" --draft"));
+        assertTrue(workflow.contains("RELEASE_ASSET_COUNT"));
+        assertTrue(workflow.contains("RELEASE_IS_IMMUTABLE"));
 
         int platformRuns = workflow.indexOf("Require dispatched platform builds to succeed");
         int assetGate = workflow.indexOf("Wait for complete cross-platform release assets");
