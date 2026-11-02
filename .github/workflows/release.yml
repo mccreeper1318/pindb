@@ -80,16 +80,622 @@ jobs:
           fi
 
           if gh release view "$RAW_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            RELEASE_IS_DRAFT="$(
+            RELEASE_STATE="$(
               gh release view "$RAW_TAG" \
                 --repo "$GITHUB_REPOSITORY" \
-                --json isDraft \
-                --jq '.isDraft'
+                --json isDraft,isImmutable,assets \
+                --jq '[.isDraft, .isImmutable, (.assets | length)] | @tsv'
             )"
+            IFS=            CREATE_ARGS=(
+              "$RAW_TAG"
+              --repo "$GITHUB_REPOSITORY"
+              --verify-tag
+              --draft
+              --title "PinDB $VERSION"
+              --generate-notes
+            )
+            if [[ "$TAG_IS_PRERELEASE" == "true" ]]; then
+              CREATE_ARGS+=(--prerelease)
+            fi
+            gh release create "${CREATE_ARGS[@]}"
+          fi
+
+          RELEASE_IS_PRERELEASE="$(
+            gh release view "$RAW_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isPrerelease \
+              --jq '.isPrerelease'
+          )"
+
+          if [[ "$TAG_IS_PRERELEASE" != "$RELEASE_IS_PRERELEASE" ]]; then
+            echo "Correcting draft release type to match tag: $RAW_TAG"
+            if [[ "$TAG_IS_PRERELEASE" == "true" ]]; then
+              gh release edit "$RAW_TAG" --repo "$GITHUB_REPOSITORY" --prerelease
+            else
+              gh release edit "$RAW_TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false
+            fi
+          fi
+
+          RELEASE_IS_DRAFT="$(
+            gh release view "$RAW_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isDraft \
+              --jq '.isDraft'
+          )"
+          if [[ "$RELEASE_IS_DRAFT" != "true" ]]; then
+            echo "Release must remain a draft until all packages pass verification."
+            exit 1
+          fi
+
+          echo "tag=$RAW_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "deb_release=$DEB_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "rpm_release=$RPM_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "deb_package_version=${BASE_VERSION}-${DEB_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "rpm_package_version=${BASE_VERSION}-${RPM_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "tag_is_prerelease=$TAG_IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+
+          echo "PinDB version: $VERSION"
+          echo "Debian version: ${BASE_VERSION}-${DEB_RELEASE}"
+          echo "RPM version: ${BASE_VERSION}-${RPM_RELEASE}"
+
+      - name: Start Windows and macOS package builds
+        id: dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_KEY="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          find_dispatched_run() {
+            local workflow="$1"
+            local key="$2"
+            local run_id=""
+
+            for attempt in {1..20}; do
+              run_id="$(
+                gh run list \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --workflow "$workflow" \
+                  --event workflow_dispatch \
+                  --limit 30 \
+                  --json databaseId,displayTitle \
+                  --jq ".[] | select(.displayTitle | contains(\"[$key]\")) | .databaseId" \
+                  | head -n 1
+              )"
+              if [[ -n "$run_id" ]]; then
+                printf '%s' "$run_id"
+                return 0
+              fi
+              sleep 3
+            done
+
+            echo "Could not resolve dispatched run for $workflow and run key $key." >&2
+            return 1
+          }
+
+          gh workflow run windows-release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$RELEASE_TAG" \
+            -f tag="$RELEASE_TAG" \
+            -f run_key="$RUN_KEY"
+
+          gh workflow run macos-release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$RELEASE_TAG" \
+            -f tag="$RELEASE_TAG" \
+            -f run_key="$RUN_KEY"
+
+          WINDOWS_RUN_ID="$(find_dispatched_run windows-release.yml "$RUN_KEY")"
+          MACOS_RUN_ID="$(find_dispatched_run macos-release.yml "$RUN_KEY")"
+
+          echo "run_key=$RUN_KEY" >> "$GITHUB_OUTPUT"
+          echo "windows_run_id=$WINDOWS_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "macos_run_id=$MACOS_RUN_ID" >> "$GITHUB_OUTPUT"
+
+          echo "Windows release run: $WINDOWS_RUN_ID"
+          echo "macOS release run: $MACOS_RUN_ID"
+
+  build-deb:
+    name: Build Debian package
+    needs: prepare
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Install Debian packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot
+
+      - name: Build Debian package
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test packageDeb \
+            -PappVersion="${{ needs.prepare.outputs.version }}"
+
+      - name: Verify and normalize Debian package
+        id: package
+        shell: bash
+        run: |
+          mapfile -t PACKAGES < <(find build/packages -maxdepth 1 -type f -name '*.deb')
+          if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one Debian package; found ${#PACKAGES[@]}."
+            printf '%s\n' "${PACKAGES[@]}"
+            exit 1
+          fi
+
+          DEB="${PACKAGES[0]}"
+          ACTUAL_VERSION="$(dpkg-deb -f "$DEB" Version)"
+          EXPECTED_VERSION="${{ needs.prepare.outputs.deb_package_version }}"
+          if [[ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "Expected Debian version: $EXPECTED_VERSION"
+            echo "Actual Debian version:   $ACTUAL_VERSION"
+            exit 1
+          fi
+
+          DEB_DIR="$(dirname "$DEB")"
+          ORIGINAL_NAME="$(basename "$DEB")"
+          SAFE_NAME="${ORIGINAL_NAME//\~/.}"
+          SAFE_DEB="$DEB_DIR/$SAFE_NAME"
+          if [[ "$SAFE_DEB" != "$DEB" ]]; then
+            mv "$DEB" "$SAFE_DEB"
+          fi
+
+          EXTRACT_DIR="$(mktemp -d)"
+          trap 'rm -rf "$EXTRACT_DIR"' EXIT
+          dpkg-deb -x "$SAFE_DEB" "$EXTRACT_DIR"
+          mapfile -t HELPERS < <(find "$EXTRACT_DIR" -type f -path '*/bin/pindb-update-helper')
+          if [[ "${#HELPERS[@]}" -ne 1 || ! -x "${HELPERS[0]:-}" ]]; then
+            echo "The Debian package must contain exactly one executable PinDB update helper."
+            printf '%s\n' "${HELPERS[@]}"
+            exit 1
+          fi
+
+          echo "package=$SAFE_DEB" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Debian checksum
+        shell: bash
+        run: |
+          PACKAGE="${{ steps.package.outputs.package }}"
+          PACKAGE_DIR="$(dirname "$PACKAGE")"
+          PACKAGE_NAME="$(basename "$PACKAGE")"
+          (cd "$PACKAGE_DIR" && sha256sum "$PACKAGE_NAME") > "$PACKAGE.sha256"
+          (cd "$PACKAGE_DIR" && sha256sum -c "$PACKAGE_NAME.sha256")
+          cat "$PACKAGE.sha256"
+
+      - name: Smoke-test Debian package installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE="$(realpath "${{ steps.package.outputs.package }}")"
+          sudo apt-get install -y "$PACKAGE"
+
+          INSTALLED_VERSION="$(dpkg-query -W -f='${Version}' pindb)"
+          EXPECTED_VERSION="${{ needs.prepare.outputs.deb_package_version }}"
+          if [[ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "Installed Debian version mismatch: expected $EXPECTED_VERSION, got $INSTALLED_VERSION"
+            exit 1
+          fi
+
+          mapfile -t LAUNCHERS < <(find /opt/pindb -type f -path '*/bin/PinDB' -executable)
+          mapfile -t HELPERS < <(find /opt/pindb -type f -path '*/bin/pindb-update-helper' -executable)
+          if [[ "${#LAUNCHERS[@]}" -ne 1 || "${#HELPERS[@]}" -ne 1 ]]; then
+            echo "Installed Debian package is missing the expected executable launcher/helper."
+            printf 'Launchers: %s\n' "${LAUNCHERS[*]:-}"
+            printf 'Helpers: %s\n' "${HELPERS[*]:-}"
+            exit 1
+          fi
+
+      - name: Upload Debian release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pindb-deb-${{ needs.prepare.outputs.version }}
+          path: |
+            ${{ steps.package.outputs.package }}
+            ${{ steps.package.outputs.package }}.sha256
+          if-no-files-found: error
+
+  build-rpm:
+    name: Build Fedora RPM
+    needs: prepare
+    runs-on: ubuntu-24.04
+    container:
+      image: fedora:latest
+
+    steps:
+      - name: Install Fedora build tools
+        run: |
+          dnf install -y \
+            git \
+            rpm-build \
+            desktop-file-utils \
+            cpio \
+            findutils \
+            gzip \
+            tar \
+            which
+
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Build RPM package
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test packageRpm \
+            -PappVersion="${{ needs.prepare.outputs.version }}"
+
+      - name: Verify RPM package
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t PACKAGES < <(find build/packages -maxdepth 1 -type f -name '*.rpm')
+          if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one RPM package; found ${#PACKAGES[@]}."
+            printf '%s\n' "${PACKAGES[@]}"
+            exit 1
+          fi
+
+          RPM="${PACKAGES[0]}"
+          ACTUAL_VERSION="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$RPM")"
+          EXPECTED_VERSION="${{ needs.prepare.outputs.rpm_package_version }}"
+          if [[ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "Expected RPM version: $EXPECTED_VERSION"
+            echo "Actual RPM version:   $ACTUAL_VERSION"
+            exit 1
+          fi
+
+          rpm -qpi "$RPM"
+          rpm -qpl "$RPM"
+
+          RPM_SCRIPTS="$(rpm -qp --scripts "$RPM")"
+          if grep -Fq 'rpm -q --whatprovides' <<< "$RPM_SCRIPTS"; then
+            echo "RPM scriptlets must not start a nested rpm ownership query."
+            printf '%s\n' "$RPM_SCRIPTS"
+            exit 1
+          fi
+          if ! grep -Fq 'if [ "$1" -eq 0 ]; then' <<< "$RPM_SCRIPTS"; then
+            echo "RPM desktop cleanup must be restricted to a real uninstall."
+            printf '%s\n' "$RPM_SCRIPTS"
+            exit 1
+          fi
+
+          EXTRACT_DIR="$(mktemp -d)"
+          trap 'rm -rf "$EXTRACT_DIR"' EXIT
+          (
+            cd "$EXTRACT_DIR"
+            rpm2cpio "$GITHUB_WORKSPACE/$RPM" | cpio -idmu
+          )
+
+          mapfile -t HELPERS < <(find "$EXTRACT_DIR" -type f -path '*/bin/pindb-update-helper')
+          if [[ "${#HELPERS[@]}" -ne 1 || ! -x "${HELPERS[0]:-}" ]]; then
+            echo "The RPM must contain exactly one executable PinDB update helper."
+            printf '%s\n' "${HELPERS[@]}"
+            exit 1
+          fi
+
+          mapfile -t DESKTOP_FILES < <(find "$EXTRACT_DIR" -type f -iname '*pindb*.desktop')
+          if [[ "${#DESKTOP_FILES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one PinDB desktop entry; found ${#DESKTOP_FILES[@]}."
+            printf '%s\n' "${DESKTOP_FILES[@]}"
+            exit 1
+          fi
+
+          DESKTOP_FILE="${DESKTOP_FILES[0]}"
+          desktop-file-validate "$DESKTOP_FILE"
+
+          if ! grep -Eq '^Exec=.*/PinDB([[:space:]]|$)' "$DESKTOP_FILE"; then
+            echo "The desktop entry does not reference the packaged PinDB launcher."
+            cat "$DESKTOP_FILE"
+            exit 1
+          fi
+
+          if ! grep -Eq '^Icon=.+' "$DESKTOP_FILE"; then
+            echo "The desktop entry does not define an icon."
+            cat "$DESKTOP_FILE"
+            exit 1
+          fi
+
+          if ! find "$EXTRACT_DIR" -type f -iname '*pindb*.png' -print -quit | grep -q .; then
+            echo "The RPM does not contain a PinDB PNG icon."
+            exit 1
+          fi
+
+          echo "package=$RPM" >> "$GITHUB_OUTPUT"
+
+      - name: Generate RPM checksum
+        shell: bash
+        run: |
+          PACKAGE="${{ steps.package.outputs.package }}"
+          PACKAGE_DIR="$(dirname "$PACKAGE")"
+          PACKAGE_NAME="$(basename "$PACKAGE")"
+          (cd "$PACKAGE_DIR" && sha256sum "$PACKAGE_NAME") > "$PACKAGE.sha256"
+          (cd "$PACKAGE_DIR" && sha256sum -c "$PACKAGE_NAME.sha256")
+          cat "$PACKAGE.sha256"
+
+      - name: Smoke-test Fedora RPM installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE="${{ steps.package.outputs.package }}"
+          dnf install -y "$PACKAGE"
+
+          INSTALLED_VERSION="$(rpm -q --qf '%{VERSION}-%{RELEASE}' pindb)"
+          EXPECTED_VERSION="${{ needs.prepare.outputs.rpm_package_version }}"
+          if [[ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "Installed RPM version mismatch: expected $EXPECTED_VERSION, got $INSTALLED_VERSION"
+            exit 1
+          fi
+
+          mapfile -t LAUNCHERS < <(find /opt/pindb -type f -path '*/bin/PinDB' -executable)
+          mapfile -t HELPERS < <(find /opt/pindb -type f -path '*/bin/pindb-update-helper' -executable)
+          if [[ "${#LAUNCHERS[@]}" -ne 1 || "${#HELPERS[@]}" -ne 1 ]]; then
+            echo "Installed RPM is missing the expected executable launcher/helper."
+            printf 'Launchers: %s\n' "${LAUNCHERS[*]:-}"
+            printf 'Helpers: %s\n' "${HELPERS[*]:-}"
+            exit 1
+          fi
+
+      - name: Upload RPM release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pindb-rpm-${{ needs.prepare.outputs.version }}
+          path: |
+            ${{ steps.package.outputs.package }}
+            ${{ steps.package.outputs.package }}.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Verify assets and publish release
+    needs:
+      - prepare
+      - build-deb
+      - build-rpm
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: List release files
+        run: find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Upload verified Linux files to draft release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t FILES < <(find release-assets -maxdepth 1 -type f | sort)
+          if [[ "${#FILES[@]}" -ne 4 ]]; then
+            echo "Expected two Linux packages and two checksum files; found ${#FILES[@]}."
+            printf '%s\n' "${FILES[@]}"
+            exit 1
+          fi
+
+          gh release upload \
+            "${{ needs.prepare.outputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            "${FILES[@]}" \
+            --clobber
+
+      - name: Require dispatched platform builds to succeed
+        shell: bash
+        run: |
+          set -euo pipefail
+          WINDOWS_RUN_ID="${{ needs.prepare.outputs.windows_run_id }}"
+          MACOS_RUN_ID="${{ needs.prepare.outputs.macos_run_id }}"
+
+          if [[ -z "$WINDOWS_RUN_ID" || -z "$MACOS_RUN_ID" ]]; then
+            echo "The coordinator did not capture both dispatched platform run IDs."
+            exit 1
+          fi
+
+          echo "Waiting for Windows release run $WINDOWS_RUN_ID..."
+          gh run watch "$WINDOWS_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --exit-status
+
+          echo "Waiting for macOS release run $MACOS_RUN_ID..."
+          gh run watch "$MACOS_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --exit-status
+
+          WINDOWS_CONCLUSION="$(
+            gh run view "$WINDOWS_RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json conclusion \
+              --jq '.conclusion'
+          )"
+          MACOS_CONCLUSION="$(
+            gh run view "$MACOS_RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json conclusion \
+              --jq '.conclusion'
+          )"
+
+          if [[ "$WINDOWS_CONCLUSION" != "success" || "$MACOS_CONCLUSION" != "success" ]]; then
+            echo "A dispatched platform release build did not complete successfully."
+            echo "Windows: $WINDOWS_CONCLUSION"
+            echo "macOS:   $MACOS_CONCLUSION"
+            exit 1
+          fi
+
+      - name: Wait for complete cross-platform release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.prepare.outputs.tag }}"
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          DEB_NAME="$(find release-assets -maxdepth 1 -type f -name '*.deb' -printf '%f\n')"
+          RPM_NAME="$(find release-assets -maxdepth 1 -type f -name '*.rpm' -printf '%f\n')"
+          if [[ -z "$DEB_NAME" || -z "$RPM_NAME" ]]; then
+            echo "Could not determine Linux package filenames."
+            exit 1
+          fi
+
+          EXPECTED=(
+            "$DEB_NAME"
+            "$DEB_NAME.sha256"
+            "$RPM_NAME"
+            "$RPM_NAME.sha256"
+            "PinDB-${VERSION}-windows-x64.exe"
+            "PinDB-${VERSION}-windows-x64.exe.sha256"
+            "PinDB-${VERSION}-macos-arm64.pkg"
+            "PinDB-${VERSION}-macos-arm64.pkg.sha256"
+            "PinDB-${VERSION}-macos-x64.pkg"
+            "PinDB-${VERSION}-macos-x64.pkg.sha256"
+          )
+
+          mapfile -t EXPECTED_SORTED < <(printf '%s\n' "${EXPECTED[@]}" | sort)
+
+          for attempt in {1..120}; do
+            mapfile -t ACTUAL < <(
+              gh release view "$TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq '.assets[].name' \
+                | sort
+            )
+
+            if [[ "${#ACTUAL[@]}" -eq "${#EXPECTED_SORTED[@]}" ]] \
+              && diff -u \
+                <(printf '%s\n' "${EXPECTED_SORTED[@]}") \
+                <(printf '%s\n' "${ACTUAL[@]}") >/dev/null; then
+              echo "All expected release assets are present."
+              exit 0
+            fi
+
+            echo "Waiting for Windows/macOS builds and final asset cleanup (attempt $attempt/120)..."
+            sleep 15
+          done
+
+          echo "Timed out waiting for the exact verified release asset set."
+          echo "Expected:"
+          printf '  %s\n' "${EXPECTED_SORTED[@]}"
+          echo "Actual:"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort
+          exit 1
+
+      - name: Download and verify every published asset checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.prepare.outputs.tag }}"
+          VERIFY_DIR="$(mktemp -d)"
+          trap 'rm -rf "$VERIFY_DIR"' EXIT
+
+          mapfile -t ASSETS < <(
+            gh release view "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json assets \
+              --jq '.assets[].name' \
+              | sort
+          )
+
+          if [[ "${#ASSETS[@]}" -ne 10 ]]; then
+            echo "Expected exactly 10 release assets before publication; found ${#ASSETS[@]}."
+            exit 1
+          fi
+
+          for name in "${ASSETS[@]}"; do
+            gh release download "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "$name" \
+              --dir "$VERIFY_DIR"
+          done
+
+          mapfile -t CHECKSUMS < <(find "$VERIFY_DIR" -maxdepth 1 -type f -name '*.sha256' -printf '%f\n' | sort)
+          if [[ "${#CHECKSUMS[@]}" -ne 5 ]]; then
+            echo "Expected five checksum files; found ${#CHECKSUMS[@]}."
+            printf '%s\n' "${CHECKSUMS[@]}"
+            exit 1
+          fi
+
+          (
+            cd "$VERIFY_DIR"
+            for checksum in "${CHECKSUMS[@]}"; do
+              sha256sum -c "$checksum"
+            done
+          )
+
+      - name: Publish fully verified release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.prepare.outputs.tag }}"
+          if [[ "${{ needs.prepare.outputs.tag_is_prerelease }}" == "true" ]]; then
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --prerelease
+          else
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --prerelease=false
+          fi
+
+          IS_DRAFT="$(
+            gh release view "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isDraft \
+              --jq '.isDraft'
+          )"
+          if [[ "$IS_DRAFT" != "false" ]]; then
+            echo "Release was not published successfully."
+            exit 1
+          fi
+
+          echo "Published $TAG only after all package assets and checksums passed verification."
+\t' read -r RELEASE_IS_DRAFT RELEASE_IS_IMMUTABLE RELEASE_ASSET_COUNT <<< "$RELEASE_STATE"
+
             if [[ "$RELEASE_IS_DRAFT" != "true" ]]; then
-              echo "Refusing to build against an already-published release: $RAW_TAG"
-              echo "Create or retain a draft release so packages can be verified before publication."
-              exit 1
+              if [[ "$RELEASE_IS_IMMUTABLE" == "true" ]]; then
+                echo "Cannot recover immutable published release: $RAW_TAG"
+                exit 1
+              fi
+              if [[ "$RELEASE_ASSET_COUNT" -ge 10 ]]; then
+                echo "Refusing to rebuild already-published release with a complete asset set: $RAW_TAG"
+                exit 1
+              fi
+
+              echo "Recovering incomplete published release $RAW_TAG ($RELEASE_ASSET_COUNT assets) back to draft."
+              gh release edit "$RAW_TAG" --repo "$GITHUB_REPOSITORY" --draft
+
+              RELEASE_IS_DRAFT="$(
+                gh release view "$RAW_TAG" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --json isDraft \
+                  --jq '.isDraft'
+              )"
+              if [[ "$RELEASE_IS_DRAFT" != "true" ]]; then
+                echo "Could not move incomplete release back to draft."
+                exit 1
+              fi
             fi
           else
             CREATE_ARGS=(
