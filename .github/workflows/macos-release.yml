@@ -1,12 +1,8 @@
 name: Build macOS Release
 
-run-name: Build PinDB ${{ github.event.release.tag_name || inputs.tag }} for macOS
+run-name: Build PinDB ${{ inputs.tag }} for macOS
 
 on:
-  release:
-    types:
-      - published
-
   workflow_dispatch:
     inputs:
       tag:
@@ -18,11 +14,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: pindb-macos-release-${{ github.event.release.tag_name || inputs.tag }}
+  group: pindb-macos-release-${{ inputs.tag }}
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:
   prepare:
