@@ -39,7 +39,7 @@ class WindowsInstallerSafetyRegressionTest {
         String script = Files.readString(Path.of("scripts/windows-installer-safety-smoke.ps1"));
 
         assertTrue(script.contains("$upgradeUuid = \"" + WINDOWS_UPGRADE_UUID + "\""));
-        assertTrue(script.contains("$installDirectory = \"Programs\\\\PinDB\""));
+        assertTrue(script.contains("$installDirectory = \"Programs\\PinDB\""));
         assertTrue(script.contains("A failed upgrade attempt removed the existing PinDB installation."));
         assertTrue(script.contains("Documents sentinel was removed."));
     }
