@@ -43,7 +43,7 @@ class WindowsInstallerSafetyRegressionTest {
         String script = Files.readString(Path.of("scripts/windows-installer-safety-smoke.ps1"));
 
         assertTrue(script.contains("$upgradeUuid = \"" + WINDOWS_UPGRADE_UUID + "\""));
-        assertTrue(script.contains("$installDirectory = \"Programs\\PinDB\""));
+        assertTrue(script.contains("$installDirectory = \"PinDB-App\""));
         assertTrue(script.contains("A failed upgrade attempt removed the existing PinDB installation."));
         assertTrue(script.contains("Documents sentinel was removed."));
     }
@@ -52,7 +52,7 @@ class WindowsInstallerSafetyRegressionTest {
     void updateDocumentationSeparatesApplicationFilesFromUserData() throws Exception {
         String documentation = Files.readString(Path.of("docs/update-system.md"));
 
-        assertTrue(documentation.contains("%LOCALAPPDATA%\\Programs\\PinDB"));
+        assertTrue(documentation.contains("%LOCALAPPDATA%\\PinDB-App"));
         assertTrue(documentation.contains("%LOCALAPPDATA%\\PinDB"));
         assertTrue(documentation.contains("Do not run a legacy uninstaller against a directory that also contains user files."));
     }
