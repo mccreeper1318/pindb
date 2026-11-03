@@ -20,7 +20,7 @@ class WindowsInstallerSafetyRegressionTest {
                 .orElseThrow();
 
         assertTrue(packageCommand.contains("'--win-per-user-install'"));
-        assertTrue(packageCommand.contains("'--install-dir', 'Programs\\\\PinDB'"));
+        assertTrue(packageCommand.contains("'--install-dir', 'PinDB-App'"));
         assertFalse(packageCommand.contains("'--win-dir-chooser'"));
         assertTrue(packageCommand.contains("'--win-upgrade-uuid', windowsUpgradeUuid"));
         assertTrue(build.contains("def windowsUpgradeUuid = '" + WINDOWS_UPGRADE_UUID + "'"));
