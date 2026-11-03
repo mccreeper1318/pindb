@@ -22,6 +22,9 @@ $upgradeDirectory = Join-Path $root "upgrade"
 New-Item -ItemType Directory -Force -Path $baselineDirectory, $upgradeDirectory | Out-Null
 
 $documentsDirectory = [Environment]::GetFolderPath("MyDocuments")
+if (-not (Test-Path $documentsDirectory -PathType Container)) {
+    New-Item -ItemType Directory -Force -Path $documentsDirectory | Out-Null
+}
 $documentsSentinel = Join-Path $documentsDirectory ("pindb-installer-safety-" + [Guid]::NewGuid().ToString("N") + ".txt")
 $localAppDataSentinel = Join-Path $env:LOCALAPPDATA ("pindb-installer-safety-" + [Guid]::NewGuid().ToString("N") + ".txt")
 Set-Content -Path $documentsSentinel -Value "PinDB installer must never remove this user document." -Encoding UTF8
