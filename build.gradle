@@ -40,6 +40,9 @@ def nativeThreePartVersion = { String numericVersion ->
 }
 
 def windowsPackageAppVersion = { nativeThreePartVersion(packageAppVersion) }
+// 0.3.2 starts a new Windows installer lineage so legacy custom-location installs
+// are never automatically removed while migrating to the isolated application directory.
+def windowsUpgradeUuid = '333e60e6-ca34-4411-9fce-6b1d6c8ff2c9'
 
 def javafxVersion = '25.0.3'
 def sqliteVersion = '3.53.2.1'
@@ -113,7 +116,7 @@ tasks.register('verifyNativePackageVersionMapping') {
 
 test {
     useJUnitPlatform()
-    dependsOn tasks.named('verifyNativePackageVersionMapping')
+    dependsOn tasks.named('verifyNativePackageVersionMapping'), tasks.named('verifyWindowsInstallerSafety')
     finalizedBy jacocoTestReport
 }
 jacocoTestReport { reports { xml.required = true; html.required = true } }
@@ -172,7 +175,32 @@ tasks.register('packageWindows', org.gradle.api.tasks.Exec) {
         }
         preparePackageDirectory(packagesDir, '.exe')
     }
-    commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', windowsPackageAppVersion(), '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--win-menu', '--win-menu-group', 'PinDB', '--win-dir-chooser', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
+    commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', windowsPackageAppVersion(), '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--install-dir', 'Programs\\PinDB', '--win-upgrade-uuid', windowsUpgradeUuid, '--win-menu', '--win-menu-group', 'PinDB', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw'
+}
+
+tasks.register('verifyWindowsInstallerSafety') {
+    group = 'verification'
+    description = 'Verifies that the Windows installer is isolated from user-data directories.'
+    doLast {
+        def args = tasks.named('packageWindows', org.gradle.api.tasks.Exec).get().getCommandLine().collect { it.toString() }
+
+        if (!args.contains('--win-per-user-install')) {
+            throw new GradleException('Windows packages must remain per-user installs.')
+        }
+        if (args.contains('--win-dir-chooser')) {
+            throw new GradleException('Windows packages must not allow arbitrary install-directory selection.')
+        }
+
+        int installDirIndex = args.indexOf('--install-dir')
+        if (installDirIndex < 0 || installDirIndex + 1 >= args.size() || args[installDirIndex + 1] != 'Programs\\PinDB') {
+            throw new GradleException('Windows packages must install only into the dedicated Programs\\PinDB directory.')
+        }
+
+        int upgradeUuidIndex = args.indexOf('--win-upgrade-uuid')
+        if (upgradeUuidIndex < 0 || upgradeUuidIndex + 1 >= args.size() || args[upgradeUuidIndex + 1] != windowsUpgradeUuid) {
+            throw new GradleException('Windows packages must keep the 0.3.2+ installer lineage UUID.')
+        }
+    }
 }
 
 tasks.register('prepareMacResources', org.gradle.api.tasks.Exec) {
