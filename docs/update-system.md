@@ -72,9 +72,13 @@ If the staging or Installer handoff fails after a protected package exists, the 
 
 Windows releases are self-contained unsigned x64 `.exe` installers produced by `jpackage` on a Windows GitHub Actions runner. They include the Java runtime and install per-user.
 
-The installer provides Start Menu integration, registers `.pindb` files, permits the installation directory to be selected, and can offer a desktop shortcut.
+Starting with 0.3.2, the Windows application is isolated in the dedicated `%LOCALAPPDATA%\Programs\PinDB` install directory. The installer no longer provides arbitrary install-directory selection. This keeps application files separate from PinDB state/cache data in `%LOCALAPPDATA%\PinDB` and from user database/document folders. `.pindb` database files may still be stored anywhere the user chooses.
 
-For an in-application Windows update, PinDB downloads the matching `.exe`, requires and verifies its SHA-256 checksum, launches that verified installer, and exits so the installer can replace the application. Because the installer is currently unsigned, Windows may identify the publisher as unknown or display SmartScreen warnings. Users should obtain installers only from the official PinDB GitHub Release.
+0.3.2 also begins a new Windows installer upgrade lineage. This intentionally prevents the 0.3.2 installer from automatically uninstalling legacy PinDB installations that may have been placed directly inside a general-purpose folder such as Documents. After 0.3.2 is installed and verified, legacy application files should be cleaned up only after backing up user data and confirming exactly which directory belonged to the old installation. Do not run a legacy uninstaller against a directory that also contains user files.
+
+The installer provides Start Menu integration, registers `.pindb` files, and can offer a desktop shortcut.
+
+For an in-application Windows update, PinDB downloads the matching `.exe`, requires and verifies its SHA-256 checksum, launches that verified installer, and exits. For the one-time 0.3.2 migration, the new isolated installation is created without automatically removing a legacy custom-location installation. Later 0.3.2+ releases use the same isolated installer lineage for normal upgrades. Because the installer is currently unsigned, Windows may identify the publisher as unknown or display SmartScreen warnings. Users should obtain installers only from the official PinDB GitHub Release.
 
 ## Linux installation
 
