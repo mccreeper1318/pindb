@@ -26,7 +26,11 @@ jobs:
         run: choco install wixtoolset -y --no-progress
       - name: Run Windows tests and build installer
         shell: pwsh
-        run: .\gradlew.bat --no-daemon clean test packageWindows -PappVersion="0.3.2-ci.1"
+        run: |
+          & .\gradlew.bat --no-daemon clean test packageWindows -PappVersion="0.3.2-ci.1"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Gradle Windows CI build failed with exit code $LASTEXITCODE."
+          }
       - name: Verify installer output
         shell: pwsh
         run: |
