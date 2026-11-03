@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $upgradeUuid = "333e60e6-ca34-4411-9fce-6b1d6c8ff2c9"
-$installDirectory = "Programs\PinDB"
+$installDirectory = "PinDB-App"
 $appDirectory = Join-Path $env:LOCALAPPDATA $installDirectory
 $inputPath = (Resolve-Path $InputDirectory).Path
 $associationsPath = (Resolve-Path $AssociationsFile).Path
