@@ -30,6 +30,18 @@ class WindowsInstallerSafetyRegressionTest {
         assertTrue(workflow.contains("test packageWindows"));
         assertTrue(workflow.contains("0.3.2-ci.1"));
         assertTrue(workflow.contains("Expected exactly one Windows EXE installer"));
+        assertTrue(workflow.contains("Smoke-test Windows installer safety"));
+        assertTrue(workflow.contains("windows-installer-safety-smoke.ps1"));
+    }
+
+    @Test
+    void safetySmokeTestUsesTheSameIsolatedDirectoryAndUpgradeLineage() throws Exception {
+        String script = Files.readString(Path.of("scripts/windows-installer-safety-smoke.ps1"));
+
+        assertTrue(script.contains("$upgradeUuid = \"" + WINDOWS_UPGRADE_UUID + "\""));
+        assertTrue(script.contains("$installDirectory = \"Programs\\\\PinDB\""));
+        assertTrue(script.contains("A failed upgrade attempt removed the existing PinDB installation."));
+        assertTrue(script.contains("Documents sentinel was removed."));
     }
 
     @Test
