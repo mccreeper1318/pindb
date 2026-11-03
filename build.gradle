@@ -116,7 +116,7 @@ tasks.register('verifyNativePackageVersionMapping') {
 
 test {
     useJUnitPlatform()
-    dependsOn tasks.named('verifyNativePackageVersionMapping'), tasks.named('verifyWindowsInstallerSafety')
+    dependsOn tasks.named('verifyNativePackageVersionMapping'), 'verifyWindowsInstallerSafety'
     finalizedBy jacocoTestReport
 }
 jacocoTestReport { reports { xml.required = true; html.required = true } }
