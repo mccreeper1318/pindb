@@ -98,6 +98,15 @@ public final class AppContext {
         if (!manual && (!settings.autoCheckUpdates() || !settings.updateCheckAllowedNow())) {
             return;
         }
+        if (!updateService.supportsCurrentArchitecture()) {
+            if (launcher != null) {
+                launcher.setUpdateStatus("Updates unavailable: unsupported system architecture");
+            }
+            if (manual) {
+                UiUtil.information(owner, "Unsupported System Architecture", unsupportedArchitectureMessage());
+            }
+            return;
+        }
         if (launcher != null) {
             launcher.setUpdateStatus("Checking for updates…");
         }
@@ -152,6 +161,13 @@ public final class AppContext {
         if (launcher != null) {
             new ReleaseNotesDialog(launcher.stage(), settings, tag, markdown).showAndWait();
         }
+    }
+
+    static String unsupportedArchitectureMessage() {
+        String architecture = System.getProperty("os.arch", "").trim();
+        String detected = architecture.isBlank() ? "unknown" : architecture;
+        return "PinDB cannot automatically select an update package for this system architecture (" + detected
+                + "). Download the correct package manually from GitHub Releases.";
     }
 
     private static Throwable unwrap(Throwable throwable) {
