@@ -175,7 +175,7 @@ tasks.register('packageWindows', org.gradle.api.tasks.Exec) {
         }
         preparePackageDirectory(packagesDir, '.exe')
     }
-    commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', windowsPackageAppVersion(), '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--install-dir', 'Programs\\PinDB', '--win-upgrade-uuid', windowsUpgradeUuid, '--win-menu', '--win-menu-group', 'PinDB', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw', '--verbose'
+    commandLine 'jpackage', '--type', 'exe', '--dest', packagesDir.absolutePath, '--input', inputDir.absolutePath, '--name', 'PinDB', '--app-version', windowsPackageAppVersion(), '--vendor', 'PinDB Project', '--description', 'A flexible personal database application.', '--main-jar', packagedMainJar, '--main-class', application.mainClass.get(), '--win-per-user-install', '--install-dir', 'PinDB-App', '--win-upgrade-uuid', windowsUpgradeUuid, '--win-menu', '--win-menu-group', 'PinDB', '--win-shortcut-prompt', '--file-associations', associations.absolutePath, '--java-options', '-Dfile.encoding=UTF-8', '--java-options', '-Dprism.order=es2,sw', '--verbose'
 }
 
 tasks.register('verifyWindowsInstallerSafety') {
@@ -192,8 +192,8 @@ tasks.register('verifyWindowsInstallerSafety') {
         }
 
         int installDirIndex = args.indexOf('--install-dir')
-        if (installDirIndex < 0 || installDirIndex + 1 >= args.size() || args[installDirIndex + 1] != 'Programs\\PinDB') {
-            throw new GradleException('Windows packages must install only into the dedicated Programs\\PinDB directory.')
+        if (installDirIndex < 0 || installDirIndex + 1 >= args.size() || args[installDirIndex + 1] != 'PinDB-App') {
+            throw new GradleException('Windows packages must install only into the dedicated PinDB-App directory.')
         }
 
         int upgradeUuidIndex = args.indexOf('--win-upgrade-uuid')
