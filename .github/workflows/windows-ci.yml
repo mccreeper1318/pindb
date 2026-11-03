@@ -21,6 +21,26 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: gradle
-      - name: Run Windows tests
+      - name: Install WiX
         shell: pwsh
-        run: .\gradlew.bat --no-daemon clean test
+        run: choco install wixtoolset -y --no-progress
+      - name: Run Windows tests and build installer
+        shell: pwsh
+        run: |
+          & .\gradlew.bat --no-daemon clean test packageWindows -PappVersion="0.3.2-ci.1"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Gradle Windows CI build failed with exit code $LASTEXITCODE."
+          }
+      - name: Verify installer output
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem 'build\packages' -Filter '*.exe' -File)
+          if ($packages.Count -ne 1) {
+            throw "Expected exactly one Windows EXE installer; found $($packages.Count)."
+          }
+          if ($packages[0].Length -le 0) {
+            throw 'Windows installer is empty.'
+          }
+      - name: Smoke-test Windows installer safety
+        shell: pwsh
+        run: .\scripts\windows-installer-safety-smoke.ps1

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2
+
+### Fixed
+- Isolated Windows application installs from user data folders and removed arbitrary install-directory selection (Issue #113).
+- Prevented 0.3.2 from automatically removing legacy Windows installs that may be located inside user data folders (Issue #113).
+
+### Changed
+- Windows CI now builds the installer and verifies its safe install-location configuration (Issue #113).
+
 ## 0.3.1.1
 
 ### Fixed
