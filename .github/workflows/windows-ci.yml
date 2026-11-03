@@ -37,3 +37,6 @@ jobs:
           if ($packages[0].Length -le 0) {
             throw 'Windows installer is empty.'
           }
+      - name: Smoke-test Windows installer safety
+        shell: pwsh
+        run: .\scripts\windows-installer-safety-smoke.ps1
