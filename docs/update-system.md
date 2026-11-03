@@ -72,7 +72,7 @@ If the staging or Installer handoff fails after a protected package exists, the 
 
 Windows releases are self-contained unsigned x64 `.exe` installers produced by `jpackage` on a Windows GitHub Actions runner. They include the Java runtime and install per-user.
 
-Starting with 0.3.2, the Windows application is isolated in the dedicated `%LOCALAPPDATA%\Programs\PinDB` install directory. The installer no longer provides arbitrary install-directory selection. This keeps application files separate from PinDB state/cache data in `%LOCALAPPDATA%\PinDB` and from user database/document folders. `.pindb` database files may still be stored anywhere the user chooses.
+Starting with 0.3.2, the Windows application is isolated in the dedicated `%LOCALAPPDATA%\PinDB-App` install directory. The installer no longer provides arbitrary install-directory selection. This keeps application files separate from PinDB state/cache data in `%LOCALAPPDATA%\PinDB` and from user database/document folders. `.pindb` database files may still be stored anywhere the user chooses.
 
 0.3.2 also begins a new Windows installer upgrade lineage. This intentionally prevents the 0.3.2 installer from automatically uninstalling legacy PinDB installations that may have been placed directly inside a general-purpose folder such as Documents. After 0.3.2 is installed and verified, legacy application files should be cleaned up only after backing up user data and confirming exactly which directory belonged to the old installation. Do not run a legacy uninstaller against a directory that also contains user files.
 
