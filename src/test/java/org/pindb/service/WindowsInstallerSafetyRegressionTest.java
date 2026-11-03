@@ -14,11 +14,15 @@ class WindowsInstallerSafetyRegressionTest {
     @Test
     void windowsInstallerUsesDedicatedPerUserApplicationDirectory() throws Exception {
         String build = Files.readString(Path.of("build.gradle"));
+        String packageCommand = build.lines()
+                .filter(line -> line.contains("commandLine 'jpackage'") && line.contains("'--type', 'exe'"))
+                .findFirst()
+                .orElseThrow();
 
-        assertTrue(build.contains("'--win-per-user-install'"));
-        assertTrue(build.contains("'--install-dir', 'Programs\\\\PinDB'"));
-        assertFalse(build.contains("'--win-dir-chooser'"));
-        assertTrue(build.contains("'--win-upgrade-uuid', windowsUpgradeUuid"));
+        assertTrue(packageCommand.contains("'--win-per-user-install'"));
+        assertTrue(packageCommand.contains("'--install-dir', 'Programs\\\\PinDB'"));
+        assertFalse(packageCommand.contains("'--win-dir-chooser'"));
+        assertTrue(packageCommand.contains("'--win-upgrade-uuid', windowsUpgradeUuid"));
         assertTrue(build.contains("def windowsUpgradeUuid = '" + WINDOWS_UPGRADE_UUID + "'"));
     }
 
