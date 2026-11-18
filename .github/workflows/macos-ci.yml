@@ -66,14 +66,14 @@ jobs:
 
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pindb-test-report-macos-${{ matrix.release_arch }}
           path: build/reports/tests/test
           if-no-files-found: ignore
 
       - name: Upload macOS PKG
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pindb-macos-${{ matrix.release_arch }}
           path: build/packages/PinDB-${{ env.CI_APP_VERSION }}-macos-${{ matrix.release_arch }}.pkg

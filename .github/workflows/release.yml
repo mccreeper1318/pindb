@@ -344,7 +344,7 @@ jobs:
           fi
 
       - name: Upload Debian release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pindb-deb-${{ needs.prepare.outputs.version }}
           path: |
@@ -509,7 +509,7 @@ jobs:
           fi
 
       - name: Upload RPM release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pindb-rpm-${{ needs.prepare.outputs.version }}
           path: |
