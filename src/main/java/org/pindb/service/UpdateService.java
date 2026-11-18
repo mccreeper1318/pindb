@@ -84,6 +84,10 @@ public final class UpdateService {
         return packageTypeFor(operatingSystem, distribution);
     }
 
+    public boolean supportsCurrentArchitecture() {
+        return architecture != SystemArchitecture.UNKNOWN;
+    }
+
     static Optional<NativePackageType> packageTypeFor(OperatingSystem operatingSystem,
                                                       LinuxDistribution distribution) {
         return switch (operatingSystem == null ? OperatingSystem.OTHER : operatingSystem) {
@@ -120,7 +124,7 @@ public final class UpdateService {
                                                             NativePackageType packageType,
                                                             SystemArchitecture architecture) {
         if (architecture == SystemArchitecture.UNKNOWN) {
-            return packageType == NativePackageType.MACOS_PKG ? Optional.empty() : candidates.stream().findFirst();
+            return Optional.empty();
         }
         Optional<ReleasePackage> exact = candidates.stream()
                 .filter(candidate -> candidate.architecture() == architecture)
