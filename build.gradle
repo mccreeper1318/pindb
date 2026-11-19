@@ -121,6 +121,20 @@ test {
 }
 jacocoTestReport { reports { xml.required = true; html.required = true } }
 
+jacocoTestCoverageVerification {
+    dependsOn test
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.30
+            }
+        }
+    }
+}
+check.dependsOn jacocoTestCoverageVerification
+
 def preparePackageDirectory = { File packagesDir, String extension ->
     if (!packagesDir.mkdirs() && !packagesDir.isDirectory()) throw new GradleException("Unable to create package directory: ${packagesDir}")
     packagesDir.listFiles()?.findAll { it.isFile() && (it.name.endsWith(extension) || it.name.endsWith(extension + '.sha256')) }?.each {
