@@ -45,7 +45,7 @@ def windowsPackageAppVersion = { nativeThreePartVersion(packageAppVersion) }
 def windowsUpgradeUuid = '333e60e6-ca34-4411-9fce-6b1d6c8ff2c9'
 
 def javafxVersion = '25.0.3'
-def sqliteVersion = '3.53.2.1'
+def sqliteVersion = '3.54.1.0'
 def slf4jVersion = '2.0.20'
 def pdfboxVersion = '3.0.8'
 def poiVersion = '6.0.0'
