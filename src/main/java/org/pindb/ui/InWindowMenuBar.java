@@ -145,6 +145,11 @@ public final class InWindowMenuBar {
             return;
         }
 
+        if (event.getCode() == KeyCode.TAB) {
+            hide(false);
+            return;
+        }
+
         switch (event.getCode()) {
             case ESCAPE -> {
                 if (levels.size() > 1) {
@@ -524,7 +529,7 @@ public final class InWindowMenuBar {
             return -1;
         }
         int step = direction > 0 ? 1 : -1;
-        int index = current;
+        int index = current < 0 ? (step > 0 ? -1 : 0) : current;
         for (int attempts = 0; attempts < navigable.size(); attempts++) {
             index = wrap(index + step, navigable.size());
             if (Boolean.TRUE.equals(navigable.get(index))) {
