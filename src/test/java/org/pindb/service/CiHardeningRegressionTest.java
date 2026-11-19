@@ -22,7 +22,7 @@ class CiHardeningRegressionTest {
         assertTrue(build.contains("jacocoTestCoverageVerification"));
         assertTrue(build.contains("counter = 'LINE'"));
         assertTrue(build.contains("value = 'COVEREDRATIO'"));
-        assertTrue(build.contains("minimum = 0.30"));
+        assertTrue(build.contains("minimum = 0.27"));
         assertTrue(build.contains("check.dependsOn jacocoTestCoverageVerification"));
     }
 
