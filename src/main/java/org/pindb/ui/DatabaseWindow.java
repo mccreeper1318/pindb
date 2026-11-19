@@ -431,19 +431,15 @@ public final class DatabaseWindow implements AutoCloseable {
         boolean addAnother;
         do {
             EntryEditorDialog.Result result = new EntryEditorDialog(
-                    stage, context.settings(), fields, null, Map.of()).showAndWait().orElse(null);
+                    stage, context.settings(), fields, null, Map.of(), saveResult -> {
+                long recordId = database.addRecord(saveResult.values());
+                documentStore.replaceDocuments(recordId, saveResult.documents());
+            }).showAndWait().orElse(null);
             if (result == null) {
                 return;
             }
-            try {
-                long recordId = database.addRecord(result.values());
-                documentStore.replaceDocuments(recordId, result.documents());
-                reloadAll();
-                addAnother = result.addAnother();
-            } catch (DatabaseException exception) {
-                UiUtil.warning(stage, "Entry Not Saved", exception.getMessage());
-                addAnother = false;
-            }
+            reloadAll();
+            addAnother = result.addAnother();
         } while (addAnother);
     }
 
@@ -453,16 +449,14 @@ public final class DatabaseWindow implements AutoCloseable {
             return;
         }
         Map<Long, DocumentData> existingDocuments = documentStore.documentsForRecord(selected.id());
-        new EntryEditorDialog(stage, context.settings(), fields, selected, existingDocuments)
-                .showAndWait().ifPresent(result -> {
-            try {
-                database.updateRecord(selected.id(), result.values());
-                documentStore.replaceDocuments(selected.id(), result.documents());
-                reloadAll();
-            } catch (DatabaseException exception) {
-                UiUtil.warning(stage, "Entry Not Saved", exception.getMessage());
-            }
-        });
+        EntryEditorDialog.Result result = new EntryEditorDialog(
+                stage, context.settings(), fields, selected, existingDocuments, saveResult -> {
+            database.updateRecord(selected.id(), saveResult.values());
+            documentStore.replaceDocuments(selected.id(), saveResult.documents());
+        }).showAndWait().orElse(null);
+        if (result != null) {
+            reloadAll();
+        }
     }
 
     private void deleteSelected() {

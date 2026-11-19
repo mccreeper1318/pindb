@@ -23,6 +23,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import org.pindb.db.DatabaseException;
 import org.pindb.model.DocumentData;
 import org.pindb.model.FieldDefinition;
 import org.pindb.model.RecordData;
@@ -39,6 +40,8 @@ import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
 
 public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("H:mm");
@@ -47,6 +50,7 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
     private final Map<Long, DocumentData> documents = new LinkedHashMap<>();
     private final Map<Long, Task<DocumentData>> documentLoads = new LinkedHashMap<>();
     private final Label error = new Label();
+    private final SaveHandler saveHandler;
 
     public EntryEditorDialog(Window owner, SettingsService settings, List<FieldDefinition> fields, RecordData existing) {
         this(owner, settings, fields, existing, Map.of());
@@ -54,7 +58,15 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
 
     public EntryEditorDialog(Window owner, SettingsService settings, List<FieldDefinition> fields,
                              RecordData existing, Map<Long, DocumentData> existingDocuments) {
+        this(owner, settings, fields, existing, existingDocuments, result -> {
+        });
+    }
+
+    public EntryEditorDialog(Window owner, SettingsService settings, List<FieldDefinition> fields,
+                             RecordData existing, Map<Long, DocumentData> existingDocuments,
+                             SaveHandler saveHandler) {
         this.fields = fields;
+        this.saveHandler = Objects.requireNonNull(saveHandler, "saveHandler");
         documents.putAll(existingDocuments == null ? Map.of() : existingDocuments);
         initOwner(owner);
         setTitle(existing == null ? "New Entry" : "Edit Entry");
@@ -181,8 +193,14 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             error.setText(validation);
             return;
         }
+
+        Result result = new Result(values(), Map.copyOf(documents), addAnother);
+        if (!attemptSave(saveHandler, result, error::setText)) {
+            return;
+        }
+
         error.setText("");
-        setResult(new Result(values(), Map.copyOf(documents), addAnother));
+        setResult(result);
         close();
     }
 
@@ -449,6 +467,22 @@ public final class EntryEditorDialog extends Dialog<EntryEditorDialog.Result> {
             values.put(field.id(), value == null ? "" : value);
         }
         return values;
+    }
+
+    static boolean attemptSave(SaveHandler saveHandler, Result result, Consumer<String> errorSink) {
+        try {
+            saveHandler.save(result);
+            return true;
+        } catch (DatabaseException exception) {
+            String message = exception.getMessage();
+            errorSink.accept(message == null || message.isBlank() ? "The entry could not be saved." : message);
+            return false;
+        }
+    }
+
+    @FunctionalInterface
+    public interface SaveHandler {
+        void save(Result result);
     }
 
     public record Result(Map<Long, String> values, Map<Long, DocumentData> documents, boolean addAnother) {

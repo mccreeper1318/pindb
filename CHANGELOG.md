@@ -4,6 +4,7 @@
 
 ### Fixed
 - Stopped automatic updates from selecting a package when the host architecture is unknown and show an unsupported-architecture message instead (Issue #46).
+- Kept entry forms open when database validation or persistence fails so typed values can be corrected without re-entering them (Issue #47).
 - Isolated Windows application installs from user data folders and removed arbitrary install-directory selection (Issue #113).
 - Prevented 0.3.2 from automatically removing legacy Windows installs that may be located inside user data folders (Issue #113).
 
