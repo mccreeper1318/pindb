@@ -12,6 +12,13 @@ CANDIDATE="$(realpath "$2")"
 baseline_version="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$BASELINE")"
 candidate_version="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$CANDIDATE")"
 
+mkdir -p \
+  /etc/xdg/menus \
+  /usr/local/share/applications \
+  /usr/local/share/desktop-directories \
+  /usr/local/share/mime/packages \
+  /usr/local/share/icons/hicolor
+
 dnf install -y "$BASELINE"
 installed="$(rpm -q --qf '%{VERSION}-%{RELEASE}' pindb)"
 [[ "$installed" == "$baseline_version" ]] || {
