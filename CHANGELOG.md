@@ -9,6 +9,15 @@
 
 ### Changed
 - Windows CI now builds the installer and verifies its safe install-location configuration (Issue #113).
+- Updated Apache POI from 5.5.1 to 6.0.0.
+- Updated SQLite JDBC from 3.53.2.1 to 3.54.1.0.
+- Updated SLF4J Simple from 2.0.17 to 2.0.20.
+- Updated JUnit BOM from 5.13.4 to 6.1.3.
+- Updated the Gradle wrapper from 9.6.1 to 9.9.1.
+- Updated `actions/checkout` from v4 to v7.
+- Updated `actions/setup-java` from v4 to v6.
+- Updated `actions/upload-artifact` from v4 to v7.
+- Updated `actions/download-artifact` from v4 to v8.
 
 ## 0.3.1.1
 
