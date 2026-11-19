@@ -17,6 +17,13 @@ if ! dpkg --compare-versions "$candidate_version" gt "$baseline_version"; then
   exit 1
 fi
 
+sudo mkdir -p \
+  /etc/xdg/menus \
+  /usr/local/share/applications \
+  /usr/local/share/desktop-directories \
+  /usr/local/share/mime/packages \
+  /usr/local/share/icons/hicolor
+
 sudo apt-get install -y "$BASELINE"
 installed="$(dpkg-query -W -f='${Version}' pindb)"
 [[ "$installed" == "$baseline_version" ]] || {
