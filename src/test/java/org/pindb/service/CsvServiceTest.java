@@ -66,7 +66,8 @@ class CsvServiceTest {
 
         CsvService.exportCsv(csv, List.of(field), List.of(record));
 
-        assertEquals("'=Formula Header\n'=2+2\n", Files.readString(csv));
+        String newline = System.lineSeparator();
+        assertEquals("'=Formula Header" + newline + "'=2+2" + newline, Files.readString(csv));
     }
 
     @Test
