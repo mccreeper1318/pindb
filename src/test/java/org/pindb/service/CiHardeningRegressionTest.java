@@ -17,13 +17,14 @@ class CiHardeningRegressionTest {
 
     @Test
     void verificationEnforcesMinimumLineCoverage() throws Exception {
-        String build = Files.readString(Path.of("build.gradle"));
+        String workflow = workflow(".github/workflows/ci.yml");
+        String verifier = Files.readString(Path.of("scripts/verify-jacoco-coverage.py"));
 
-        assertTrue(build.contains("jacocoTestCoverageVerification"));
-        assertTrue(build.contains("counter = 'LINE'"));
-        assertTrue(build.contains("value = 'COVEREDRATIO'"));
-        assertTrue(build.contains("minimum = 0.27"));
-        assertTrue(build.contains("check.dependsOn jacocoTestCoverageVerification"));
+        assertTrue(workflow.contains("Enforce JaCoCo line coverage baseline"));
+        assertTrue(workflow.contains("verify-jacoco-coverage.py"));
+        assertTrue(workflow.contains("jacocoTestReport.xml 0.27"));
+        assertTrue(verifier.contains("counter.get(\"covered\""));
+        assertTrue(verifier.contains("ratio < minimum"));
     }
 
     @Test
