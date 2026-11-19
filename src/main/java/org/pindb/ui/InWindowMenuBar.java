@@ -362,7 +362,7 @@ public final class InWindowMenuBar {
             return;
         }
         int current = focusedIndex(level);
-        int next = nextNavigableIndex(level.items().stream().map(ItemButton::item).toList(), current, direction);
+        int next = nextNavigableIndex(navigableStates(level), current, direction);
         if (next >= 0) {
             level.items().get(next).button().requestFocus();
         }
@@ -373,15 +373,14 @@ public final class InWindowMenuBar {
         if (level == null) {
             return;
         }
-        List<MenuItem> items = level.items().stream().map(ItemButton::item).toList();
-        int index = boundaryNavigableIndex(items, first);
+        int index = boundaryNavigableIndex(navigableStates(level), first);
         if (index >= 0) {
             level.items().get(index).button().requestFocus();
         }
     }
 
     private void focusFirstEnabled(MenuLevel level) {
-        int index = boundaryNavigableIndex(level.items().stream().map(ItemButton::item).toList(), true);
+        int index = boundaryNavigableIndex(navigableStates(level), true);
         if (index >= 0) {
             level.items().get(index).button().requestFocus();
         } else if (activeMenu != null) {
@@ -514,31 +513,35 @@ public final class InWindowMenuBar {
         }
     }
 
-    static int nextNavigableIndex(List<MenuItem> items, int current, int direction) {
-        if (items == null || items.isEmpty() || direction == 0) {
+    private static List<Boolean> navigableStates(MenuLevel level) {
+        return level.items().stream()
+                .map(item -> !item.item().isDisable())
+                .toList();
+    }
+
+    static int nextNavigableIndex(List<Boolean> navigable, int current, int direction) {
+        if (navigable == null || navigable.isEmpty() || direction == 0) {
             return -1;
         }
         int step = direction > 0 ? 1 : -1;
         int index = current;
-        for (int attempts = 0; attempts < items.size(); attempts++) {
-            index = wrap(index + step, items.size());
-            MenuItem item = items.get(index);
-            if (!(item instanceof SeparatorMenuItem) && !item.isDisable()) {
+        for (int attempts = 0; attempts < navigable.size(); attempts++) {
+            index = wrap(index + step, navigable.size());
+            if (Boolean.TRUE.equals(navigable.get(index))) {
                 return index;
             }
         }
         return -1;
     }
 
-    static int boundaryNavigableIndex(List<MenuItem> items, boolean first) {
-        if (items == null || items.isEmpty()) {
+    static int boundaryNavigableIndex(List<Boolean> navigable, boolean first) {
+        if (navigable == null || navigable.isEmpty()) {
             return -1;
         }
-        int index = first ? 0 : items.size() - 1;
+        int index = first ? 0 : navigable.size() - 1;
         int step = first ? 1 : -1;
-        while (index >= 0 && index < items.size()) {
-            MenuItem item = items.get(index);
-            if (!(item instanceof SeparatorMenuItem) && !item.isDisable()) {
+        while (index >= 0 && index < navigable.size()) {
+            if (Boolean.TRUE.equals(navigable.get(index))) {
                 return index;
             }
             index += step;
