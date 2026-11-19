@@ -11,6 +11,7 @@
 - Prevented 0.3.2 from automatically removing legacy Windows installs that may be located inside user data folders (Issue #113).
 
 ### Changed
+- Improved the Wayland-safe in-window menu with Alt mnemonics, arrow-key/focus navigation, submenu support, and accessibility metadata (Issue #50).
 - Windows CI now builds the installer and verifies its safe install-location configuration (Issue #113).
 - Updated Apache POI from 5.5.1 to 6.0.0.
 - Updated SQLite JDBC from 3.53.2.1 to 3.54.1.0.
