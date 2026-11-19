@@ -41,13 +41,13 @@ jobs:
           ./gradlew --no-daemon clean packageDeb -PappVersion="0.3.2-ci.1"
           cp build/packages/*.deb "$RUNNER_TEMP/pindb-baseline.deb"
 
-      - name: Run verification and build candidate Debian package
-        run: ./gradlew --no-daemon clean check packageDeb -PappVersion="0.3.2-ci.2"
-
       - name: Run JavaFX UI smoke test
         env:
           PINDB_RUN_JAVAFX_TESTS: "true"
         run: xvfb-run -a ./gradlew --no-daemon test --tests org.pindb.ui.InWindowMenuBarUiTest
+
+      - name: Run verification and build candidate Debian package
+        run: ./gradlew --no-daemon clean check packageDeb -PappVersion="0.3.2-ci.2"
 
       - name: Verify packaged Debian update helper
         shell: bash
@@ -102,7 +102,6 @@ jobs:
           dnf install -y \
             git \
             rpm-build \
-            rpmdevtools \
             desktop-file-utils \
             cpio \
             findutils \
