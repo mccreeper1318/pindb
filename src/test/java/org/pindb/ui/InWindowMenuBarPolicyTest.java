@@ -29,6 +29,8 @@ class InWindowMenuBarPolicyTest {
         assertEquals(3, InWindowMenuBar.nextNavigableIndex(navigable, 0, 1));
         assertEquals(0, InWindowMenuBar.nextNavigableIndex(navigable, 3, 1));
         assertEquals(3, InWindowMenuBar.nextNavigableIndex(navigable, 0, -1));
+        assertEquals(0, InWindowMenuBar.nextNavigableIndex(navigable, -1, 1));
+        assertEquals(3, InWindowMenuBar.nextNavigableIndex(navigable, -1, -1));
         assertEquals(0, InWindowMenuBar.boundaryNavigableIndex(navigable, true));
         assertEquals(3, InWindowMenuBar.boundaryNavigableIndex(navigable, false));
     }
