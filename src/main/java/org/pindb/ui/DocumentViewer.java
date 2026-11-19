@@ -32,10 +32,10 @@ import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.pindb.model.DocumentData;
 import org.pindb.service.DocumentCopyService;
+import org.pindb.service.ExternalDocumentCopyService;
 import org.pindb.service.PdfPageSource;
 import org.pindb.service.SettingsService;
 
-import java.awt.Desktop;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -46,9 +46,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -63,6 +65,7 @@ public final class DocumentViewer {
 
     private final Stage stage = new Stage();
     private final DocumentData document;
+    private final ExternalDocumentCopyService externalDocumentCopies;
     private final StackPane previewHost = new StackPane();
     private final ExecutorService worker = Executors.newSingleThreadExecutor(
             Thread.ofVirtual().name("pindb-document-viewer-", 0).factory());
@@ -72,6 +75,8 @@ public final class DocumentViewer {
             return size() > PDF_CACHE_PAGES;
         }
     };
+    private final Set<Path> externalCopies = new LinkedHashSet<>();
+    private final Set<Task<?>> fileTasks = new LinkedHashSet<>();
     private PdfPageSource pdfSource;
     private Task<?> currentPreviewTask;
     private String printableText;
@@ -79,8 +84,10 @@ public final class DocumentViewer {
     private boolean printable;
     private boolean viewerClosed;
 
-    public DocumentViewer(Window owner, SettingsService settings, DocumentData document) {
+    public DocumentViewer(Window owner, SettingsService settings, DocumentData document,
+                          ExternalDocumentCopyService externalDocumentCopies) {
         this.document = document;
+        this.externalDocumentCopies = externalDocumentCopies;
         stage.initOwner(owner);
         stage.initModality(Modality.NONE);
         stage.setTitle(document.fileName() + " — PinDB Document Viewer");
@@ -486,13 +493,13 @@ public final class DocumentViewer {
     }
 
     private void openExternally() {
-        if (!Desktop.isDesktopSupported()) {
+        if (!externalDocumentCopies.canOpenWithSystemApplication()) {
             UiUtil.warning(stage, "Open Unavailable", "This system does not provide a desktop file-opening service.");
             return;
         }
         try {
-            String suffix = extension(document.fileName());
-            Path copy = Files.createTempFile("pindb-document-", suffix.isBlank() ? ".tmp" : "." + suffix);
+            Path copy = externalDocumentCopies.createTemporaryCopy(document.fileName());
+            externalCopies.add(copy);
             runFileWrite("Preparing system copy…", copy, true);
         } catch (IOException exception) {
             UiUtil.error(stage, "Could Not Open Document",
@@ -509,6 +516,9 @@ public final class DocumentViewer {
                         document.writeTo(output,
                                 (completed, total) -> updateProgress(completed, total),
                                 this::isCancelled);
+                    }
+                    if (!isCancelled()) {
+                        externalDocumentCopies.openWithSystemApplication(destination);
                     }
                 } else {
                     DocumentCopyService.saveAtomically(document, destination,
@@ -531,27 +541,25 @@ public final class DocumentViewer {
         box.setPadding(new Insets(18));
         box.setAlignment(Pos.CENTER);
         progressStage.setScene(new Scene(box));
+        fileTasks.add(task);
         task.setOnSucceeded(event -> {
+            fileTasks.remove(task);
             progressStage.close();
-            if (openAfter) {
-                destination.toFile().deleteOnExit();
-                try {
-                    Desktop.getDesktop().open(destination.toFile());
-                } catch (IOException exception) {
-                    UiUtil.error(stage, "Could Not Open Document",
-                            "PinDB could not open the temporary copy with the system application.", exception);
-                }
-            }
         });
         task.setOnFailed(event -> {
+            fileTasks.remove(task);
             progressStage.close();
             if (openAfter) {
                 cleanupTemporaryCopy(destination);
             }
             UiUtil.error(stage, openAfter ? "Could Not Open Document" : "Could Not Save Document",
-                    "PinDB could not write the selected document copy.", task.getException());
+                    openAfter
+                            ? "PinDB could not prepare or open the temporary document copy."
+                            : "PinDB could not write the selected document copy.",
+                    task.getException());
         });
         task.setOnCancelled(event -> {
+            fileTasks.remove(task);
             progressStage.close();
             if (openAfter) {
                 cleanupTemporaryCopy(destination);
@@ -565,12 +573,9 @@ public final class DocumentViewer {
         worker.submit(task);
     }
 
-    private static void cleanupTemporaryCopy(Path destination) {
-        try {
-            Files.deleteIfExists(destination);
-        } catch (IOException ignored) {
-            destination.toFile().deleteOnExit();
-        }
+    private void cleanupTemporaryCopy(Path destination) {
+        externalCopies.remove(destination);
+        externalDocumentCopies.release(destination);
     }
 
     private void closeResources() {
@@ -579,6 +584,10 @@ public final class DocumentViewer {
         if (task != null) {
             task.cancel(true);
         }
+        for (Task<?> fileTask : List.copyOf(fileTasks)) {
+            fileTask.cancel(true);
+        }
+        fileTasks.clear();
         worker.shutdownNow();
         PdfPageSource source = pdfSource;
         pdfSource = null;
@@ -588,6 +597,10 @@ public final class DocumentViewer {
         synchronized (pdfCache) {
             pdfCache.clear();
         }
+        for (Path copy : List.copyOf(externalCopies)) {
+            externalDocumentCopies.release(copy);
+        }
+        externalCopies.clear();
     }
 
     private Image cachedPdfPage(int pageIndex) {
