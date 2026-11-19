@@ -36,6 +36,18 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Configure CI Maven Central mirror
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/ci-maven-mirror.gradle" <<'EOF'
+          allprojects {
+              repositories {
+                  maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
+                  mavenCentral()
+              }
+          }
+          EOF
+
       - name: Build baseline Debian package
         shell: bash
         run: |
@@ -45,7 +57,7 @@ jobs:
             if [[ "$attempt" -gt 1 ]]; then
               extra_args+=(--refresh-dependencies)
             fi
-            if ./gradlew --no-daemon "${extra_args[@]}" clean packageDeb -PappVersion="0.3.2-ci.1"; then
+            if ./gradlew --no-daemon --init-script "$RUNNER_TEMP/ci-maven-mirror.gradle" "${extra_args[@]}" clean packageDeb -PappVersion="0.3.2-ci.1"; then
               break
             fi
             if [[ "$attempt" -eq 3 ]]; then
@@ -59,10 +71,10 @@ jobs:
       - name: Run JavaFX UI smoke test
         env:
           PINDB_RUN_JAVAFX_TESTS: "true"
-        run: xvfb-run -a ./gradlew --no-daemon test --tests org.pindb.ui.InWindowMenuBarUiTest
+        run: xvfb-run -a ./gradlew --no-daemon --init-script "$RUNNER_TEMP/ci-maven-mirror.gradle" test --tests org.pindb.ui.InWindowMenuBarUiTest
 
       - name: Run verification and build candidate Debian package
-        run: ./gradlew --no-daemon clean check packageDeb -PappVersion="0.3.2-ci.2"
+        run: ./gradlew --no-daemon --init-script "$RUNNER_TEMP/ci-maven-mirror.gradle" clean check packageDeb -PappVersion="0.3.2-ci.2"
 
       - name: Enforce JaCoCo line coverage baseline
         run: python3 scripts/verify-jacoco-coverage.py build/reports/jacoco/test/jacocoTestReport.xml 0.27
@@ -140,6 +152,18 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Configure CI Maven Central mirror
+        shell: bash
+        run: |
+          cat > /tmp/ci-maven-mirror.gradle <<'EOF'
+          allprojects {
+              repositories {
+                  maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
+                  mavenCentral()
+              }
+          }
+          EOF
+
       - name: Build baseline RPM package
         shell: bash
         run: |
@@ -149,7 +173,7 @@ jobs:
             if [[ "$attempt" -gt 1 ]]; then
               extra_args+=(--refresh-dependencies)
             fi
-            if ./gradlew --no-daemon "${extra_args[@]}" clean packageRpm -PappVersion="0.3.2-ci.1"; then
+            if ./gradlew --no-daemon --init-script /tmp/ci-maven-mirror.gradle "${extra_args[@]}" clean packageRpm -PappVersion="0.3.2-ci.1"; then
               break
             fi
             if [[ "$attempt" -eq 3 ]]; then
@@ -161,7 +185,7 @@ jobs:
           cp build/packages/*.rpm /tmp/pindb-baseline.rpm
 
       - name: Run verification and build candidate RPM package
-        run: ./gradlew --no-daemon clean check packageRpm -PappVersion="0.3.2-ci.2"
+        run: ./gradlew --no-daemon --init-script /tmp/ci-maven-mirror.gradle clean check packageRpm -PappVersion="0.3.2-ci.2"
 
       - name: Verify RPM metadata and desktop integration
         shell: bash
