@@ -64,6 +64,9 @@ jobs:
       - name: Run verification and build candidate Debian package
         run: ./gradlew --no-daemon clean check packageDeb -PappVersion="0.3.2-ci.2"
 
+      - name: Enforce JaCoCo line coverage baseline
+        run: python3 scripts/verify-jacoco-coverage.py build/reports/jacoco/test/jacocoTestReport.xml 0.27
+
       - name: Verify packaged Debian update helper
         shell: bash
         run: |
