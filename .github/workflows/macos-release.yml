@@ -82,7 +82,7 @@ jobs:
 
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ needs.prepare.outputs.tag }}
           persist-credentials: false
