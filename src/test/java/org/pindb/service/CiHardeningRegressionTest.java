@@ -41,6 +41,8 @@ class CiHardeningRegressionTest {
         assertTrue(linux.contains("PINDB_RUN_JAVAFX_TESTS"));
         assertTrue(linux.contains("xvfb-run -a"));
         assertTrue(linux.contains("InWindowMenuBarUiTest"));
+        assertTrue(linux.contains("maven-central.storage-download.googleapis.com/maven2/"));
+        assertTrue(linux.contains("--init-script"));
 
         assertTrue(linux.contains("Smoke-test Debian install, upgrade, and uninstall"));
         assertTrue(linux.contains("scripts/deb-package-lifecycle-smoke.sh"));
