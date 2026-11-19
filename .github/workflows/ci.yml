@@ -19,10 +19,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Java 25
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: temurin
           java-version: "25"
@@ -31,13 +31,23 @@ jobs:
       - name: Install Debian packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y fakeroot
+          sudo apt-get install -y fakeroot xvfb libgtk-3-0
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Run tests and build Debian package
-        run: ./gradlew --no-daemon clean test packageDeb
+      - name: Build baseline Debian package
+        run: |
+          ./gradlew --no-daemon clean packageDeb -PappVersion="0.3.2-ci.1"
+          cp build/packages/*.deb "$RUNNER_TEMP/pindb-baseline.deb"
+
+      - name: Run verification and build candidate Debian package
+        run: ./gradlew --no-daemon clean check packageDeb -PappVersion="0.3.2-ci.2"
+
+      - name: Run JavaFX UI smoke test
+        env:
+          PINDB_RUN_JAVAFX_TESTS: "true"
+        run: xvfb-run -a ./gradlew --no-daemon test --tests org.pindb.ui.InWindowMenuBarUiTest
 
       - name: Verify packaged Debian update helper
         shell: bash
@@ -58,16 +68,23 @@ jobs:
             exit 1
           fi
 
+      - name: Smoke-test Debian install, upgrade, and uninstall
+        shell: bash
+        run: |
+          bash scripts/deb-package-lifecycle-smoke.sh \
+            "$RUNNER_TEMP/pindb-baseline.deb" \
+            "$(realpath build/packages/*.deb)"
+
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pindb-test-report
           path: build/reports/tests/test
           if-no-files-found: ignore
 
       - name: Upload Debian package
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pindb-deb
           path: build/packages/*.deb
@@ -77,7 +94,7 @@ jobs:
     name: Test and build Fedora RPM
     runs-on: ubuntu-24.04
     container:
-      image: fedora:latest
+      image: fedora:45
 
     steps:
       - name: Install Fedora build tools
@@ -85,6 +102,7 @@ jobs:
           dnf install -y \
             git \
             rpm-build \
+            rpmdevtools \
             desktop-file-utils \
             cpio \
             findutils \
@@ -93,10 +111,10 @@ jobs:
             which
 
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Java 25
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: temurin
           java-version: "25"
@@ -105,8 +123,13 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Run tests and build RPM package
-        run: ./gradlew --no-daemon clean test packageRpm
+      - name: Build baseline RPM package
+        run: |
+          ./gradlew --no-daemon clean packageRpm -PappVersion="0.3.2-ci.1"
+          cp build/packages/*.rpm /tmp/pindb-baseline.rpm
+
+      - name: Run verification and build candidate RPM package
+        run: ./gradlew --no-daemon clean check packageRpm -PappVersion="0.3.2-ci.2"
 
       - name: Verify RPM metadata and desktop integration
         shell: bash
@@ -176,8 +199,15 @@ jobs:
             exit 1
           fi
 
+      - name: Smoke-test RPM install, upgrade, and uninstall
+        shell: bash
+        run: |
+          bash scripts/rpm-package-lifecycle-smoke.sh \
+            /tmp/pindb-baseline.rpm \
+            "$(realpath build/packages/*.rpm)"
+
       - name: Upload Fedora RPM
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pindb-rpm
           path: build/packages/*.rpm
