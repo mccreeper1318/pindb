@@ -511,6 +511,11 @@ public final class DatabaseWindow implements AutoCloseable {
     }
 
     private void exportCsv() {
+        CsvService.ExportMode exportMode = chooseCsvExportMode();
+        if (exportMode == null) {
+            return;
+        }
+
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Export PinDB Database to CSV");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV files", "*.csv"));
@@ -523,11 +528,47 @@ public final class DatabaseWindow implements AutoCloseable {
         Path destination = file.toPath().getFileName().toString().toLowerCase().endsWith(".csv")
                 ? file.toPath() : file.toPath().resolveSibling(file.getName() + ".csv");
         try {
-            CsvService.exportCsv(destination, fields, new ArrayList<>(filtered));
+            CsvService.exportCsv(destination, fields, new ArrayList<>(filtered), exportMode);
             UiUtil.information(stage, "CSV Export Complete", "The visible entries were exported to:\n" + destination);
         } catch (RuntimeException exception) {
             UiUtil.error(stage, "CSV Export Failed", "PinDB could not export this database.", exception);
         }
+    }
+
+    private CsvService.ExportMode chooseCsvExportMode() {
+        Dialog<CsvService.ExportMode> dialog = new Dialog<>();
+        dialog.initOwner(stage);
+        dialog.setTitle("CSV Export Mode");
+        dialog.setHeaderText("How should PinDB prepare values for spreadsheet applications?");
+
+        ButtonType safe = new ButtonType("Spreadsheet Safe", ButtonBar.ButtonData.OK_DONE);
+        ButtonType raw = new ButtonType("Raw Data", ButtonBar.ButtonData.OTHER);
+        dialog.getDialogPane().getButtonTypes().addAll(safe, raw, ButtonType.CANCEL);
+
+        Label explanation = new Label(
+                "Spreadsheet Safe is recommended. It neutralizes values that spreadsheet applications could "
+                        + "interpret as formulas while preserving normal numeric values.\n\n"
+                        + "Raw Data exports the exact stored text. Choose it only when another system requires "
+                        + "unchanged values, because formula-like text may be evaluated when the CSV is opened "
+                        + "in a spreadsheet application.");
+        explanation.setWrapText(true);
+        explanation.setMaxWidth(560);
+        dialog.getDialogPane().setContent(explanation);
+        dialog.setResultConverter(button -> {
+            if (button == safe) {
+                return CsvService.ExportMode.SPREADSHEET_SAFE;
+            }
+            if (button == raw) {
+                return CsvService.ExportMode.RAW_DATA;
+            }
+            return null;
+        });
+        dialog.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                UiUtil.applyStyles(newScene, context.settings());
+            }
+        });
+        return dialog.showAndWait().orElse(null);
     }
 
     private void printDatabase() {
