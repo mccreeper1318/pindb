@@ -6,6 +6,7 @@
 - Stopped automatic updates from selecting a package when the host architecture is unknown and show an unsupported-architecture message instead (Issue #46).
 - Kept entry forms open when database validation or persistence fails so typed values can be corrected without re-entering them (Issue #47).
 - Moved externally opened document copies into private PinDB-managed temporary sessions, cleaned stale copies after crashes, and now remove copies on viewer/application shutdown while opening system applications off the UI thread (Issue #48).
+- Added spreadsheet-safe CSV exports that neutralize formula-like cells by default, with an explicitly selected raw-data mode for exact-value integrations (Issue #49).
 - Isolated Windows application installs from user data folders and removed arbitrary install-directory selection (Issue #113).
 - Prevented 0.3.2 from automatically removing legacy Windows installs that may be located inside user data folders (Issue #113).
 
