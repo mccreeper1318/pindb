@@ -242,12 +242,12 @@ jobs:
 
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Set up Java 25
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: temurin
           java-version: "25"
@@ -344,7 +344,7 @@ jobs:
           fi
 
       - name: Upload Debian release artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pindb-deb-${{ needs.prepare.outputs.version }}
           path: |
@@ -357,7 +357,7 @@ jobs:
     needs: prepare
     runs-on: ubuntu-24.04
     container:
-      image: fedora:latest
+      image: fedora:45
 
     steps:
       - name: Install Fedora build tools
@@ -373,12 +373,12 @@ jobs:
             which
 
       - name: Check out release tag
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Set up Java 25
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: temurin
           java-version: "25"
@@ -509,7 +509,7 @@ jobs:
           fi
 
       - name: Upload RPM release artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pindb-rpm-${{ needs.prepare.outputs.version }}
           path: |
@@ -527,7 +527,7 @@ jobs:
 
     steps:
       - name: Download built packages
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: release-assets
           merge-multiple: true
