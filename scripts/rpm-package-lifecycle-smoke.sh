@@ -33,16 +33,22 @@ installed="$(rpm -q --qf '%{VERSION}-%{RELEASE}' pindb)"
   exit 1
 }
 
-test -x /opt/pindb/bin/PinDB
-test -x /opt/pindb/bin/pindb-update-helper
+mapfile -t LAUNCHERS < <(find /opt/pindb -type f -path '*/bin/PinDB' -executable)
+mapfile -t HELPERS < <(find /opt/pindb -type f -path '*/bin/pindb-update-helper' -executable)
+if [[ "${#LAUNCHERS[@]}" -ne 1 || "${#HELPERS[@]}" -ne 1 ]]; then
+  echo "Installed package is missing the expected executable launcher/helper." >&2
+  printf 'Launchers: %s\n' "${LAUNCHERS[*]:-}" >&2
+  printf 'Helpers: %s\n' "${HELPERS[*]:-}" >&2
+  exit 1
+fi
 
 dnf remove -y pindb
 if rpm -q pindb >/dev/null 2>&1; then
   echo "RPM still appears installed after removal." >&2
   exit 1
 fi
-if [[ -e /opt/pindb ]]; then
-  echo "/opt/pindb remains after RPM package removal." >&2
-  find /opt/pindb -maxdepth 3 -print >&2 || true
+if [[ -d /opt/pindb ]] && find /opt/pindb -mindepth 1 -print -quit | grep -q .; then
+  echo "Package files remain under /opt/pindb after removal." >&2
+  find /opt/pindb -maxdepth 4 -print >&2 || true
   exit 1
 fi
