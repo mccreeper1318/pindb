@@ -138,6 +138,14 @@ public final class InWindowMenuBar {
             return;
         }
 
+        if (event.getCode() == KeyCode.ALT) {
+            Button activeButton = buttons.get(activeMenu);
+            hide(false);
+            activeButton.requestFocus();
+            event.consume();
+            return;
+        }
+
         switch (event.getCode()) {
             case ESCAPE -> {
                 if (levels.size() > 1) {
@@ -410,7 +418,7 @@ public final class InWindowMenuBar {
             if (itemButton.item().isDisable()) {
                 continue;
             }
-            Character mnemonic = mnemonicKey(itemButton.item().getText(), false);
+            Character mnemonic = mnemonicKey(itemButton.item().getText(), true);
             if (mnemonic != null && mnemonic == Character.toUpperCase(key)) {
                 return itemButton;
             }
