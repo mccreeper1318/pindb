@@ -29,7 +29,6 @@ import javafx.scene.layout.VBox;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -454,7 +453,13 @@ public final class InWindowMenuBar {
     }
 
     private void closeLevelsAfter(MenuLevel level) {
+        if (level == null) {
+            return;
+        }
         int index = levels.indexOf(level);
+        if (index < 0) {
+            return;
+        }
         while (levels.size() > index + 1) {
             MenuLevel removed = levels.removeLast();
             overlay.getChildren().remove(removed.box());
