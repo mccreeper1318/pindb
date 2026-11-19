@@ -1,7 +1,5 @@
 package org.pindb.ui;
 
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -26,28 +24,20 @@ class InWindowMenuBarPolicyTest {
 
     @Test
     void keyboardNavigationSkipsSeparatorsAndDisabledItemsAndWraps() {
-        MenuItem first = new MenuItem("First");
-        MenuItem disabled = new MenuItem("Disabled");
-        disabled.setDisable(true);
-        SeparatorMenuItem separator = new SeparatorMenuItem();
-        MenuItem last = new MenuItem("Last");
-        List<MenuItem> items = List.of(first, disabled, separator, last);
+        List<Boolean> navigable = List.of(true, false, false, true);
 
-        assertEquals(3, InWindowMenuBar.nextNavigableIndex(items, 0, 1));
-        assertEquals(0, InWindowMenuBar.nextNavigableIndex(items, 3, 1));
-        assertEquals(3, InWindowMenuBar.nextNavigableIndex(items, 0, -1));
-        assertEquals(0, InWindowMenuBar.boundaryNavigableIndex(items, true));
-        assertEquals(3, InWindowMenuBar.boundaryNavigableIndex(items, false));
+        assertEquals(3, InWindowMenuBar.nextNavigableIndex(navigable, 0, 1));
+        assertEquals(0, InWindowMenuBar.nextNavigableIndex(navigable, 3, 1));
+        assertEquals(3, InWindowMenuBar.nextNavigableIndex(navigable, 0, -1));
+        assertEquals(0, InWindowMenuBar.boundaryNavigableIndex(navigable, true));
+        assertEquals(3, InWindowMenuBar.boundaryNavigableIndex(navigable, false));
     }
 
     @Test
     void navigationReportsNoTargetWhenEveryItemIsUnavailable() {
-        MenuItem disabled = new MenuItem("Disabled");
-        disabled.setDisable(true);
+        List<Boolean> navigable = List.of(false, false);
 
-        assertEquals(-1, InWindowMenuBar.nextNavigableIndex(
-                List.of(disabled, new SeparatorMenuItem()), -1, 1));
-        assertEquals(-1, InWindowMenuBar.boundaryNavigableIndex(
-                List.of(disabled, new SeparatorMenuItem()), true));
+        assertEquals(-1, InWindowMenuBar.nextNavigableIndex(navigable, -1, 1));
+        assertEquals(-1, InWindowMenuBar.boundaryNavigableIndex(navigable, true));
     }
 }
