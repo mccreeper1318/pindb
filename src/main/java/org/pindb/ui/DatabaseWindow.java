@@ -504,7 +504,8 @@ public final class DatabaseWindow implements AutoCloseable {
 
     private void openDocument(long recordId, long fieldId) {
         documentStore.document(recordId, fieldId).ifPresentOrElse(
-                document -> new DocumentViewer(stage, context.settings(), document).show(),
+                document -> new DocumentViewer(
+                        stage, context.settings(), document, context.externalDocumentCopies()).show(),
                 () -> UiUtil.warning(stage, "Document Unavailable",
                         "The selected document is no longer stored in this entry."));
     }

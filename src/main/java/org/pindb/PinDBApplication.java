@@ -117,6 +117,12 @@ public final class PinDBApplication extends Application {
             System.err.println("PinDB could not close every database cleanly during application shutdown.");
             exception.printStackTrace(System.err);
         }
+        try {
+            context.externalDocumentCopies().close();
+        } catch (RuntimeException exception) {
+            System.err.println("PinDB could not clean every temporary external document copy during shutdown.");
+            exception.printStackTrace(System.err);
+        }
     }
 
     public static void main(String[] args) {
