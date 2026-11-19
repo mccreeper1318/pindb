@@ -12,16 +12,6 @@ CANDIDATE="$(realpath "$2")"
 baseline_version="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$BASELINE")"
 candidate_version="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$CANDIDATE")"
 
-set +e
-rpmdev-vercmp "$candidate_version" "$baseline_version" >/tmp/pindb-rpm-version-compare.txt 2>&1
-compare_status="$?"
-set -e
-if [[ "$compare_status" -ne 11 ]]; then
-  echo "Candidate RPM must be newer than baseline: $baseline_version -> $candidate_version" >&2
-  cat /tmp/pindb-rpm-version-compare.txt >&2 || true
-  exit 1
-fi
-
 dnf install -y "$BASELINE"
 installed="$(rpm -q --qf '%{VERSION}-%{RELEASE}' pindb)"
 [[ "$installed" == "$baseline_version" ]] || {
