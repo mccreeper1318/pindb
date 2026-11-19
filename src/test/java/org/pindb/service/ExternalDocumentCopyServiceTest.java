@@ -5,11 +5,15 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class ExternalDocumentCopyServiceTest {
     @TempDir
@@ -30,6 +34,32 @@ class ExternalDocumentCopyServiceTest {
 
             assertFalse(Files.exists(copy));
             assertEquals(0, service.trackedCopyCount());
+        }
+    }
+
+    @Test
+    void usesOwnerOnlyPermissionsWhenPosixPermissionsAreAvailable() throws Exception {
+        assumeTrue(Files.getFileAttributeView(
+                temporaryDirectory, PosixFileAttributeView.class) != null);
+        Path root = temporaryDirectory.resolve("copies");
+
+        try (ExternalDocumentCopyService service = new ExternalDocumentCopyService(root, 250L, ignored -> false)) {
+            Path copy = service.createTemporaryCopy("private.pdf");
+
+            assertEquals(Set.of(
+                            PosixFilePermission.OWNER_READ,
+                            PosixFilePermission.OWNER_WRITE,
+                            PosixFilePermission.OWNER_EXECUTE),
+                    Files.getPosixFilePermissions(service.rootDirectory()));
+            assertEquals(Set.of(
+                            PosixFilePermission.OWNER_READ,
+                            PosixFilePermission.OWNER_WRITE,
+                            PosixFilePermission.OWNER_EXECUTE),
+                    Files.getPosixFilePermissions(service.sessionDirectory()));
+            assertEquals(Set.of(
+                            PosixFilePermission.OWNER_READ,
+                            PosixFilePermission.OWNER_WRITE),
+                    Files.getPosixFilePermissions(copy));
         }
     }
 
