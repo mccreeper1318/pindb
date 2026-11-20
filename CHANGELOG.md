@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3
+
+### Fixed
+- Hardened Linux release builds against transient Maven Central resolution failures by adding the CI Maven mirror and bounded dependency-resolution retries for Debian and Fedora release packaging.
+
 ## 0.3.2
 
 ### Fixed
