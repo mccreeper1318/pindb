@@ -3,6 +3,7 @@ package org.pindb;
 import javafx.application.Platform;
 import javafx.stage.Window;
 import org.pindb.db.DatabaseService;
+import org.pindb.service.ExternalDocumentCopyService;
 import org.pindb.service.ReleaseInfo;
 import org.pindb.service.SettingsService;
 import org.pindb.service.UpdateInstaller;
@@ -22,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 
 public final class AppContext {
     private final SettingsService settings = new SettingsService();
+    private final ExternalDocumentCopyService externalDocumentCopies = new ExternalDocumentCopyService();
     private final UpdateService updateService = new UpdateService();
     private final Map<Path, DatabaseWindow> databaseWindows = new LinkedHashMap<>();
     private LauncherWindow launcher;
@@ -29,6 +31,10 @@ public final class AppContext {
 
     public SettingsService settings() {
         return settings;
+    }
+
+    public ExternalDocumentCopyService externalDocumentCopies() {
+        return externalDocumentCopies;
     }
 
     public void setLauncher(LauncherWindow launcher) {
@@ -98,6 +104,15 @@ public final class AppContext {
         if (!manual && (!settings.autoCheckUpdates() || !settings.updateCheckAllowedNow())) {
             return;
         }
+        if (!updateService.supportsCurrentArchitecture()) {
+            if (launcher != null) {
+                launcher.setUpdateStatus("Updates unavailable: unsupported system architecture");
+            }
+            if (manual) {
+                UiUtil.information(owner, "Unsupported System Architecture", unsupportedArchitectureMessage());
+            }
+            return;
+        }
         if (launcher != null) {
             launcher.setUpdateStatus("Checking for updates…");
         }
@@ -152,6 +167,13 @@ public final class AppContext {
         if (launcher != null) {
             new ReleaseNotesDialog(launcher.stage(), settings, tag, markdown).showAndWait();
         }
+    }
+
+    static String unsupportedArchitectureMessage() {
+        String architecture = System.getProperty("os.arch", "").trim();
+        String detected = architecture.isBlank() ? "unknown" : architecture;
+        return "PinDB cannot automatically select an update package for this system architecture (" + detected
+                + "). Download the correct package manually from GitHub Releases.";
     }
 
     private static Throwable unwrap(Throwable throwable) {

@@ -4,12 +4,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.pindb.db.DatabaseException;
 import org.pindb.db.DatabaseService;
+import org.pindb.model.FieldDefinition;
 import org.pindb.model.FieldType;
+import org.pindb.model.RecordData;
+import org.pindb.model.SummaryType;
 
 import java.io.BufferedWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -19,6 +24,51 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CsvServiceTest {
     @TempDir
     Path tempDirectory;
+
+    @Test
+    void spreadsheetSafeModeNeutralizesFormulaLikeValuesButPreservesNumbers() {
+        assertEquals("'=SUM(A1:A2)",
+                CsvService.exportValue("=SUM(A1:A2)", CsvService.ExportMode.SPREADSHEET_SAFE));
+        assertEquals("'@danger",
+                CsvService.exportValue("@danger", CsvService.ExportMode.SPREADSHEET_SAFE));
+        assertEquals("'+1+2",
+                CsvService.exportValue("+1+2", CsvService.ExportMode.SPREADSHEET_SAFE));
+        assertEquals("'-1+2",
+                CsvService.exportValue("-1+2", CsvService.ExportMode.SPREADSHEET_SAFE));
+        assertEquals("' =1+1",
+                CsvService.exportValue(" =1+1", CsvService.ExportMode.SPREADSHEET_SAFE));
+        assertEquals("-42.50",
+                CsvService.exportValue("-42.50", CsvService.ExportMode.SPREADSHEET_SAFE));
+        assertEquals("+42.50",
+                CsvService.exportValue("+42.50", CsvService.ExportMode.SPREADSHEET_SAFE));
+    }
+
+    @Test
+    void rawModePreservesFormulaLeadingValuesExactly() {
+        assertEquals("=SUM(A1:A2)",
+                CsvService.exportValue("=SUM(A1:A2)", CsvService.ExportMode.RAW_DATA));
+        assertEquals("+1+2",
+                CsvService.exportValue("+1+2", CsvService.ExportMode.RAW_DATA));
+        assertEquals("-1+2",
+                CsvService.exportValue("-1+2", CsvService.ExportMode.RAW_DATA));
+        assertEquals("@danger",
+                CsvService.exportValue("@danger", CsvService.ExportMode.RAW_DATA));
+    }
+
+    @Test
+    void defaultCsvExportUsesSpreadsheetSafeModeForHeadersAndValues() throws Exception {
+        Path csv = tempDirectory.resolve("safe-export.csv");
+        FieldDefinition field = new FieldDefinition(
+                1L, "=Formula Header", FieldType.TEXT, 0, false,
+                "", "", "", false, null, List.of(), SummaryType.NONE);
+        LocalDateTime now = LocalDateTime.now();
+        RecordData record = new RecordData(1L, now, now, null, Map.of(1L, "=2+2"));
+
+        CsvService.exportCsv(csv, List.of(field), List.of(record));
+
+        String newline = System.lineSeparator();
+        assertEquals("'=Formula Header" + newline + "'=2+2" + newline, Files.readString(csv));
+    }
 
     @Test
     void readsQuotedCsvValues() throws Exception {

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$#" -ne 2 ]]; then
+  echo "Usage: $0 <baseline.deb> <candidate.deb>" >&2
+  exit 2
+fi
+
+BASELINE="$(realpath "$1")"
+CANDIDATE="$(realpath "$2")"
+
+baseline_version="$(dpkg-deb -f "$BASELINE" Version)"
+candidate_version="$(dpkg-deb -f "$CANDIDATE" Version)"
+
+if ! dpkg --compare-versions "$candidate_version" gt "$baseline_version"; then
+  echo "Candidate Debian package must be newer than baseline: $baseline_version -> $candidate_version" >&2
+  exit 1
+fi
+
+sudo mkdir -p \
+  /etc/xdg/menus \
+  /usr/local/share/applications \
+  /usr/local/share/desktop-directories \
+  /usr/local/share/mime/packages \
+  /usr/local/share/icons/hicolor
+
+sudo apt-get install -y "$BASELINE"
+installed="$(dpkg-query -W -f='${Version}' pindb)"
+[[ "$installed" == "$baseline_version" ]] || {
+  echo "Baseline Debian install mismatch: expected $baseline_version, got $installed" >&2
+  exit 1
+}
+
+sudo apt-get install -y "$CANDIDATE"
+installed="$(dpkg-query -W -f='${Version}' pindb)"
+[[ "$installed" == "$candidate_version" ]] || {
+  echo "Debian upgrade mismatch: expected $candidate_version, got $installed" >&2
+  exit 1
+}
+
+mapfile -t LAUNCHERS < <(find /opt/pindb -type f -path '*/bin/PinDB' -executable)
+mapfile -t HELPERS < <(find /opt/pindb -type f -path '*/bin/pindb-update-helper' -executable)
+if [[ "${#LAUNCHERS[@]}" -ne 1 || "${#HELPERS[@]}" -ne 1 ]]; then
+  echo "Installed package is missing the expected executable launcher/helper." >&2
+  printf 'Launchers: %s\n' "${LAUNCHERS[*]:-}" >&2
+  printf 'Helpers: %s\n' "${HELPERS[*]:-}" >&2
+  exit 1
+fi
+
+sudo apt-get purge -y pindb
+if dpkg-query -W pindb >/dev/null 2>&1; then
+  echo "Debian package still appears installed after purge." >&2
+  exit 1
+fi
+if [[ -d /opt/pindb ]] && find /opt/pindb -mindepth 1 -print -quit | grep -q .; then
+  echo "Package files remain under /opt/pindb after removal." >&2
+  find /opt/pindb -maxdepth 4 -print >&2 || true
+  exit 1
+fi

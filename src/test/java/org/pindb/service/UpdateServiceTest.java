@@ -136,6 +136,28 @@ class UpdateServiceTest {
                 SystemArchitecture.UNKNOWN).isEmpty());
     }
 
+    @Test void windowsUpdateSelectionRejectsUnknownHostArchitecture() {
+        assertTrue(UpdateService.selectPackage(
+                List.of(asset("PinDB-0.3-windows-x64.exe")),
+                NativePackageType.WINDOWS_EXE,
+                SystemArchitecture.UNKNOWN).isEmpty());
+    }
+
+    @Test void linuxUpdateSelectionRejectsUnknownHostArchitecture() {
+        assertTrue(UpdateService.selectPackage(
+                List.of(asset("pindb-0.3-1.x86_64.rpm")),
+                NativePackageType.RPM,
+                SystemArchitecture.UNKNOWN).isEmpty());
+    }
+
+    @Test void reportsWhetherTheCurrentArchitectureIsSupported() {
+        LinuxDistribution nonLinux = LinuxDistribution.detect("Windows 11", "");
+        assertTrue(new UpdateService(null, nonLinux, SystemArchitecture.X86_64, OperatingSystem.WINDOWS)
+                .supportsCurrentArchitecture());
+        assertTrue(!new UpdateService(null, nonLinux, SystemArchitecture.UNKNOWN, OperatingSystem.WINDOWS)
+                .supportsCurrentArchitecture());
+    }
+
     @Test void macUpdateSelectionRejectsUnmarkedPackageArchitecture() {
         assertTrue(UpdateService.selectPackage(
                 List.of(asset("PinDB-0.3-macos.pkg")),

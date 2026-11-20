@@ -31,16 +31,32 @@ public final class CsvService {
     private CsvService() {
     }
 
+    public enum ExportMode {
+        SPREADSHEET_SAFE,
+        RAW_DATA
+    }
+
     public static void exportCsv(Path destination, List<FieldDefinition> fields, List<RecordData> records) {
+        exportCsv(destination, fields, records, ExportMode.SPREADSHEET_SAFE);
+    }
+
+    public static void exportCsv(Path destination, List<FieldDefinition> fields, List<RecordData> records,
+                                 ExportMode exportMode) {
+        ExportMode mode = exportMode == null ? ExportMode.SPREADSHEET_SAFE : exportMode;
         try (BufferedWriter writer = Files.newBufferedWriter(destination, StandardCharsets.UTF_8)) {
-            writer.write(fields.stream().map(FieldDefinition::name).map(CsvService::quote).reduce((a, b) -> a + "," + b).orElse(""));
+            writer.write(fields.stream()
+                    .map(FieldDefinition::name)
+                    .map(value -> exportValue(value, mode))
+                    .map(CsvService::quote)
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse(""));
             writer.newLine();
             for (RecordData record : records) {
                 for (int index = 0; index < fields.size(); index++) {
                     if (index > 0) {
                         writer.write(',');
                     }
-                    writer.write(quote(record.value(fields.get(index).id())));
+                    writer.write(quote(exportValue(record.value(fields.get(index).id()), mode)));
                 }
                 writer.newLine();
             }
@@ -248,6 +264,39 @@ public final class CsvService {
             } catch (IOException ignored) {
                 // Preserve the original import failure; temporary files are never published as the destination.
             }
+        }
+    }
+
+    static String exportValue(String value, ExportMode mode) {
+        String safe = value == null ? "" : value;
+        if (mode == ExportMode.RAW_DATA || safe.isEmpty()) {
+            return safe;
+        }
+
+        int triggerIndex = 0;
+        while (triggerIndex < safe.length() && Character.isWhitespace(safe.charAt(triggerIndex))) {
+            triggerIndex++;
+        }
+        if (triggerIndex >= safe.length()) {
+            return safe;
+        }
+
+        char first = safe.charAt(triggerIndex);
+        if (first == '=' || first == '@') {
+            return "'" + safe;
+        }
+        if ((first == '+' || first == '-') && !isNumericLiteral(safe.substring(triggerIndex))) {
+            return "'" + safe;
+        }
+        return safe;
+    }
+
+    private static boolean isNumericLiteral(String value) {
+        try {
+            new java.math.BigDecimal(value);
+            return true;
+        } catch (NumberFormatException exception) {
+            return false;
         }
     }
 

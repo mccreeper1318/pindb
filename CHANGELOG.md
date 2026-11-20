@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.2
+
+### Fixed
+- Stopped automatic updates from selecting a package when the host architecture is unknown and show an unsupported-architecture message instead (Issue #46).
+- Kept entry forms open when database validation or persistence fails so typed values can be corrected without re-entering them (Issue #47).
+- Moved externally opened document copies into private PinDB-managed temporary sessions, cleaned stale copies after crashes, and now remove copies on viewer/application shutdown while opening system applications off the UI thread (Issue #48).
+- Added spreadsheet-safe CSV exports that neutralize formula-like cells by default, with an explicitly selected raw-data mode for exact-value integrations (Issue #49).
+- Isolated Windows application installs from user data folders and removed arbitrary install-directory selection (Issue #113).
+- Prevented 0.3.2 from automatically removing legacy Windows installs that may be located inside user data folders (Issue #113).
+
+### Changed
+- Improved the Wayland-safe in-window menu with Alt mnemonics, arrow-key/focus navigation, submenu support, and accessibility metadata (Issue #50).
+- Hardened CI with JavaFX UI smoke coverage, JaCoCo coverage enforcement, Linux package install/upgrade/uninstall tests, fixed Fedora 45 containers, and immutable GitHub Action pins (Issue #51).
+- Windows CI now builds the installer and verifies its safe install-location configuration (Issue #113).
+- Updated Apache POI from 5.5.1 to 6.0.0.
+- Updated SQLite JDBC from 3.53.2.1 to 3.54.1.0.
+- Updated SLF4J Simple from 2.0.17 to 2.0.20.
+- Updated JUnit BOM from 5.13.4 to 6.1.3.
+- Updated the Gradle wrapper from 9.6.1 to 9.9.1.
+- Updated `actions/checkout` from v4 to v7.
+- Updated `actions/setup-java` from v4 to v6.
+- Updated `actions/upload-artifact` from v4 to v7.
+- Updated `actions/download-artifact` from v4 to v8.
+
 ## 0.3.1.1
 
 ### Fixed
