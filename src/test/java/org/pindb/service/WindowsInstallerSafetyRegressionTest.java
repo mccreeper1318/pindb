@@ -31,7 +31,7 @@ class WindowsInstallerSafetyRegressionTest {
         String workflow = normalizedWorkflow(".github/workflows/windows-ci.yml");
 
         assertTrue(workflow.contains("Install WiX"));
-        assertTrue(workflow.contains("test packageWindows"));
+        assertTrue(workflow.contains("check packageWindows"));
         assertTrue(workflow.contains("0.3.2-ci.1"));
         assertTrue(workflow.contains("Expected exactly one Windows EXE installer"));
         assertTrue(workflow.contains("Smoke-test Windows installer safety"));

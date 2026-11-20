@@ -12,6 +12,7 @@
 
 ### Changed
 - Improved the Wayland-safe in-window menu with Alt mnemonics, arrow-key/focus navigation, submenu support, and accessibility metadata (Issue #50).
+- Hardened CI with JavaFX UI smoke coverage, JaCoCo coverage enforcement, Linux package install/upgrade/uninstall tests, fixed Fedora 45 containers, and immutable GitHub Action pins (Issue #51).
 - Windows CI now builds the installer and verifies its safe install-location configuration (Issue #113).
 - Updated Apache POI from 5.5.1 to 6.0.0.
 - Updated SQLite JDBC from 3.53.2.1 to 3.54.1.0.
