@@ -258,11 +258,38 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fakeroot
 
-      - name: Build Debian package
+      - name: Configure CI Maven Central mirror
+        shell: bash
         run: |
+          cat > "$RUNNER_TEMP/ci-maven-mirror.gradle" <<'EOF'
+          allprojects {
+              repositories {
+                  maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
+                  mavenCentral()
+              }
+          }
+          EOF
+
+      - name: Build Debian package
+        shell: bash
+        run: |
+          set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon clean test packageDeb \
-            -PappVersion="${{ needs.prepare.outputs.version }}"
+          for attempt in 1 2 3; do
+            extra_args=()
+            if [[ "$attempt" -gt 1 ]]; then
+              extra_args+=(--refresh-dependencies)
+            fi
+            if ./gradlew --no-daemon --init-script "$RUNNER_TEMP/ci-maven-mirror.gradle" "${extra_args[@]}" clean test packageDeb \
+              -PappVersion="${{ needs.prepare.outputs.version }}"; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              exit 1
+            fi
+            echo "Gradle dependency resolution failed; retrying Debian release build (attempt $((attempt + 1))/3)."
+            sleep $((attempt * 5))
+          done
 
       - name: Verify and normalize Debian package
         id: package
@@ -384,11 +411,38 @@ jobs:
           java-version: "25"
           cache: gradle
 
-      - name: Build RPM package
+      - name: Configure CI Maven Central mirror
+        shell: bash
         run: |
+          cat > /tmp/ci-maven-mirror.gradle <<'EOF'
+          allprojects {
+              repositories {
+                  maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
+                  mavenCentral()
+              }
+          }
+          EOF
+
+      - name: Build RPM package
+        shell: bash
+        run: |
+          set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon clean test packageRpm \
-            -PappVersion="${{ needs.prepare.outputs.version }}"
+          for attempt in 1 2 3; do
+            extra_args=()
+            if [[ "$attempt" -gt 1 ]]; then
+              extra_args+=(--refresh-dependencies)
+            fi
+            if ./gradlew --no-daemon --init-script /tmp/ci-maven-mirror.gradle "${extra_args[@]}" clean test packageRpm \
+              -PappVersion="${{ needs.prepare.outputs.version }}"; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              exit 1
+            fi
+            echo "Gradle dependency resolution failed; retrying RPM release build (attempt $((attempt + 1))/3)."
+            sleep $((attempt * 5))
+          done
 
       - name: Verify RPM package
         id: package
