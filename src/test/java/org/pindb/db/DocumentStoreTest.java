@@ -16,6 +16,8 @@ import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 
@@ -206,6 +208,40 @@ class DocumentStoreTest {
             DatabaseException failure = assertThrows(DatabaseException.class,
                     () -> documents.document(recordId, fieldId));
             assertTrue(failure.getMessage().contains("50 MiB"));
+        }
+    }
+
+    @Test
+    void busyCheckpointDoesNotPreventDocumentStoreClose() throws Exception {
+        Path databasePath = tempDirectory.resolve("busy-checkpoint.pindb");
+
+        try (DatabaseService database = DatabaseService.create(databasePath, "Busy Checkpoint", "",
+                List.of(documentField()), DatabaseView.TABLE, 10);
+             Connection documentConnection = DriverManager.getConnection(
+                     "jdbc:sqlite:" + databasePath.toAbsolutePath());
+             Connection readerConnection = DriverManager.getConnection(
+                     "jdbc:sqlite:" + databasePath.toAbsolutePath())) {
+            long fieldId = database.fields().getFirst().id();
+            long recordId = database.addRecord(Map.of(fieldId, "busy.txt"));
+
+            try (Statement statement = documentConnection.createStatement()) {
+                statement.execute("PRAGMA busy_timeout=0");
+            }
+
+            DocumentStore documents = new DocumentStore(documentConnection);
+            readerConnection.setAutoCommit(false);
+            try (Statement readerStatement = readerConnection.createStatement();
+                 ResultSet reader = readerStatement.executeQuery("SELECT id FROM records")) {
+                assertTrue(reader.next());
+
+                documents.replaceDocuments(recordId,
+                        Map.of(fieldId, textDocument("busy.txt", "committed while reader is active")));
+
+                documents.close();
+                assertTrue(documentConnection.isClosed());
+            } finally {
+                readerConnection.rollback();
+            }
         }
     }
 
