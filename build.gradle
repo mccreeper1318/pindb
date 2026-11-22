@@ -117,6 +117,11 @@ tasks.register('verifyNativePackageVersionMapping') {
 test {
     useJUnitPlatform()
     dependsOn tasks.named('verifyNativePackageVersionMapping'), 'verifyWindowsInstallerSafety'
+    // JavaFX can only start once per JVM. When UI-only tests are explicitly enabled,
+    // isolate test classes so each class owns a fresh toolkit lifecycle.
+    if (System.getenv('PINDB_RUN_JAVAFX_TESTS') == 'true') {
+        forkEvery = 1
+    }
     finalizedBy jacocoTestReport
 }
 jacocoTestReport { reports { xml.required = true; html.required = true } }
