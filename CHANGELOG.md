@@ -4,6 +4,7 @@
 
 ### Fixed
 - Hardened Linux release builds against transient Maven Central resolution failures by adding the CI Maven mirror and bounded dependency-resolution retries for Debian and Fedora release packaging.
+- Treated a busy SQLite WAL checkpoint as best-effort when closing embedded document storage so transient readers no longer block database/window shutdown (Issue #62).
 
 ## 0.3.2
 
