@@ -312,7 +312,7 @@ public final class PrintService {
                 used += estimateHeadingHeight(fields, columnWidth);
             }
             if (records.isEmpty()) {
-                grid.add(cell("No entries in this database.", false), 0, row, Math.max(1, fields.size()), 1);
+                grid.add(tableCell("No entries in this database.", false), 0, row, Math.max(1, fields.size()), 1);
                 pages.add(grid);
                 break;
             }
@@ -324,7 +324,7 @@ public final class PrintService {
                 }
                 for (int col = 0; col < fields.size(); col++) {
                     FieldDefinition field = fields.get(col);
-                    grid.add(cell(UiUtil.formatValue(field, record.value(field.id())), false), col, row);
+                    grid.add(tableCell(UiUtil.formatValue(field, record.value(field.id())), false), col, row);
                 }
                 row++;
                 used += Math.min(rowHeight, bodyHeight);
@@ -370,9 +370,13 @@ public final class PrintService {
         return pages;
     }
 
-    private static GridPane tableGrid(List<FieldDefinition> fields, double columnWidth) {
+    static GridPane tableGrid(List<FieldDefinition> fields, double columnWidth) {
         GridPane grid = new GridPane();
-        grid.setGridLinesVisible(true);
+        // GridPane grid lines are intended for debugging and can render inconsistently
+        // when wrapped cells make one row taller than its neighbors. Draw the printable
+        // table with explicit cell borders instead.
+        grid.setGridLinesVisible(false);
+        grid.setStyle("-fx-border-color: #9aa7b4; -fx-border-width: 1 0 0 1;");
         int count = Math.max(1, fields.size());
         grid.setMinWidth(columnWidth * count);
         grid.setPrefWidth(columnWidth * count);
@@ -387,7 +391,7 @@ public final class PrintService {
 
     private static void addHeadings(GridPane grid, List<FieldDefinition> fields, int row) {
         for (int col = 0; col < fields.size(); col++) {
-            grid.add(cell(fields.get(col).name(), true), col, row);
+            grid.add(tableCell(fields.get(col).name(), true), col, row);
         }
     }
 
@@ -577,6 +581,19 @@ public final class PrintService {
             BorderPane.setMargin(footer, new Insets(8, 0, 0, 0));
         }
         return page;
+    }
+
+    static Label tableCell(String text, boolean heading) {
+        Label label = cell(text, heading);
+        // Let every cell grow to the GridPane row's resolved height. The tallest
+        // wrapped value determines that row height, so all right/bottom borders
+        // extend continuously through the same full row.
+        label.setMaxHeight(Double.MAX_VALUE);
+        GridPane.setFillHeight(label, true);
+        GridPane.setFillWidth(label, true);
+        label.setStyle(label.getStyle()
+                + "-fx-border-color: #9aa7b4; -fx-border-width: 0 1 1 0;");
+        return label;
     }
 
     private static Label cell(String text, boolean heading) {

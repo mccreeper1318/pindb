@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3
+
+### Fixed
+- Fixed printed column tables so wrapped or multiline values expand the full row while keeping vertical and horizontal separators continuous across every cell (Issue #116).
+- Hardened Linux release builds against transient Maven Central resolution failures by adding the CI Maven mirror and bounded dependency-resolution retries for Debian and Fedora release packaging.
+- Treated a busy SQLite WAL checkpoint as best-effort when closing embedded document storage so transient readers no longer block database/window shutdown (Issue #62).
+
 ## 0.3.2
 
 ### Fixed

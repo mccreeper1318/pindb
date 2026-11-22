@@ -73,6 +73,11 @@ jobs:
           PINDB_RUN_JAVAFX_TESTS: "true"
         run: xvfb-run -a ./gradlew --no-daemon --init-script "$RUNNER_TEMP/ci-maven-mirror.gradle" test --tests org.pindb.ui.InWindowMenuBarUiTest
 
+      - name: Run JavaFX print layout regression test
+        env:
+          PINDB_RUN_JAVAFX_TESTS: "true"
+        run: xvfb-run -a ./gradlew --no-daemon --init-script "$RUNNER_TEMP/ci-maven-mirror.gradle" test --tests org.pindb.service.PrintServiceUiTest
+
       - name: Run verification and build candidate Debian package
         run: ./gradlew --no-daemon --init-script "$RUNNER_TEMP/ci-maven-mirror.gradle" clean check packageDeb -PappVersion="0.3.2-ci.2"
 
