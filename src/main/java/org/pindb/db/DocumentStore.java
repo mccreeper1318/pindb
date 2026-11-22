@@ -267,8 +267,12 @@ public final class DocumentStore implements AutoCloseable {
     private static void checkpointWal(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(TRUNCATE)")) {
-            if (result.next() && result.getInt(1) != 0) {
-                throw new SQLException("SQLite could not obtain the lock needed to checkpoint the WAL.");
+            if (result.next()) {
+                // A nonzero first column means another connection temporarily prevented a full
+                // checkpoint. Closing this connection is still safe: committed frames remain in
+                // the WAL and SQLite will recover them on the next open. Only SQL execution
+                // failures should prevent a clean close.
+                result.getInt(1);
             }
         }
     }
