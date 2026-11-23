@@ -153,7 +153,7 @@ public final class AppContext {
             if (action == UpdateDialog.Action.REMIND_LATER) {
                 settings.snoozeUpdatesForHours(24);
             } else if (action == UpdateDialog.Action.UPDATE) {
-                settings.setPendingReleaseNotes(available.tag(), available.markdownNotes());
+                settings.setPendingReleaseNotes(available.tag(), available.postUpdateMarkdownNotes());
                 new UpdateInstaller(settings, this::prepareForUpdateRestart).downloadAndInstall(owner, available);
             }
         }));
