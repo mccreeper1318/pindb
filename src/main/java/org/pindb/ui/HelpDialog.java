@@ -37,6 +37,13 @@ public final class HelpDialog extends Dialog<Void> {
 
                         Fields can be changed from **Database → Manage Fields**. Deleting a field deletes its stored values after a warning. Restore an earlier internal backup when necessary.
                         """),
+                tab("Saved Views", """
+                        # Saved Views
+
+                        Use **Saved Views** in an open database to save the current search, filter, and sort setup for reuse later.
+
+                        Saved views are stored inside that `.pindb` file. You can rename them, update them from the current view, apply them again, or delete them. If a referenced field was removed or changed to an incompatible type, PinDB warns you and lets you update or remove the saved view instead of applying it incorrectly.
+                        """),
                 tab("Documents", """
                         # Documents
 
