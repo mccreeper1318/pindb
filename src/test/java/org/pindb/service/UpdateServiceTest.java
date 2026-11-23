@@ -183,5 +183,122 @@ class UpdateServiceTest {
                 UpdateService.packageTypeFor(OperatingSystem.MACOS, nonLinux).orElseThrow());
     }
 
+    @Test
+    void oneVersionUpdateKeepsTargetReleaseNotesUnwrapped() {
+        UpdateService service = windowsUpdateService();
+        ReleaseInfo update = service.selectUpdate(
+                List.of(release("0.3.2", false, false, "Only 0.3.2 notes", true)),
+                Version.parse("0.3.1"),
+                false).orElseThrow();
+
+        assertEquals("0.3.2", update.tag());
+        assertEquals("Only 0.3.2 notes", update.markdownNotes());
+        assertEquals("Only 0.3.2 notes", update.postUpdateMarkdownNotes());
+    }
+
+    @Test
+    void skippedVersionUpdateCombinesEveryPublishedReleaseOldestToNewest() {
+        UpdateService service = windowsUpdateService();
+        ReleaseInfo update = service.selectUpdate(
+                List.of(
+                        release("0.3.3", false, false, "Third notes", true),
+                        release("0.3.2", false, false, "Second notes", false)),
+                Version.parse("0.3.1"),
+                false).orElseThrow();
+
+        assertEquals("0.3.3", update.tag());
+        assertEquals("Third notes", update.markdownNotes());
+        assertEquals("## PinDB 0.3.2\n\nSecond notes\n\n## PinDB 0.3.3\n\nThird notes",
+                update.postUpdateMarkdownNotes());
+    }
+
+    @Test
+    void cumulativeNotesIncludeFourPartHotfixesInVersionOrder() {
+        UpdateService service = windowsUpdateService();
+        ReleaseInfo update = service.selectUpdate(
+                List.of(
+                        release("0.3.2", false, false, "0.3.2 notes", true),
+                        release("0.3.1.1", false, false, "Hotfix notes", false),
+                        release("0.3.1", false, false, "0.3.1 notes", false)),
+                Version.parse("0.3"),
+                false).orElseThrow();
+
+        String notes = update.postUpdateMarkdownNotes();
+        assertTrue(notes.indexOf("## PinDB 0.3.1") < notes.indexOf("## PinDB 0.3.1.1"));
+        assertTrue(notes.indexOf("## PinDB 0.3.1.1") < notes.indexOf("## PinDB 0.3.2"));
+        assertTrue(notes.contains("Hotfix notes"));
+    }
+
+    @Test
+    void stableChannelExcludesPrereleaseAndDraftNotes() {
+        UpdateService service = windowsUpdateService();
+        ReleaseInfo update = service.selectUpdate(
+                List.of(
+                        release("0.3.3", false, false, "Stable target", true),
+                        release("0.3.2", true, false, "Preview notes", false),
+                        release("0.3.1.1", false, true, "Draft notes", false),
+                        release("0.3.1", false, false, "Stable intermediate", false)),
+                Version.parse("0.3"),
+                false).orElseThrow();
+
+        assertTrue(update.postUpdateMarkdownNotes().contains("Stable intermediate"));
+        assertTrue(update.postUpdateMarkdownNotes().contains("Stable target"));
+        assertTrue(!update.postUpdateMarkdownNotes().contains("Preview notes"));
+        assertTrue(!update.postUpdateMarkdownNotes().contains("Draft notes"));
+    }
+
+    @Test
+    void prereleaseChannelIncludesPublishedPrereleaseNotes() {
+        UpdateService service = windowsUpdateService();
+        ReleaseInfo update = service.selectUpdate(
+                List.of(
+                        release("0.3.2", false, false, "Stable target", true),
+                        release("0.3.2-beta.2", true, false, "Beta 2 notes", false),
+                        release("0.3.2-beta.1", true, false, "Beta 1 notes", false)),
+                Version.parse("0.3.1"),
+                true).orElseThrow();
+
+        String notes = update.postUpdateMarkdownNotes();
+        assertTrue(notes.indexOf("Beta 1 notes") < notes.indexOf("Beta 2 notes"));
+        assertTrue(notes.indexOf("Beta 2 notes") < notes.indexOf("Stable target"));
+    }
+
+    @Test
+    void cumulativeNotesIncludeIntermediateReleaseWithoutCurrentPlatformPackage() {
+        UpdateService service = windowsUpdateService();
+        ReleaseInfo update = service.selectUpdate(
+                List.of(
+                        release("0.3.3", false, false, "Installable target", true),
+                        release("0.3.2", false, false, "No Windows package here", false)),
+                Version.parse("0.3.1"),
+                false).orElseThrow();
+
+        assertEquals("0.3.3", update.tag());
+        assertTrue(update.postUpdateMarkdownNotes().contains("No Windows package here"));
+        assertTrue(update.postUpdateMarkdownNotes().contains("Installable target"));
+    }
+
+    private static UpdateService windowsUpdateService() {
+        LinuxDistribution nonLinux = LinuxDistribution.detect("Windows 11", "");
+        return new UpdateService(null, nonLinux, SystemArchitecture.X86_64, OperatingSystem.WINDOWS);
+    }
+
+    private static Map<String, Object> release(String tag, boolean prerelease, boolean draft,
+                                               String body, boolean installable) {
+        List<Map<String, Object>> assets = installable
+                ? List.of(
+                        asset("PinDB-" + tag + "-windows-x64.exe"),
+                        asset("PinDB-" + tag + "-windows-x64.exe.sha256"))
+                : List.of();
+        return Map.of(
+                "tag_name", tag,
+                "name", "PinDB " + tag,
+                "body", body,
+                "draft", draft,
+                "prerelease", prerelease,
+                "published_at", "2026-11-22T00:00:00Z",
+                "assets", assets);
+    }
+
     private static Map<String, Object> asset(String name) { return Map.of("name", name, "browser_download_url", "https://example.invalid/" + name); }
 }
