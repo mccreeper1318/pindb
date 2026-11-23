@@ -4,6 +4,7 @@
 
 ### Added
 - Automatic updates now show release notes for every published version skipped between the installed version and the newly installed version, while respecting the selected stable or pre-release update channel (Issue #137).
+- Expanded PinDB's built-in database templates with Collections, Household Belongings, Vehicle Maintenance, and system-neutral Tabletop RPG campaign/reference setups; improved Inventory and Contacts defaults; added template descriptions in the creation wizard; and added regression coverage for template-created databases (Issue #138).
 
 ## 0.3.3
 
