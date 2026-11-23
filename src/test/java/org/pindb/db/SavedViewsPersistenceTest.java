@@ -46,6 +46,22 @@ class SavedViewsPersistenceTest {
             assertEquals(1, database.savedViews().size());
             assertEquals(created, database.savedViews().getFirst());
 
+            database.addRecord(Map.of(
+                    fields.get(0).id(), "2026-06-01",
+                    fields.get(1).id(), "5",
+                    fields.get(2).id(), "Tools"));
+            database.addRecord(Map.of(
+                    fields.get(0).id(), "2026-06-01",
+                    fields.get(1).id(), "20",
+                    fields.get(2).id(), "Tools"));
+            Map<Long, FieldDefinition> fieldsById = Map.of(
+                    fields.get(0).id(), fields.get(0),
+                    fields.get(1).id(), fields.get(1),
+                    fields.get(2).id(), fields.get(2));
+            assertEquals(1, database.activeRecords().stream()
+                    .filter(record -> created.filterSpec().matches(record, fieldsById))
+                    .count());
+
             SavedView updated = new SavedView(created.id(), "Low Stock Tools", "", filter,
                     List.of(new SavedView.SortSpec(fields.get(1).id(), true)));
             database.updateSavedView(updated);
