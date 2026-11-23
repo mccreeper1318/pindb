@@ -96,8 +96,8 @@ public final class SavedViewsDialog {
         apply.setOnAction(event -> {
             SavedView selected = list.getSelectionModel().getSelectedItem();
             if (selected != null) {
-                onApply.accept(selected);
                 stage.close();
+                onApply.accept(selected);
             }
         });
         rename.setOnAction(event -> renameSelected());
