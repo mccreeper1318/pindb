@@ -113,6 +113,23 @@ class SavedViewsPersistenceTest {
     }
 
     @Test
+    void booleanChoiceValidationRejectsStaleDropdownValues() {
+        FieldDefinition booleanField = field("Status", FieldType.BOOLEAN, 0);
+        booleanField.setId(42L);
+        Map<Long, FieldDefinition> fields = Map.of(booleanField.id(), booleanField);
+
+        SavedView stale = new SavedView("stale", "Stale Status", "",
+                new FilterSpec(null, null, null, null, null, null, booleanField.id(), "Open"),
+                List.of());
+        assertFalse(stale.validationProblems(fields).isEmpty());
+
+        SavedView valid = new SavedView("valid", "Valid Status", "",
+                new FilterSpec(null, null, null, null, null, null, booleanField.id(), "true"),
+                List.of());
+        assertTrue(valid.validationProblems(fields).isEmpty());
+    }
+
+    @Test
     void logicalBackupsIncludeSavedViewMetadata() {
         Path file = tempDirectory.resolve("saved-view-backup.pindb");
         try (DatabaseService database = DatabaseService.create(file, "Backup", "",
