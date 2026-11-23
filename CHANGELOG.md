@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+### Added
+- Automatic updates now show release notes for every published version skipped between the installed version and the newly installed version, while respecting the selected stable or pre-release update channel (Issue #137).
+
 ## 0.3.3
 
 ### Fixed

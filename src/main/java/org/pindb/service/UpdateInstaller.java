@@ -85,7 +85,7 @@ public final class UpdateInstaller {
                 Files.move(partial, destination, StandardCopyOption.REPLACE_EXISTING);
                 String digest = verifyChecksum(destination, releasePackage.checksumUri(), this::updateMessage);
                 Path notes = directory.resolve("release-notes-" + release.version().normalized() + ".md");
-                Files.writeString(notes, release.markdownNotes() == null ? "" : release.markdownNotes(), StandardCharsets.UTF_8,
+                Files.writeString(notes, release.postUpdateMarkdownNotes() == null ? "" : release.postUpdateMarkdownNotes(), StandardCharsets.UTF_8,
                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
                 return new DownloadedUpdate(destination, notes, digest, releasePackage, distribution);
             }
