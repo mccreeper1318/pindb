@@ -80,6 +80,12 @@ class SavedViewsPersistenceTest {
                             null, ""),
                     List.of(new SavedView.SortSpec(stored.id(), true)));
 
+            FieldDefinition changed = stored.copy();
+            changed.setType(FieldType.TEXT);
+            database.updateField(changed);
+            Map<Long, FieldDefinition> changedFields = Map.of(changed.id(), database.fields().getFirst());
+            assertFalse(saved.validationProblems(changedFields).isEmpty());
+
             database.deleteField(stored.id());
 
             SavedView stillStored = database.savedViews().getFirst();
