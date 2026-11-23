@@ -48,6 +48,7 @@ public final class DatabaseWizard {
     private final TextArea description = new TextArea();
     private final TextField destination = new TextField();
     private final ComboBox<TemplateService.Template> template = new ComboBox<>();
+    private final Label templateDescription = new Label();
     private final ComboBox<DatabaseView> defaultView = new ComboBox<>();
     private final Spinner<Integer> backupLimit = new Spinner<>(1, 100, 10);
     private final Label review = new Label();
@@ -78,6 +79,9 @@ public final class DatabaseWizard {
 
         template.setItems(FXCollections.observableArrayList(TemplateService.Template.values()));
         template.setValue(initialTemplate == null ? TemplateService.Template.BLANK : initialTemplate);
+        templateDescription.setWrapText(true);
+        templateDescription.getStyleClass().add("muted-label");
+        updateTemplateDescription(template.getValue());
         defaultView.setItems(FXCollections.observableArrayList(DatabaseView.values()));
         defaultView.setValue(DatabaseView.TABLE);
         description.setPrefRowCount(5);
@@ -98,6 +102,7 @@ public final class DatabaseWizard {
             if (newValue != null) {
                 fields.setAll(TemplateService.fieldsFor(newValue));
                 normalizeFieldPositions();
+                updateTemplateDescription(newValue);
             }
         });
 
@@ -144,6 +149,7 @@ public final class DatabaseWizard {
         addFormRow(grid, "Database name", databaseName, row++);
         addFormRow(grid, "Description", description, row++);
         addFormRow(grid, "Template", template, row++);
+        grid.add(templateDescription, 1, row++);
 
         Button browse = new Button("Browse…");
         browse.setOnAction(event -> chooseDestination());
@@ -313,6 +319,10 @@ public final class DatabaseWizard {
             text.append('\n');
         }
         review.setText(text.toString());
+    }
+
+    private void updateTemplateDescription(TemplateService.Template selected) {
+        templateDescription.setText(selected == null ? "" : selected.description());
     }
 
     private void chooseDestination() {
