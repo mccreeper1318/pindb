@@ -332,6 +332,20 @@
     .platform-row .small-link { color:#b9c7be; font-size:.88rem; text-decoration:none; }
     .platform-row .small-link:hover { color:white; }
 
+    .mac-package-options {
+      display: none;
+      grid-column: 1 / -1;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 2px 0 4px;
+    }
+    .mac-package-options.open { display: grid; }
+    .mac-package-options .btn {
+      width: 100%;
+      min-width: 0;
+    }
+    #mac-package-toggle { cursor: pointer; }
+
     .release-status { margin: 22px 0 0; color: #92a199; font-size: .86rem; }
 
     .guide-grid {
@@ -493,6 +507,7 @@
       .platform-row { grid-template-columns:1fr; gap:12px; }
       .platform-row > div:nth-child(2) { grid-column:auto; grid-row:auto; }
       .platform-row .btn { width:100%; }
+      .mac-package-options { grid-template-columns: 1fr; }
       .footer-row { flex-direction:column; align-items:flex-start; }
     }
 
@@ -623,7 +638,11 @@
           <div class="platform-row">
             <div><h3>macOS</h3><p>Apple Silicon and Intel packages</p></div>
             <div><a class="small-link" href="#macos-install">Which Mac package?</a></div>
-            <a class="btn btn-primary" href="#macos-install">Choose package</a>
+            <button class="btn btn-primary" id="mac-package-toggle" type="button" aria-expanded="false" aria-controls="mac-package-options">Choose package</button>
+            <div class="mac-package-options" id="mac-package-options">
+              <a class="btn btn-primary" id="mac-arm-download" href="https://github.com/mccreeper1318/pindb/releases">Apple Silicon · ARM64</a>
+              <a class="btn btn-primary" id="mac-x64-download" href="https://github.com/mccreeper1318/pindb/releases">Intel · x64</a>
+            </div>
           </div>
           <div class="platform-row">
             <div><h3>Debian family</h3><p>Debian, Ubuntu, Linux Mint & related</p></div>
@@ -672,8 +691,8 @@ Get-Content .\PinDB-&lt;version&gt;-windows-x64.exe.sha256</pre>
             <div class="detail-body">
               <p>Use <code>-macos-arm64.pkg</code> for Apple Silicon and <code>-macos-x64.pkg</code> for Intel Macs.</p>
               <div class="actions">
-                <a class="btn btn-secondary" id="mac-arm-download" href="https://github.com/mccreeper1318/pindb/releases">Apple Silicon package</a>
-                <a class="btn btn-secondary" id="mac-x64-download" href="https://github.com/mccreeper1318/pindb/releases">Intel package</a>
+                <a class="btn btn-secondary" id="mac-arm-guide-download" href="https://github.com/mccreeper1318/pindb/releases">Apple Silicon package</a>
+                <a class="btn btn-secondary" id="mac-x64-guide-download" href="https://github.com/mccreeper1318/pindb/releases">Intel package</a>
               </div>
               <pre>shasum -a 256 -c PinDB-&lt;version&gt;-macos-arm64.pkg.sha256
 # or
@@ -809,6 +828,15 @@ git switch dev</pre>
         }));
       }
 
+      const macPackageToggle = document.getElementById('mac-package-toggle');
+      const macPackageOptions = document.getElementById('mac-package-options');
+      if (macPackageToggle && macPackageOptions) {
+        macPackageToggle.addEventListener('click', () => {
+          const open = macPackageOptions.classList.toggle('open');
+          macPackageToggle.setAttribute('aria-expanded', String(open));
+        });
+      }
+
       const repo = 'mccreeper1318/pindb';
       const releases = `https://github.com/${repo}/releases`;
       const api = `https://api.github.com/repos/${repo}/releases?per_page=30`;
@@ -863,6 +891,8 @@ git switch dev</pre>
           setLink('windows-download', windows, 'View releases');
           setLink('mac-arm-download', macArm, 'View Apple Silicon releases');
           setLink('mac-x64-download', macX64, 'View Intel releases');
+          setLink('mac-arm-guide-download', macArm, 'View Apple Silicon releases');
+          setLink('mac-x64-guide-download', macX64, 'View Intel releases');
           setLink('deb-download', deb, 'View releases');
           setLink('rpm-download', rpm, 'View releases');
           setChecksum('windows-checksum', stable, windows, 'windows');
