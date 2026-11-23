@@ -1,52 +1,881 @@
----
-layout: default
-title: PinDB
----
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PinDB is a free, local-first personal database for organizing structured information in portable .pindb files.">
+  <title>PinDB — A personal database that stays yours</title>
+  <link rel="icon" href="assets/icon.png">
+  <meta name="theme-color" content="#2f7d57">
+  <style>
+    :root {
+      --bg: #f4f6f3;
+      --surface: #ffffff;
+      --surface-soft: #eef2ee;
+      --text: #18221d;
+      --muted: #66716b;
+      --line: #dce3de;
+      --accent: #2f7d57;
+      --accent-dark: #236142;
+      --accent-soft: #e6f2ea;
+      --warning-bg: #fff8e7;
+      --warning-line: #e3c66b;
+      --shadow: 0 24px 60px rgba(24, 34, 29, .10);
+      --radius: 22px;
+      --small-radius: 14px;
+      --page: min(1080px, calc(100% - 12vw));
+      --reading: 760px;
+    }
 
-<h1>A personal database that stays yours</h1>
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+      text-rendering: optimizeLegibility;
+    }
 
-<p>PinDB is an open-source desktop database for organizing structured information in portable <code>.pindb</code> files. It is designed for people who want flexible records, embedded documents, search, filtering, backups, and native desktop integration without running a separate database server.</p>
+    a { color: inherit; }
+    img { display: block; max-width: 100%; }
+    button, input, select { font: inherit; }
 
-<p class="page-actions"><a class="btn" href="download.html">Choose a download</a> <a class="btn secondary" href="features.html">Explore features</a></p>
+    .shell { width: var(--page); margin-inline: auto; }
+    .reading { max-width: var(--reading); }
 
-<h2>Supported platforms</h2>
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(220, 227, 222, .8);
+    }
 
-<div class="platform-grid platform-grid-home">
-  <div class="platform-card">
-    <h3>Windows</h3>
-    <p>Native self-contained installer for supported 64-bit Windows systems.</p>
-    <a class="btn" href="windows.html">Windows downloads</a>
-  </div>
-  <div class="platform-card">
-    <h3>macOS</h3>
-    <p>Native packages for Apple Silicon and Intel Macs.</p>
-    <a class="btn" href="macos.html">macOS downloads</a>
-  </div>
-  <div class="platform-card">
-    <h3>Linux</h3>
-    <p>Native packages for Debian-family and Fedora-family distributions.</p>
-    <div class="button-row">
-      <a class="btn" href="debian.html">Debian / Ubuntu / Mint</a>
-      <a class="btn" href="fedora.html">Fedora</a>
+    .nav {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      text-decoration: none;
+      font-weight: 760;
+      letter-spacing: -.02em;
+      font-size: 1.07rem;
+    }
+
+    .brand img {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(24,34,29,.12);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 26px;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--muted);
+      font-size: .95rem;
+      font-weight: 620;
+    }
+
+    .nav-links a:hover,
+    .nav-links a:focus-visible { color: var(--text); }
+
+    .nav-github {
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.65);
+    }
+
+    .menu-button {
+      display: none;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 9px 12px;
+      color: var(--text);
+    }
+
+    .hero {
+      padding: 96px 0 72px;
+      overflow: hidden;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: .88fr 1.12fr;
+      align-items: center;
+      gap: 72px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      color: var(--accent-dark);
+      font-weight: 720;
+      font-size: .84rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 5px var(--accent-soft);
+    }
+
+    h1, h2, h3 { line-height: 1.12; letter-spacing: -.035em; }
+    h1 {
+      margin: 0;
+      max-width: 690px;
+      font-size: clamp(3rem, 6.8vw, 5.5rem);
+      font-weight: 790;
+    }
+
+    h2 {
+      margin: 0 0 18px;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      font-weight: 760;
+    }
+
+    h3 { margin: 0 0 10px; font-size: 1.18rem; }
+
+    .hero-copy {
+      margin: 26px 0 0;
+      color: var(--muted);
+      font-size: 1.16rem;
+      max-width: 620px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 34px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 18px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 700;
+      border: 1px solid transparent;
+      transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 10px 24px rgba(47,125,87,.20);
+    }
+    .btn-primary:hover { background: var(--accent-dark); }
+    .btn-secondary {
+      background: var(--surface);
+      border-color: var(--line);
+      color: var(--text);
+    }
+
+    .hero-frame {
+      position: relative;
+      padding: 18px;
+      border-radius: 28px;
+      background: linear-gradient(145deg, #dfe9e3 0%, #eef3ef 52%, #d9e5dd 100%);
+      box-shadow: var(--shadow);
+      transform: rotate(.35deg);
+    }
+
+    .hero-frame::before {
+      content: "";
+      position: absolute;
+      inset: -16% auto auto 55%;
+      width: 280px;
+      height: 280px;
+      background: rgba(47,125,87,.14);
+      filter: blur(70px);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .hero-frame img {
+      position: relative;
+      border-radius: 17px;
+      border: 1px solid rgba(24,34,29,.10);
+      background: white;
+      width: 100%;
+    }
+
+    .trust-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      padding: 22px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: .92rem;
+    }
+
+    .trust-row div {
+      text-align: center;
+      padding: 3px 20px;
+      border-right: 1px solid var(--line);
+    }
+    .trust-row div:last-child { border-right: 0; }
+    .trust-row strong { color: var(--text); display: block; font-size: .98rem; }
+
+    section { padding: 104px 0; }
+    .section-head { margin-bottom: 48px; }
+    .section-head p { margin: 0; color: var(--muted); font-size: 1.06rem; max-width: 680px; }
+
+    .feature-list {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 42px;
+    }
+
+    .feature {
+      padding-top: 22px;
+      border-top: 2px solid var(--line);
+    }
+
+    .feature-number {
+      display: inline-block;
+      color: var(--accent);
+      font-size: .78rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      margin-bottom: 15px;
+    }
+
+    .feature p { margin: 0; color: var(--muted); }
+
+    .use-cases {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 36px;
+    }
+
+    .pill {
+      padding: 9px 13px;
+      background: var(--surface-soft);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #405047;
+      font-size: .9rem;
+      font-weight: 620;
+    }
+
+    .download-panel {
+      background: #17231d;
+      color: #f5f8f5;
+      border-radius: 30px;
+      padding: 54px;
+      box-shadow: var(--shadow);
+    }
+
+    .download-panel .section-head p { color: #aab7af; }
+    .download-panel .eyebrow { color: #9bd2b4; }
+    .download-panel .eyebrow::before { background:#7cc89e; box-shadow:0 0 0 5px rgba(124,200,158,.16); }
+
+    .release-meta {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin: 16px 0 30px;
+      color: #aab7af;
+      font-size: .9rem;
+    }
+
+    .release-meta strong { color: white; }
+
+    .platform-list { border-top: 1px solid rgba(255,255,255,.13); }
+    .platform-row {
+      display: grid;
+      grid-template-columns: 1.1fr 1.5fr auto;
+      align-items: center;
+      gap: 24px;
+      padding: 22px 0;
+      border-bottom: 1px solid rgba(255,255,255,.13);
+    }
+
+    .platform-row p { margin: 2px 0 0; color: #9faea5; font-size: .9rem; }
+    .platform-row .btn { min-width: 150px; }
+    .platform-row .btn-primary { background: #f7faf7; color: #17231d; box-shadow:none; }
+    .platform-row .btn-primary:hover { background:#dfe9e3; }
+    .platform-row .small-link { color:#b9c7be; font-size:.88rem; text-decoration:none; }
+    .platform-row .small-link:hover { color:white; }
+
+    .release-status { margin: 22px 0 0; color: #92a199; font-size: .86rem; }
+
+    .guide-grid {
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+      gap: 70px;
+      align-items: start;
+    }
+
+    .steps { counter-reset: step; }
+    .step {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 16px;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      border-radius: 50%;
+      font-weight: 780;
+    }
+    .step p { margin: 4px 0 0; color: var(--muted); }
+
+    .details-stack { border-top: 1px solid var(--line); }
+    details { border-bottom: 1px solid var(--line); }
+    summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 20px 0;
+      font-weight: 720;
+      display:flex;
+      justify-content:space-between;
+      gap:20px;
+    }
+    summary::-webkit-details-marker { display:none; }
+    summary::after { content:"+"; color:var(--accent); font-size:1.2rem; }
+    details[open] summary::after { content:"–"; }
+    .detail-body { padding: 0 0 22px; color: var(--muted); }
+    .detail-body p:first-child { margin-top:0; }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      background: #17231d;
+      color: #e8f1eb;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font: .87rem/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .gallery-strip {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 22px;
+    }
+    .gallery-stack { display:grid; gap:22px; }
+    .shot {
+      margin: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 18px 44px rgba(24,34,29,.07);
+    }
+    .shot img { width:100%; height:100%; object-fit:cover; }
+    .shot figcaption { padding: 12px 14px; color: var(--muted); font-size:.86rem; border-top:1px solid var(--line); }
+
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px 48px;
+      margin-top: 38px;
+    }
+    .principle { padding: 20px 0; border-top: 1px solid var(--line); }
+    .principle p { margin: 6px 0 0; color: var(--muted); }
+
+    .warning {
+      margin-top: 42px;
+      padding: 22px 24px;
+      border-left: 4px solid var(--warning-line);
+      background: var(--warning-bg);
+      border-radius: 0 14px 14px 0;
+      color: #594b1f;
+    }
+
+    .resource-row {
+      margin-top: 44px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .resource-row a {
+      padding: 22px 24px;
+      text-decoration: none;
+      border-right: 1px solid var(--line);
+    }
+    .resource-row a:last-child { border-right:0; }
+    .resource-row a:hover { background: var(--surface-soft); }
+    .resource-row strong { display:block; margin-bottom:3px; }
+    .resource-row span { color:var(--muted); font-size:.88rem; }
+
+    footer { padding: 42px 0 62px; color: var(--muted); font-size: .88rem; }
+    .footer-row { display:flex; justify-content:space-between; gap:24px; align-items:center; }
+    .footer-links { display:flex; gap:18px; flex-wrap:wrap; }
+    .footer-links a { text-decoration:none; }
+    .footer-links a:hover { color:var(--text); }
+
+    @media (max-width: 900px) {
+      :root { --page: min(100% - 48px, 1080px); }
+      .hero { padding-top: 64px; }
+      .hero-grid, .guide-grid { grid-template-columns: 1fr; gap: 48px; }
+      .hero-frame { transform:none; }
+      .trust-row { grid-template-columns: 1fr 1fr; }
+      .trust-row div:nth-child(2) { border-right:0; }
+      .trust-row div:nth-child(-n+2) { border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:16px; }
+      .feature-list { grid-template-columns:1fr; gap:22px; }
+      .platform-row { grid-template-columns: 1fr auto; }
+      .platform-row > div:nth-child(2) { grid-column:1 / -1; grid-row:2; }
+      .gallery-strip { grid-template-columns:1fr; }
+      .principles { grid-template-columns:1fr; }
+      .resource-row { grid-template-columns:1fr; }
+      .resource-row a { border-right:0; border-bottom:1px solid var(--line); }
+      .resource-row a:last-child { border-bottom:0; }
+    }
+
+    @media (max-width: 720px) {
+      :root { --page: calc(100% - 34px); }
+      .menu-button { display:block; }
+      .nav-links {
+        display:none;
+        position:absolute;
+        left:17px;
+        right:17px;
+        top:70px;
+        padding:16px;
+        border:1px solid var(--line);
+        border-radius:16px;
+        background:var(--surface);
+        box-shadow:var(--shadow);
+        flex-direction:column;
+        align-items:stretch;
+        gap:8px;
+      }
+      .nav-links.open { display:flex; }
+      .nav-links a { padding:10px 8px; }
+      .hero { padding: 54px 0 54px; }
+      h1 { font-size: clamp(2.65rem, 14vw, 4rem); }
+      section { padding: 78px 0; }
+      .download-panel { padding: 32px 24px; border-radius:22px; }
+      .platform-row { grid-template-columns:1fr; gap:12px; }
+      .platform-row > div:nth-child(2) { grid-column:auto; grid-row:auto; }
+      .platform-row .btn { width:100%; }
+      .footer-row { flex-direction:column; align-items:flex-start; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111713;
+        --surface: #17201a;
+        --surface-soft: #1c2720;
+        --text: #edf3ef;
+        --muted: #a7b3ab;
+        --line: #2c3931;
+        --accent: #69b889;
+        --accent-dark: #8dccaa;
+        --accent-soft: #1c3527;
+        --warning-bg:#2c281b;
+        --warning-line:#9b8341;
+        --shadow:0 24px 60px rgba(0,0,0,.28);
+      }
+      .site-header { background: rgba(17,23,19,.88); }
+      .nav-github { background: rgba(23,32,26,.7); }
+      .hero-frame { background:linear-gradient(145deg,#22352a,#1a2a21); }
+      .download-panel { background:#0c110e; }
+      pre { background:#0b100d; }
+      .warning { color:#d7c889; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell nav">
+      <a class="brand" href="#top" aria-label="PinDB home">
+        <img src="assets/icon.png" alt="" onerror="this.style.display='none'">
+        <span>PinDB</span>
+      </a>
+      <button class="menu-button" type="button" aria-expanded="false" aria-controls="main-nav">Menu</button>
+      <nav class="nav-links" id="main-nav" aria-label="Main navigation">
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+        <a href="#guide">Guide</a>
+        <a href="#gallery">Gallery</a>
+        <a href="#about">About</a>
+        <a class="nav-github" href="https://github.com/mccreeper1318/pindb">GitHub</a>
+      </nav>
     </div>
-  </div>
-</div>
+  </header>
 
-<h2>Built around your data</h2>
-<ul>
-  <li>Create custom databases with text, numbers, currency, dates, yes/no values, dropdowns, and embedded documents.</li>
-  <li>Search, sort, filter, summarize, and switch between table and record views.</li>
-  <li>Import and export CSV data and create formatted print layouts.</li>
-  <li>Use Recently Deleted and internal snapshots for day-to-day recovery.</li>
-  <li>Move closed <code>.pindb</code> files between systems like ordinary files.</li>
-</ul>
+  <main id="top">
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div>
+          <div class="eyebrow">Free · local-first · open source</div>
+          <h1>Your data, organized. Your file, yours.</h1>
+          <p class="hero-copy">PinDB is a desktop personal database for structured information, embedded documents, search, filtering, printing, and recovery—without a server or subscription.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="#download">Download PinDB</a>
+            <a class="btn btn-secondary" href="#features">See what it does</a>
+          </div>
+        </div>
+        <div class="hero-frame" aria-label="PinDB table view screenshot">
+          <img src="assets/gallery/06-table-view.png" alt="PinDB table view showing structured database records">
+        </div>
+      </div>
+    </section>
 
-<h2>Project resources</h2>
-<div class="resource-grid">
-  <a class="resource-card" href="manual.html"><strong>User guide</strong><span>Learn the application workflow.</span></a>
-  <a class="resource-card" href="build.html"><strong>Build from source</strong><span>Choose a platform-specific build guide.</span></a>
-  <a class="resource-card" href="gallery.html"><strong>Gallery</strong><span>See the application interface.</span></a>
-  <a class="resource-card" href="about.html"><strong>About PinDB</strong><span>Project goals, privacy, and limitations.</span></a>
-</div>
+    <div class="shell trust-row" aria-label="PinDB highlights">
+      <div><strong>Local-first</strong>No hosted database required</div>
+      <div><strong>Portable</strong>One .pindb file you control</div>
+      <div><strong>Cross-platform</strong>Windows, macOS & Linux</div>
+      <div><strong>Private by default</strong>Your database stays local</div>
+    </div>
 
-<p class="project-links"><a href="https://github.com/mccreeper1318/pindb">Source repository</a> · <a href="https://github.com/mccreeper1318/pindb/releases">All releases</a> · <a href="https://github.com/mccreeper1318/pindb/issues">Issues</a></p>
+    <section id="features">
+      <div class="shell">
+        <div class="section-head reading">
+          <div class="eyebrow">Features</div>
+          <h2>Enough structure to be useful. Not enough complexity to get in the way.</h2>
+          <p>PinDB sits between a spreadsheet and a full database system: flexible enough for real data, simple enough to use without SQL.</p>
+        </div>
+
+        <div class="feature-list">
+          <article class="feature">
+            <span class="feature-number">01 · STRUCTURE</span>
+            <h3>Build the database you need</h3>
+            <p>Create text, multiline text, number, currency, date, date/time, yes/no, dropdown, and embedded-document fields with validation rules, defaults, limits, uniqueness, and summaries where appropriate.</p>
+          </article>
+          <article class="feature">
+            <span class="feature-number">02 · WORKFLOW</span>
+            <h3>Find and work with records quickly</h3>
+            <p>Search visible data, sort columns, build field-specific filters, switch between table and record views, import/export CSV data, and print filtered results.</p>
+          </article>
+          <article class="feature">
+            <span class="feature-number">03 · RECOVERY</span>
+            <h3>Keep your data recoverable</h3>
+            <p>Recently Deleted and internal logical snapshots give you day-to-day recovery tools, while embedded documents stay inside the database instead of depending on fragile external paths.</p>
+          </article>
+        </div>
+
+        <div class="use-cases" aria-label="Example uses">
+          <span class="pill">Collections</span>
+          <span class="pill">Inventory</span>
+          <span class="pill">Contacts</span>
+          <span class="pill">Household records</span>
+          <span class="pill">Project tracking</span>
+          <span class="pill">Personal reference data</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="download">
+      <div class="shell download-panel">
+        <div class="section-head reading">
+          <div class="eyebrow">Download</div>
+          <h2>Pick your platform.</h2>
+          <p>Native packages include PinDB's Java runtime. The current stable release is detected from GitHub automatically.</p>
+        </div>
+
+        <div class="release-meta">
+          <span>Stable: <strong id="stable-version">checking…</strong></span>
+          <span>Preview: <strong id="preview-version">checking…</strong></span>
+        </div>
+
+        <div class="platform-list">
+          <div class="platform-row">
+            <div><h3>Windows</h3><p>64-bit per-user installer</p></div>
+            <div><a class="small-link" id="windows-checksum" href="https://github.com/mccreeper1318/pindb/releases">Checksum & release details</a></div>
+            <a class="btn btn-primary" id="windows-download" href="https://github.com/mccreeper1318/pindb/releases">Download .exe</a>
+          </div>
+          <div class="platform-row">
+            <div><h3>macOS</h3><p>Apple Silicon and Intel packages</p></div>
+            <div><a class="small-link" href="#macos-install">Which Mac package?</a></div>
+            <a class="btn btn-primary" href="#macos-install">Choose package</a>
+          </div>
+          <div class="platform-row">
+            <div><h3>Debian family</h3><p>Debian, Ubuntu, Linux Mint & related</p></div>
+            <div><a class="small-link" id="deb-checksum" href="https://github.com/mccreeper1318/pindb/releases">Checksum & release details</a></div>
+            <a class="btn btn-primary" id="deb-download" href="https://github.com/mccreeper1318/pindb/releases">Download .deb</a>
+          </div>
+          <div class="platform-row">
+            <div><h3>Fedora family</h3><p>Fedora Workstation & traditional RPM systems</p></div>
+            <div><a class="small-link" id="rpm-checksum" href="https://github.com/mccreeper1318/pindb/releases">Checksum & release details</a></div>
+            <a class="btn btn-primary" id="rpm-download" href="https://github.com/mccreeper1318/pindb/releases">Download .rpm</a>
+          </div>
+        </div>
+        <p class="release-status" id="release-status">Looking up current GitHub release assets…</p>
+      </div>
+    </section>
+
+    <section id="guide">
+      <div class="shell guide-grid">
+        <div>
+          <div class="section-head">
+            <div class="eyebrow">Getting started</div>
+            <h2>From zero to your first database.</h2>
+            <p>No server setup, database account, or separate runtime installation required.</p>
+          </div>
+          <div class="steps">
+            <div class="step"><div><h3>Install PinDB</h3><p>Use the native package for your operating system and verify the published checksum.</p></div></div>
+            <div class="step"><div><h3>Create a .pindb file</h3><p>Name your database, choose where it lives, and add the fields you want to track.</p></div></div>
+            <div class="step"><div><h3>Add and organize records</h3><p>Enter data, attach documents, search, sort, filter, and switch views as needed.</p></div></div>
+            <div class="step"><div><h3>Back it up like a file</h3><p>Close the database normally, then copy the .pindb file anywhere you keep important backups.</p></div></div>
+          </div>
+        </div>
+
+        <div class="details-stack" aria-label="Platform and usage details">
+          <details>
+            <summary>Windows install & verification</summary>
+            <div class="detail-body">
+              <p>PinDB uses a native x64 <code>.exe</code> installer. It installs per-user, can integrate with the Start Menu and desktop, and registers <code>.pindb</code> files.</p>
+              <pre>Get-FileHash .\PinDB-&lt;version&gt;-windows-x64.exe -Algorithm SHA256
+Get-Content .\PinDB-&lt;version&gt;-windows-x64.exe.sha256</pre>
+              <p>Configuration lives under <code>%APPDATA%\PinDB</code>; state/cache uses <code>%LOCALAPPDATA%\PinDB</code>.</p>
+            </div>
+          </details>
+
+          <details id="macos-install">
+            <summary>macOS package choice & verification</summary>
+            <div class="detail-body">
+              <p>Use <code>-macos-arm64.pkg</code> for Apple Silicon and <code>-macos-x64.pkg</code> for Intel Macs.</p>
+              <div class="actions">
+                <a class="btn btn-secondary" id="mac-arm-download" href="https://github.com/mccreeper1318/pindb/releases">Apple Silicon package</a>
+                <a class="btn btn-secondary" id="mac-x64-download" href="https://github.com/mccreeper1318/pindb/releases">Intel package</a>
+              </div>
+              <pre>shasum -a 256 -c PinDB-&lt;version&gt;-macos-arm64.pkg.sha256
+# or
+shasum -a 256 -c PinDB-&lt;version&gt;-macos-x64.pkg.sha256</pre>
+              <p>Application data uses native macOS locations under <code>~/Library/Application Support/PinDB</code> and <code>~/Library/Caches/PinDB</code>.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Debian / Ubuntu / Mint install</summary>
+            <div class="detail-body">
+              <pre>sha256sum -c downloaded-package.deb.sha256
+sudo apt install ./pindb_*_amd64.deb</pre>
+              <p>On supported traditional Debian-family systems, PinDB can verify and hand an update to its packaged privileged helper and the native package manager.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Fedora install & Atomic note</summary>
+            <div class="detail-body">
+              <p>Traditional Fedora:</p>
+              <pre>sha256sum -c downloaded-package.rpm.sha256
+sudo dnf install ./pindb-*.x86_64.rpm</pre>
+              <p>Fedora Atomic variants such as Silverblue or Kinoite require manual <code>rpm-ostree</code> layering and a reboot.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Fields, records & embedded documents</summary>
+            <div class="detail-body">
+              <p>PinDB supports text, multiline text, numbers, currency, dates, date/time, yes/no, dropdowns, and embedded documents. Documents are stored in the database itself and can be previewed, saved as copies, printed where supported, or opened with the system application.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>CSV, summaries & printing</summary>
+            <div class="detail-body">
+              <p>Import and export CSV data, calculate supported summaries such as sum/average/min/max/count, and print column or record layouts. Printing can target the currently searched or filtered rows.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Build PinDB from source</summary>
+            <div class="detail-body">
+              <p>PinDB uses the Gradle wrapper and Java 25. Native packaging also requires the platform's normal packaging tools.</p>
+              <pre>git clone https://github.com/mccreeper1318/pindb.git
+cd pindb
+git switch dev</pre>
+              <p><a href="https://github.com/mccreeper1318/pindb">Open the repository</a> for current build tasks and source.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section id="gallery">
+      <div class="shell">
+        <div class="section-head reading">
+          <div class="eyebrow">Gallery</div>
+          <h2>A desktop app, not a web dashboard.</h2>
+          <p>PinDB keeps the workflow familiar: launch a database, define fields, add records, and work with your information in focused desktop windows.</p>
+        </div>
+        <div class="gallery-strip">
+          <figure class="shot">
+            <img src="assets/gallery/07-record-view.png" alt="PinDB record view">
+            <figcaption>Record view</figcaption>
+          </figure>
+          <div class="gallery-stack">
+            <figure class="shot">
+              <img src="assets/gallery/01-launcher.png" alt="PinDB launcher">
+              <figcaption>Launcher</figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="assets/gallery/09-print-preview.png" alt="PinDB print preview">
+              <figcaption>Print workflow</figcaption>
+            </figure>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="about">
+      <div class="shell">
+        <div class="section-head reading">
+          <div class="eyebrow">About PinDB</div>
+          <h2>Designed around ownership, portability, and straightforward desktop use.</h2>
+          <p>PinDB is for people who need more structure than a spreadsheet but do not want to run or administer a database server.</p>
+        </div>
+
+        <div class="principles">
+          <div class="principle"><h3>Local-first</h3><p>Your databases remain local unless you choose to copy or sync them elsewhere.</p></div>
+          <div class="principle"><h3>Portable</h3><p>A closed <code>.pindb</code> file can be copied, backed up, and moved like an ordinary file.</p></div>
+          <div class="principle"><h3>Approachable</h3><p>Common database tasks are exposed through a desktop interface instead of SQL.</p></div>
+          <div class="principle"><h3>Open source</h3><p>Development, issues, releases, and source code are public on GitHub.</p></div>
+        </div>
+
+        <div class="warning">
+          <strong>Current limitations:</strong> built-in database encryption is not yet available; package signing/trust prompts can vary by platform and release; immutable Linux distributions may require manual package-management steps; and embedded previews are intended for convenient inspection rather than full office-suite fidelity.
+        </div>
+
+        <div class="resource-row">
+          <a href="https://github.com/mccreeper1318/pindb"><strong>Source repository</strong><span>Code, development, and project history</span></a>
+          <a href="https://github.com/mccreeper1318/pindb/releases"><strong>All releases</strong><span>Stable, preview, and older packages</span></a>
+          <a href="https://github.com/mccreeper1318/pindb/issues"><strong>Issues</strong><span>Report bugs or follow planned work</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-row">
+      <div>PinDB · Free and open-source personal database software.</div>
+      <div class="footer-links">
+        <a href="#top">Top</a>
+        <a href="#download">Download</a>
+        <a href="https://github.com/mccreeper1318/pindb">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      const menu = document.querySelector('.menu-button');
+      const nav = document.querySelector('.nav-links');
+      if (menu && nav) {
+        menu.addEventListener('click', () => {
+          const open = nav.classList.toggle('open');
+          menu.setAttribute('aria-expanded', String(open));
+        });
+        nav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+          nav.classList.remove('open');
+          menu.setAttribute('aria-expanded', 'false');
+        }));
+      }
+
+      const repo = 'mccreeper1318/pindb';
+      const releases = `https://github.com/${repo}/releases`;
+      const api = `https://api.github.com/repos/${repo}/releases?per_page=30`;
+
+      function findAsset(release, test) {
+        return release && Array.isArray(release.assets) ? release.assets.find(a => test(a.name.toLowerCase())) : null;
+      }
+      function packageFor(release, kind) {
+        if (!release) return null;
+        switch (kind) {
+          case 'windows': return findAsset(release, n => n.endsWith('-windows-x64.exe'));
+          case 'mac-arm': return findAsset(release, n => n.endsWith('-macos-arm64.pkg'));
+          case 'mac-x64': return findAsset(release, n => n.endsWith('-macos-x64.pkg'));
+          case 'deb': return findAsset(release, n => n.endsWith('.deb') && /(?:amd64|x86_64)/.test(n));
+          case 'rpm': return findAsset(release, n => n.endsWith('.rpm') && /(?:x86_64|amd64)/.test(n));
+          default: return null;
+        }
+      }
+      function checksumFor(release, asset, platform) {
+        if (!asset) return null;
+        const exact = `${asset.name}.sha256`.toLowerCase();
+        const aggregate = platform === 'windows' ? 'checksums-windows.sha256' : platform === 'mac' ? 'checksums-macos.sha256' : 'checksums-linux.sha256';
+        return findAsset(release, n => n === exact) || findAsset(release, n => n === aggregate) || findAsset(release, n => n === 'checksums.sha256');
+      }
+      function setLink(id, asset, fallbackLabel) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (asset) el.href = asset.browser_download_url;
+        else { el.href = releases; if (fallbackLabel) el.textContent = fallbackLabel; }
+      }
+      function setChecksum(id, release, asset, platform) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const checksum = checksumFor(release, asset, platform);
+        el.href = checksum ? checksum.browser_download_url : releases;
+      }
+
+      fetch(api, { headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } })
+        .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+        .then(items => {
+          const published = items.filter(r => !r.draft);
+          const stable = published.find(r => !r.prerelease) || null;
+          const preview = published.find(r => r.prerelease) || null;
+          document.getElementById('stable-version').textContent = stable ? stable.tag_name : 'not published';
+          document.getElementById('preview-version').textContent = preview ? preview.tag_name : 'none';
+
+          const windows = packageFor(stable, 'windows');
+          const macArm = packageFor(stable, 'mac-arm');
+          const macX64 = packageFor(stable, 'mac-x64');
+          const deb = packageFor(stable, 'deb');
+          const rpm = packageFor(stable, 'rpm');
+          setLink('windows-download', windows, 'View releases');
+          setLink('mac-arm-download', macArm, 'View Apple Silicon releases');
+          setLink('mac-x64-download', macX64, 'View Intel releases');
+          setLink('deb-download', deb, 'View releases');
+          setLink('rpm-download', rpm, 'View releases');
+          setChecksum('windows-checksum', stable, windows, 'windows');
+          setChecksum('deb-checksum', stable, deb, 'linux');
+          setChecksum('rpm-checksum', stable, rpm, 'linux');
+          document.getElementById('release-status').textContent = 'Live release information loaded from GitHub. Downloads remain tied to published release assets and checksums.';
+        })
+        .catch(() => {
+          document.getElementById('stable-version').textContent = 'GitHub releases';
+          document.getElementById('preview-version').textContent = 'GitHub releases';
+          document.getElementById('release-status').textContent = 'Live release lookup is unavailable in this preview. Download links fall back to the official GitHub Releases page.';
+        });
+    }());
+  </script>
+</body>
+</html>

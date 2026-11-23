@@ -1,9 +1,37 @@
----
-layout: default
-title: Page not found
-permalink: /404.html
----
-
-<h1>Page not found</h1>
-<p>The page may have moved while the PinDB website was reorganized around platform-specific downloads and guides.</p>
-<p class="page-actions"><a class="btn" href="index.html">PinDB home</a><a class="btn secondary" href="download.html">Choose a download</a></p>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#2f7d57">
+  <link rel="icon" href="assets/icon.png">
+  <title>Page moved · PinDB</title>
+  <style>
+    :root{--bg:#f4f6f3;--surface:#fff;--text:#18221d;--muted:#66716b;--line:#dce3de;--accent:#2f7d57}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:32px;line-height:1.6}.card{width:min(620px,100%);padding:42px;background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:0 24px 60px rgba(24,34,29,.10)}h1{margin:0 0 12px;font-size:clamp(2rem,7vw,3.25rem);line-height:1.05;letter-spacing:-.04em}p{margin:0 0 26px;color:var(--muted)}a{display:inline-flex;align-items:center;min-height:46px;padding:0 18px;border-radius:12px;background:var(--accent);color:#fff;text-decoration:none;font-weight:700}@media(prefers-color-scheme:dark){:root{--bg:#111713;--surface:#17201a;--text:#edf3ef;--muted:#a7b3ab;--line:#2c3931;--accent:#69b889}.card{box-shadow:0 24px 60px rgba(0,0,0,.28)}}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>This page has moved.</h1>
+    <p>PinDB's website has been simplified. The information you were looking for is now part of the main site.</p>
+    <a id="home-link" href="/pindb/">Go to PinDB</a>
+  </main>
+  <script>
+    (function(){
+      const path=location.pathname.toLowerCase();
+      const base='/pindb/';
+      let anchor='';
+      if(/features/.test(path)) anchor='#features';
+      else if(/download|windows|macos|debian|fedora/.test(path)) anchor='#download';
+      else if(/manual|guide|build/.test(path)) anchor='#guide';
+      else if(/gallery/.test(path)) anchor='#gallery';
+      else if(/about/.test(path)) anchor='#about';
+      const target=base+anchor;
+      document.getElementById('home-link').href=target;
+      if(anchor) location.replace(target);
+    }());
+  </script>
+</body>
+</html>
