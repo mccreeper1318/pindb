@@ -36,6 +36,11 @@ public record SavedView(
                     && field.dropdownOptions().stream().noneMatch(option -> option.equals(filterSpec.choiceValue()))) {
                 problems.add("The choice filter value “" + filterSpec.choiceValue()
                         + "” is no longer available in “" + field.name() + "”.");
+            } else if (field != null && field.type() == FieldType.BOOLEAN
+                    && !filterSpec.choiceValue().equalsIgnoreCase("true")
+                    && !filterSpec.choiceValue().equalsIgnoreCase("false")) {
+                problems.add("The choice filter value “" + filterSpec.choiceValue()
+                        + "” is not valid for the Yes/No field “" + field.name() + "”.");
             }
         }
 
