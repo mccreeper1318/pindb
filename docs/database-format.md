@@ -4,7 +4,7 @@ A `.pindb` file is a SQLite database. The custom extension identifies files inte
 
 ## Schema version 1
 
-The `pindb_meta` table stores the database name, description, schema version, default view, delete-confirmation preference, backup limit, and print preferences.
+The `pindb_meta` table stores the database name, description, schema version, default view, delete-confirmation preference, backup limit, print preferences, and saved-view definitions. Saved views are metadata-only reusable search/filter/sort settings, so adding them does not require a new database schema version.
 
 Field definitions are stored in `field_definitions`. Records use a stable row in `records` and field values in `record_values`. Removing a field cascades its values from current records.
 

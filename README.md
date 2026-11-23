@@ -110,6 +110,8 @@ PinDB supports text, multiline text, number, currency, date, date/time, yes/no, 
 - Add, edit, delete, restore, and permanently remove entries.
 - Search visible field values.
 - Sort table columns and create field-specific filters.
+- Save commonly used search, filter, and sort setups as database-specific **Saved Views**.
+- Rename, update, apply, or delete saved views, with safe handling when referenced fields later change.
 - Switch between table and record views.
 - Use **Add & Add Another** for repeated entry.
 

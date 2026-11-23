@@ -10,7 +10,7 @@ The **+** button opens a separate entry window. Double-click an entry or select 
 
 ## Views and finding information
 
-Table view displays fields as columns. Record view displays each entry as a vertical field list. The selected view is remembered inside the database. Search checks every field. Filter supports date ranges, numeric ranges, dropdowns, and Yes/No values.
+Table view displays fields as columns. Record view displays each entry as a vertical field list. The selected view is remembered inside the database. Search checks every field. Filter supports date ranges, numeric ranges, dropdowns, and Yes/No values.\n\nUse **Saved Views** to store a frequently used search, filter, and sort setup inside the current database. Saved views can be applied again later, renamed, updated from the current view, or deleted. If a saved view references a field that was removed or changed to an incompatible type, PinDB warns you instead of applying a broken view and opens the manager so you can update or remove it.
 
 ## Fields and summaries
 
