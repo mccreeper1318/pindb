@@ -35,6 +35,7 @@ import org.pindb.model.PrintArrangement;
 import org.pindb.model.PrintOptions;
 import org.pindb.model.RecordData;
 import org.pindb.model.SummaryType;
+import org.pindb.ui.PrintPreviewDialog;
 import org.pindb.ui.UiUtil;
 
 import javax.print.PrintServiceLookup;
@@ -71,14 +72,20 @@ public final class PrintService {
     private PrintService() {
     }
 
-    public static boolean print(Window owner, DatabaseInfo info, List<FieldDefinition> allFields,
-                                List<RecordData> records, PrintOptions options) {
+    public enum PrintResult {
+        PRINTED,
+        CANCELLED,
+        BACK_TO_SETTINGS
+    }
+
+    public static PrintResult print(Window owner, DatabaseInfo info, List<FieldDefinition> allFields,
+                                    List<RecordData> records, PrintOptions options) {
         PrinterJob job = PrinterJob.createPrinterJob();
         if (job == null) {
             return printWithDesktopFallback(owner, info, allFields, records, options);
         }
         if (!job.showPrintDialog(owner)) {
-            return false;
+            return PrintResult.CANCELLED;
         }
 
         Printer printer = job.getPrinter();
@@ -90,6 +97,16 @@ public final class PrintService {
 
         PrintArea area = new PrintArea(pageLayout.getPrintableWidth(), pageLayout.getPrintableHeight());
         List<Node> pages = printablePages(info, allFields, records, options, area);
+        PrintPreviewDialog.Result preview = new PrintPreviewDialog(owner, info.name(), pages).showAndWait();
+        if (preview == PrintPreviewDialog.Result.BACK_TO_SETTINGS) {
+            job.cancelJob();
+            return PrintResult.BACK_TO_SETTINGS;
+        }
+        if (preview != PrintPreviewDialog.Result.PRINT) {
+            job.cancelJob();
+            return PrintResult.CANCELLED;
+        }
+
         boolean success = true;
         for (Node printablePage : pages) {
             printablePage.applyCss();
@@ -104,10 +121,10 @@ public final class PrintService {
         } else {
             job.cancelJob();
         }
-        return success;
+        return success ? PrintResult.PRINTED : PrintResult.CANCELLED;
     }
 
-    private static boolean printWithDesktopFallback(Window owner, DatabaseInfo info,
+    private static PrintResult printWithDesktopFallback(Window owner, DatabaseInfo info,
                                                     List<FieldDefinition> allFields,
                                                     List<RecordData> records, PrintOptions options) {
         javax.print.PrintService[] services;
@@ -116,14 +133,14 @@ public final class PrintService {
         } catch (RuntimeException exception) {
             UiUtil.error(owner, "Printing Unavailable",
                     "JavaFX could not find a printer, and PinDB could not query the system print service.", exception);
-            return false;
+            return PrintResult.CANCELLED;
         }
 
         if (services.length == 0) {
             UiUtil.warning(owner, "Printing Unavailable",
                     "Neither JavaFX nor the system Java/CUPS print service could find a configured printer. "
                             + "Check that the printer is enabled in system settings and that the CUPS service is running.");
-            return false;
+            return PrintResult.CANCELLED;
         }
 
         try {
@@ -132,7 +149,7 @@ public final class PrintService {
                 awtJob.setPrintService(services[0]);
             }
             if (!awtJob.printDialog()) {
-                return false;
+                return PrintResult.CANCELLED;
             }
 
             PageFormat pageFormat = awtJob.defaultPage();
@@ -140,6 +157,14 @@ public final class PrintService {
             pageFormat = awtJob.validatePage(pageFormat);
             PrintArea area = new PrintArea(pageFormat.getImageableWidth(), pageFormat.getImageableHeight());
             List<Node> pages = printablePages(info, allFields, records, options, area);
+            PrintPreviewDialog.Result preview = new PrintPreviewDialog(owner, info.name(), pages).showAndWait();
+            if (preview == PrintPreviewDialog.Result.BACK_TO_SETTINGS) {
+                return PrintResult.BACK_TO_SETTINGS;
+            }
+            if (preview != PrintPreviewDialog.Result.PRINT) {
+                return PrintResult.CANCELLED;
+            }
+
             OnDemandPageSource<Node, BufferedImage> renderedPages =
                     new OnDemandPageSource<>(pages, PrintService::renderFallbackPageOnFxThread);
             PageFormat finalPageFormat = pageFormat;
@@ -220,13 +245,13 @@ public final class PrintService {
             if (failure.get() != null) {
                 UiUtil.error(owner, "Printing Failed",
                         "The system printer was detected, but PinDB could not submit the print job.", failure.get());
-                return false;
+                return PrintResult.CANCELLED;
             }
-            return completed.get() && !cancelled.get();
+            return completed.get() && !cancelled.get() ? PrintResult.PRINTED : PrintResult.CANCELLED;
         } catch (PrinterException | RuntimeException exception) {
             UiUtil.error(owner, "Printing Failed",
                     "The system printer was detected, but PinDB could not submit the print job.", exception);
-            return false;
+            return PrintResult.CANCELLED;
         }
     }
 
@@ -268,7 +293,7 @@ public final class PrintService {
         return SwingFXUtils.fromFXImage(image, null);
     }
 
-    private static List<Node> printablePages(DatabaseInfo info, List<FieldDefinition> allFields,
+    static List<Node> printablePages(DatabaseInfo info, List<FieldDefinition> allFields,
                                              List<RecordData> records, PrintOptions options, PrintArea area) {
         List<FieldDefinition> fields = selectedFields(allFields, options.fieldIds());
         List<Node> bodies = options.arrangement() == PrintArrangement.COLUMNS
