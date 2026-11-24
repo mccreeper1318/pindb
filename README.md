@@ -125,6 +125,8 @@ Document fields store the original file inside the `.pindb` database. Embedded d
 - CSV import and export.
 - Printable column or record layouts.
 - Portrait/landscape, headings, database names, dates, page numbers, and summaries.
+- Print preview with page-by-page navigation before the job is submitted.
+- Return from preview to print settings, adjust the layout, and preview again.
 - Printing of the currently visible searched/filtered result set.
 
 ### Backups and recovery
