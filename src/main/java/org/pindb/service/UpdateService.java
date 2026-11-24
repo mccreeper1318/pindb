@@ -54,30 +54,98 @@ public final class UpdateService {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) throw new IOException("GitHub returned HTTP " + response.statusCode() + " while checking for updates.");
         Version current = Version.parse(AppVersion.VERSION);
-        return MiniJson.array(MiniJson.parse(response.body())).stream().map(MiniJson::object)
-                .filter(release -> !MiniJson.bool(release.get("draft")))
-                .filter(release -> includePrereleases || !MiniJson.bool(release.get("prerelease")))
-                .map(this::toRelease).flatMap(Optional::stream)
-                .filter(release -> release.version().compareTo(current) > 0)
-                .max(Comparator.comparing(ReleaseInfo::version));
+        List<Map<String, Object>> releases = MiniJson.array(MiniJson.parse(response.body())).stream()
+                .map(MiniJson::object)
+                .toList();
+        return selectUpdate(releases, current, includePrereleases);
     }
 
-    private Optional<ReleaseInfo> toRelease(Map<String, Object> release) {
+    Optional<ReleaseInfo> selectUpdate(List<Map<String, Object>> releases, Version current,
+                                       boolean includePrereleases) {
+        Optional<NativePackageType> packageType = currentPackageType();
+        if (packageType.isEmpty()) {
+            return Optional.empty();
+        }
+
+        List<ReleaseMetadata> eligible = releases.stream()
+                .filter(release -> !MiniJson.bool(release.get("draft")))
+                .map(this::toMetadata)
+                .flatMap(Optional::stream)
+                .filter(release -> includePrereleases || !release.prerelease())
+                .filter(release -> release.version().compareTo(current) > 0)
+                .sorted(Comparator.comparing(ReleaseMetadata::version))
+                .toList();
+
+        Optional<InstallableRelease> target = eligible.stream()
+                .map(release -> installableRelease(release, packageType.get()))
+                .flatMap(Optional::stream)
+                .max(Comparator.comparing(release -> release.metadata().version()));
+        if (target.isEmpty()) {
+            return Optional.empty();
+        }
+
+        InstallableRelease selected = target.get();
+        List<ReleaseMetadata> includedNotes = eligible.stream()
+                .filter(release -> release.version().compareTo(selected.metadata().version()) <= 0)
+                .toList();
+        String postUpdateNotes = combinedReleaseNotes(includedNotes);
+        ReleaseMetadata metadata = selected.metadata();
+        return Optional.of(new ReleaseInfo(
+                metadata.tag(),
+                metadata.version(),
+                metadata.name(),
+                metadata.markdownNotes(),
+                postUpdateNotes,
+                selected.releasePackage(),
+                metadata.prerelease(),
+                metadata.publishedAt()));
+    }
+
+    private Optional<ReleaseMetadata> toMetadata(Map<String, Object> release) {
         try {
-            Optional<NativePackageType> packageType = currentPackageType();
-            if (packageType.isEmpty()) return Optional.empty();
             String tag = MiniJson.string(release.get("tag_name"));
             Version version = Version.parse(tag);
-            List<Map<String, Object>> assets = MiniJson.array(release.get("assets")).stream().map(MiniJson::object).toList();
-            Optional<ReleasePackage> releasePackage = selectInstallablePackage(assets, packageType.get(), architecture);
-            if (releasePackage.isEmpty()) return Optional.empty();
             String releaseName = MiniJson.string(release.get("name"));
-            return Optional.of(new ReleaseInfo(tag, version, releaseName.isBlank() ? "PinDB " + tag : releaseName,
-                    MiniJson.string(release.get("body")), releasePackage.get(), MiniJson.bool(release.get("prerelease")),
+            List<Map<String, Object>> assets = MiniJson.array(release.get("assets")).stream()
+                    .map(MiniJson::object)
+                    .toList();
+            return Optional.of(new ReleaseMetadata(
+                    tag,
+                    version,
+                    releaseName.isBlank() ? "PinDB " + tag : releaseName,
+                    MiniJson.string(release.get("body")),
+                    assets,
+                    MiniJson.bool(release.get("prerelease")),
                     parseInstant(MiniJson.string(release.get("published_at")))));
         } catch (RuntimeException exception) {
             return Optional.empty();
         }
+    }
+
+    private Optional<InstallableRelease> installableRelease(ReleaseMetadata release,
+                                                            NativePackageType packageType) {
+        return selectInstallablePackage(release.assets(), packageType, architecture)
+                .map(releasePackage -> new InstallableRelease(release, releasePackage));
+    }
+
+    static String combinedReleaseNotes(List<ReleaseMetadata> releases) {
+        if (releases.isEmpty()) {
+            return "";
+        }
+        if (releases.size() == 1) {
+            return releases.getFirst().markdownNotes();
+        }
+
+        StringBuilder combined = new StringBuilder();
+        for (ReleaseMetadata release : releases) {
+            if (!combined.isEmpty()) {
+                combined.append("\n\n");
+            }
+            combined.append("## PinDB ").append(release.tag()).append("\n\n");
+            String notes = release.markdownNotes() == null ? "" : release.markdownNotes().strip();
+            combined.append(notes.isBlank() ? "_No release notes were provided for this version._" : notes);
+        }
+        return combined.toString();
     }
 
     private Optional<NativePackageType> currentPackageType() {
@@ -176,6 +244,20 @@ public final class UpdateService {
         return assets.stream()
                 .filter(asset -> MiniJson.string(asset.get("name")).equals("checksums.sha256"))
                 .findFirst();
+    }
+
+    record ReleaseMetadata(
+            String tag,
+            Version version,
+            String name,
+            String markdownNotes,
+            List<Map<String, Object>> assets,
+            boolean prerelease,
+            Instant publishedAt
+    ) {
+    }
+
+    private record InstallableRelease(ReleaseMetadata metadata, ReleasePackage releasePackage) {
     }
 
     private static Instant parseInstant(String value) {

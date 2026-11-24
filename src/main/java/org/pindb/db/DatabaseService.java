@@ -5,7 +5,9 @@ import org.pindb.model.DatabaseInfo;
 import org.pindb.model.DatabaseView;
 import org.pindb.model.FieldDefinition;
 import org.pindb.model.FieldType;
+import org.pindb.model.FilterSpec;
 import org.pindb.model.RecordData;
+import org.pindb.model.SavedView;
 import org.pindb.model.SummaryType;
 import org.pindb.util.MiniJson;
 
@@ -32,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 public final class DatabaseService implements AutoCloseable {
     private final Path path;
@@ -74,6 +77,7 @@ public final class DatabaseService implements AutoCloseable {
                 service.setMetaInternal("backup_limit", String.valueOf(Math.max(1, backupLimit)));
                 service.setMetaInternal("print_layout", "COLUMNS");
                 service.setMetaInternal("print_orientation", "LANDSCAPE");
+                service.setMetaInternal("saved_views", "[]");
                 for (FieldDefinition copy : validatedFields) {
                     service.insertFieldInternal(copy);
                 }
@@ -204,6 +208,130 @@ public final class DatabaseService implements AutoCloseable {
             statement.setString(1, key);
             statement.setString(2, Objects.requireNonNullElse(value, ""));
             statement.executeUpdate();
+        }
+    }
+
+    public List<SavedView> savedViews() {
+        String raw = getMeta("saved_views", "[]");
+        try {
+            List<SavedView> views = new ArrayList<>();
+            for (Object element : MiniJson.array(MiniJson.parse(raw))) {
+                Map<String, Object> object = MiniJson.object(element);
+                String id = MiniJson.string(object.get("id"));
+                String name = MiniJson.string(object.get("name")).trim();
+                if (id.isBlank() || name.isBlank()) {
+                    continue;
+                }
+                FilterSpec filter = new FilterSpec(
+                        nullableLong(object.get("dateFieldId")),
+                        nullableDate(object.get("dateFrom")),
+                        nullableDate(object.get("dateTo")),
+                        nullableLong(object.get("numericFieldId")),
+                        nullableDecimal(object.get("numericMinimum")),
+                        nullableDecimal(object.get("numericMaximum")),
+                        nullableLong(object.get("choiceFieldId")),
+                        MiniJson.string(object.get("choiceValue"))
+                );
+                List<SavedView.SortSpec> sortOrder = new ArrayList<>();
+                for (Object sortElement : MiniJson.array(object.get("sortOrder"))) {
+                    Map<String, Object> sortObject = MiniJson.object(sortElement);
+                    Long fieldId = nullableLong(sortObject.get("fieldId"));
+                    if (fieldId != null) {
+                        sortOrder.add(new SavedView.SortSpec(fieldId, !Boolean.FALSE.equals(sortObject.get("ascending"))));
+                    }
+                }
+                views.add(new SavedView(id, name, MiniJson.string(object.get("searchText")), filter, sortOrder));
+            }
+            return List.copyOf(views);
+        } catch (RuntimeException exception) {
+            return List.of();
+        }
+    }
+
+    public SavedView createSavedView(String name, String searchText, FilterSpec filterSpec,
+                                     List<SavedView.SortSpec> sortOrder) {
+        String normalizedName = requireSavedViewName(name);
+        List<SavedView> views = new ArrayList<>(savedViews());
+        ensureSavedViewNameAvailable(views, normalizedName, null);
+        SavedView created = new SavedView(UUID.randomUUID().toString(), normalizedName, searchText,
+                filterSpec, sortOrder);
+        views.add(created);
+        writeSavedViews(views);
+        return created;
+    }
+
+    public void updateSavedView(SavedView updated) {
+        Objects.requireNonNull(updated, "updated");
+        String normalizedName = requireSavedViewName(updated.name());
+        List<SavedView> views = new ArrayList<>(savedViews());
+        int index = -1;
+        for (int i = 0; i < views.size(); i++) {
+            if (views.get(i).id().equals(updated.id())) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) {
+            throw new DatabaseException("The selected saved view no longer exists.");
+        }
+        ensureSavedViewNameAvailable(views, normalizedName, updated.id());
+        views.set(index, new SavedView(updated.id(), normalizedName, updated.searchText(),
+                updated.filterSpec(), updated.sortOrder()));
+        writeSavedViews(views);
+    }
+
+    public void deleteSavedView(String id) {
+        List<SavedView> views = new ArrayList<>(savedViews());
+        boolean removed = views.removeIf(view -> view.id().equals(id));
+        if (!removed) {
+            throw new DatabaseException("The selected saved view no longer exists.");
+        }
+        writeSavedViews(views);
+    }
+
+    private void writeSavedViews(List<SavedView> views) {
+        List<Map<String, Object>> encoded = new ArrayList<>();
+        for (SavedView view : views) {
+            FilterSpec filter = view.filterSpec();
+            LinkedHashMap<String, Object> object = new LinkedHashMap<>();
+            object.put("id", view.id());
+            object.put("name", view.name());
+            object.put("searchText", view.searchText());
+            object.put("dateFieldId", filter.dateFieldId());
+            object.put("dateFrom", filter.dateFrom() == null ? null : filter.dateFrom().toString());
+            object.put("dateTo", filter.dateTo() == null ? null : filter.dateTo().toString());
+            object.put("numericFieldId", filter.numericFieldId());
+            object.put("numericMinimum", filter.numericMinimum() == null ? null : filter.numericMinimum().toPlainString());
+            object.put("numericMaximum", filter.numericMaximum() == null ? null : filter.numericMaximum().toPlainString());
+            object.put("choiceFieldId", filter.choiceFieldId());
+            object.put("choiceValue", filter.choiceValue());
+            object.put("sortOrder", view.sortOrder().stream().map(sort -> {
+                LinkedHashMap<String, Object> encodedSort = new LinkedHashMap<>();
+                encodedSort.put("fieldId", sort.fieldId());
+                encodedSort.put("ascending", sort.ascending());
+                return encodedSort;
+            }).toList());
+            encoded.add(object);
+        }
+        setMeta("saved_views", MiniJson.stringify(encoded));
+    }
+
+    private static String requireSavedViewName(String name) {
+        String normalized = Objects.requireNonNullElse(name, "").trim();
+        if (normalized.isBlank()) {
+            throw new DatabaseException("Enter a name for the saved view.");
+        }
+        if (normalized.length() > 120) {
+            throw new DatabaseException("Saved view names cannot be longer than 120 characters.");
+        }
+        return normalized;
+    }
+
+    private static void ensureSavedViewNameAvailable(List<SavedView> views, String name, String excludedId) {
+        boolean duplicate = views.stream().anyMatch(view -> !view.id().equals(excludedId)
+                && view.name().equalsIgnoreCase(name));
+        if (duplicate) {
+            throw new DatabaseException("A saved view named “" + name + "” already exists.");
         }
     }
 
@@ -941,6 +1069,45 @@ public final class DatabaseService implements AutoCloseable {
 
     private static LocalDateTime nullableDateTime(String value) {
         return value == null || value.isBlank() ? null : LocalDateTime.parse(value);
+    }
+
+    private static Long nullableLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            String text = String.valueOf(value).trim();
+            return text.isBlank() ? null : Long.parseLong(text);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private static LocalDate nullableDate(Object value) {
+        String text = MiniJson.string(value).trim();
+        if (text.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(text);
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private static BigDecimal nullableDecimal(Object value) {
+        String text = MiniJson.string(value).trim();
+        if (text.isBlank()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(text);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private static int parseInteger(String value, int fallback) {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+### Added
+- Automatic updates now show release notes for every published version skipped between the installed version and the newly installed version, while respecting the selected stable or pre-release update channel (Issue #137).
+- Expanded PinDB's built-in database templates with Collections, Household Belongings, Vehicle Maintenance, and system-neutral Tabletop RPG campaign/reference setups; improved Inventory and Contacts defaults; added template descriptions in the creation wizard; and added regression coverage for template-created databases (Issue #138).
+- Added database-specific Saved Views for reusable search, filter, and sort setups, including rename, update, delete, persistence, and safe handling when referenced fields are removed or changed (Issue #139).
+
+### Changed
+- Updated the Gradle wrapper from 9.9.1 to 9.9.2 (PR #193).
+
 ## 0.3.3
 
 ### Fixed

@@ -18,6 +18,7 @@ import javafx.scene.control.Hyperlink;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
+import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.ScrollPane;
@@ -25,6 +26,7 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
@@ -51,6 +53,7 @@ import org.pindb.model.FieldDefinition;
 import org.pindb.model.FieldType;
 import org.pindb.model.FilterSpec;
 import org.pindb.model.RecordData;
+import org.pindb.model.SavedView;
 import org.pindb.service.CsvService;
 import org.pindb.service.PrintService;
 
@@ -75,11 +78,13 @@ public final class DatabaseWindow implements AutoCloseable {
     private final Stage stage = new Stage();
     private final ObservableList<RecordData> records = FXCollections.observableArrayList();
     private final FilteredList<RecordData> filtered = new FilteredList<>(records, record -> true);
+    private final SortedList<RecordData> sorted = new SortedList<>(filtered);
     private final TableView<RecordData> table = new TableView<>();
     private final ListView<RecordData> recordList = new ListView<>();
     private final StackPane viewStack = new StackPane();
     private final FlowPane summaries = new FlowPane(12, 12);
     private final TextField search = new TextField();
+    private final MenuButton savedViewsButton = new MenuButton("Saved Views");
     private final Label nameLabel = UiUtil.title("");
     private final Label detailsLabel = new Label();
     private final Label statusLabel = new Label();
@@ -121,6 +126,8 @@ public final class DatabaseWindow implements AutoCloseable {
 
         search.setPromptText("Search all fields…");
         search.textProperty().addListener((observable, oldValue, newValue) -> updatePredicate());
+        sorted.comparatorProperty().bind(table.comparatorProperty());
+        savedViewsButton.setOnShowing(event -> refreshSavedViewsMenu());
         table.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2 && selectedRecord() != null) {
                 editSelected();
@@ -215,12 +222,16 @@ public final class DatabaseWindow implements AutoCloseable {
         recordItem.setSelected(view == DatabaseView.RECORD);
         tableItem.setOnAction(event -> showView(DatabaseView.TABLE, true));
         recordItem.setOnAction(event -> showView(DatabaseView.RECORD, true));
+        MenuItem saveView = item("Save Current View…", event -> saveCurrentView());
+        MenuItem manageViews = item("Manage Saved Views…", event -> manageSavedViews());
         MenuItem clearFilter = item("Clear Search and Filters", event -> {
             search.clear();
             filterSpec = FilterSpec.empty();
+            table.getSortOrder().clear();
             updatePredicate();
         });
-        viewMenu.getItems().addAll(tableItem, recordItem, new javafx.scene.control.SeparatorMenuItem(), clearFilter);
+        viewMenu.getItems().addAll(tableItem, recordItem, new javafx.scene.control.SeparatorMenuItem(),
+                saveView, manageViews, clearFilter);
 
         Menu help = new Menu("Help");
         help.getItems().addAll(
@@ -251,7 +262,7 @@ public final class DatabaseWindow implements AutoCloseable {
         Button fieldsButton = new Button("Fields…");
         fieldsButton.setOnAction(event -> new ManageFieldsDialog(stage, context.settings(), database, this::reloadAll).showAndWait());
         search.setPrefWidth(260);
-        HBox tools = new HBox(8, search, filter, fieldsButton);
+        HBox tools = new HBox(8, search, filter, savedViewsButton, fieldsButton);
         tools.setAlignment(Pos.CENTER_RIGHT);
         HBox top = new HBox(14, titles, spacer, tools);
         top.setAlignment(Pos.CENTER_LEFT);
@@ -285,12 +296,14 @@ public final class DatabaseWindow implements AutoCloseable {
 
     private void reloadAll() {
         try {
+            List<SavedView.SortSpec> sortOrder = currentSortOrder();
             fields = database.fields();
             LinkedHashMap<Long, FieldDefinition> map = new LinkedHashMap<>();
             fields.forEach(field -> map.put(field.id(), field));
             fieldsById = Map.copyOf(map);
             records.setAll(database.activeRecords());
             rebuildTableColumns();
+            applySortOrder(sortOrder);
             refreshSummaryCards();
             DatabaseInfo info = database.info();
             stage.setTitle(info.name() + " — PinDB");
@@ -309,6 +322,7 @@ public final class DatabaseWindow implements AutoCloseable {
         table.getColumns().clear();
         for (FieldDefinition field : fields) {
             TableColumn<RecordData, String> column = new TableColumn<>(field.name());
+            column.setUserData(field.id());
             column.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().value(field.id())));
             column.setCellFactory(ignored -> new javafx.scene.control.TableCell<>() {
                 @Override
@@ -338,10 +352,8 @@ public final class DatabaseWindow implements AutoCloseable {
             column.setMinWidth(field.type() == FieldType.MULTILINE_TEXT ? 180 : 110);
             table.getColumns().add(column);
         }
-        SortedList<RecordData> sorted = new SortedList<>(filtered);
-        sorted.comparatorProperty().bind(table.comparatorProperty());
         table.setItems(sorted);
-        recordList.setItems(filtered);
+        recordList.setItems(sorted);
     }
 
     private Comparator<String> comparatorFor(FieldDefinition field) {
@@ -375,6 +387,104 @@ public final class DatabaseWindow implements AutoCloseable {
             Label noSummaries = new Label("No field summaries configured. Use Fields… to add one.");
             noSummaries.getStyleClass().add("muted-label");
             summaries.getChildren().add(noSummaries);
+        }
+    }
+
+    private void refreshSavedViewsMenu() {
+        savedViewsButton.getItems().clear();
+        List<SavedView> views = database.savedViews();
+        for (SavedView savedView : views) {
+            MenuItem item = new MenuItem(savedView.name());
+            item.setOnAction(event -> applySavedView(savedView));
+            savedViewsButton.getItems().add(item);
+        }
+        if (!views.isEmpty()) {
+            savedViewsButton.getItems().add(new javafx.scene.control.SeparatorMenuItem());
+        }
+        savedViewsButton.getItems().addAll(
+                item("Save Current View…", event -> saveCurrentView()),
+                item("Manage Saved Views…", event -> manageSavedViews()));
+    }
+
+    private void saveCurrentView() {
+        SavedView current = currentSavedView();
+        if (!current.isMeaningful()) {
+            UiUtil.warning(stage, "Nothing to Save",
+                    "Add a search, filter, or sort setting before saving this view.");
+            return;
+        }
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.initOwner(stage);
+        dialog.setTitle("Save Current View");
+        dialog.setHeaderText("Save the current search, filter, and sort setup");
+        dialog.setContentText("View name:");
+        dialog.getDialogPane().sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                UiUtil.applyStyles(newScene, context.settings());
+            }
+        });
+        String name = dialog.showAndWait().map(String::trim).orElse("");
+        if (name.isBlank()) {
+            return;
+        }
+        try {
+            database.createSavedView(name, current.searchText(), current.filterSpec(), current.sortOrder());
+            refreshSavedViewsMenu();
+        } catch (DatabaseException exception) {
+            UiUtil.error(stage, "Could Not Save View", exception.getMessage(), exception);
+        }
+    }
+
+    private void manageSavedViews() {
+        new SavedViewsDialog(stage, context.settings(), database, this::currentSavedView,
+                this::applySavedView, this::refreshSavedViewsMenu).showAndWait();
+        refreshSavedViewsMenu();
+    }
+
+    private SavedView currentSavedView() {
+        return new SavedView("", "", search.getText(), filterSpec, currentSortOrder());
+    }
+
+    private List<SavedView.SortSpec> currentSortOrder() {
+        List<SavedView.SortSpec> result = new ArrayList<>();
+        for (TableColumn<RecordData, ?> column : table.getSortOrder()) {
+            if (column.getUserData() instanceof Long fieldId) {
+                result.add(new SavedView.SortSpec(fieldId,
+                        column.getSortType() != TableColumn.SortType.DESCENDING));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private void applySavedView(SavedView savedView) {
+        List<String> problems = savedView.validationProblems(fieldsById);
+        if (!problems.isEmpty()) {
+            UiUtil.warning(stage, "Saved View Needs Attention",
+                    "“" + savedView.name() + "” can no longer be fully applied:\n\n• "
+                            + String.join("\n• ", problems)
+                            + "\n\nThe Saved Views manager will open so you can update or delete this view.");
+            manageSavedViews();
+            return;
+        }
+        filterSpec = savedView.filterSpec();
+        search.setText(savedView.searchText());
+        applySortOrder(savedView.sortOrder());
+        updatePredicate();
+    }
+
+    private void applySortOrder(List<SavedView.SortSpec> sortOrder) {
+        table.getSortOrder().clear();
+        for (SavedView.SortSpec sort : sortOrder) {
+            TableColumn<RecordData, ?> column = table.getColumns().stream()
+                    .filter(candidate -> candidate.getUserData() instanceof Long fieldId && fieldId == sort.fieldId())
+                    .findFirst()
+                    .orElse(null);
+            if (column == null) {
+                continue;
+            }
+            column.setSortType(sort.ascending()
+                    ? TableColumn.SortType.ASCENDING : TableColumn.SortType.DESCENDING);
+            table.getSortOrder().add(column);
         }
     }
 
