@@ -25,39 +25,50 @@ import java.util.Map;
 public final class PrintOptionsDialog extends Dialog<PrintOptions> {
     public PrintOptionsDialog(Window owner, SettingsService settings, DatabaseService database,
                               List<FieldDefinition> fields) {
+        this(owner, settings, database, fields, null);
+    }
+
+    public PrintOptionsDialog(Window owner, SettingsService settings, DatabaseService database,
+                              List<FieldDefinition> fields, PrintOptions initial) {
         initOwner(owner);
         setTitle("Print Database");
-        setHeaderText("Choose how the database should be formatted");
-        ButtonType print = new ButtonType("Continue to Printer", ButtonBar.ButtonData.OK_DONE);
+        setHeaderText("Choose formatting, then select printer settings and review the preview before printing");
+        ButtonType print = new ButtonType("Continue", ButtonBar.ButtonData.OK_DONE);
         getDialogPane().getButtonTypes().addAll(print, ButtonType.CANCEL);
 
         ComboBox<PrintArrangement> arrangement = new ComboBox<>(
                 FXCollections.observableArrayList(PrintArrangement.values()));
-        arrangement.setValue(parseArrangement(database.getMeta("print_layout", "COLUMNS")));
+        arrangement.setValue(initial == null
+                ? parseArrangement(database.getMeta("print_layout", "COLUMNS"))
+                : initial.arrangement());
         arrangement.setMaxWidth(Double.MAX_VALUE);
 
         ComboBox<String> orientation = new ComboBox<>(
                 FXCollections.observableArrayList("Portrait", "Landscape"));
-        orientation.setValue("LANDSCAPE".equalsIgnoreCase(database.getMeta("print_orientation", "LANDSCAPE"))
-                ? "Landscape" : "Portrait");
+        orientation.setValue(initial == null
+                ? ("LANDSCAPE".equalsIgnoreCase(database.getMeta("print_orientation", "LANDSCAPE"))
+                        ? "Landscape" : "Portrait")
+                : (initial.landscape() ? "Landscape" : "Portrait"));
         orientation.setMaxWidth(Double.MAX_VALUE);
 
         CheckBox databaseName = new CheckBox("Database name in header");
-        databaseName.setSelected(true);
+        databaseName.setSelected(initial == null || initial.showDatabaseName());
         CheckBox printDate = new CheckBox("Print date in header");
-        printDate.setSelected(true);
+        printDate.setSelected(initial == null || initial.showPrintDate());
         CheckBox pageNumbers = new CheckBox("Page numbers");
-        pageNumbers.setSelected(true);
+        pageNumbers.setSelected(initial == null || initial.showPageNumbers());
         CheckBox repeatHeadings = new CheckBox("Repeat field headings on every page");
-        repeatHeadings.setSelected(true);
+        repeatHeadings.setSelected(initial == null || initial.repeatHeadings());
         CheckBox summaries = new CheckBox("Include field summaries for visible entries");
-        summaries.setSelected(Boolean.parseBoolean(database.getMeta("print_summaries", "true")));
+        summaries.setSelected(initial == null
+                ? Boolean.parseBoolean(database.getMeta("print_summaries", "true"))
+                : initial.includeSummaries());
 
         Map<Long, CheckBox> fieldChecks = new LinkedHashMap<>();
         VBox fieldBox = new VBox(7);
         for (FieldDefinition field : fields) {
             CheckBox check = new CheckBox(field.name());
-            check.setSelected(true);
+            check.setSelected(initial == null || initial.fieldIds().contains(field.id()));
             fieldChecks.put(field.id(), check);
             fieldBox.getChildren().add(check);
         }
