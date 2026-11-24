@@ -63,6 +63,8 @@ public final class HelpDialog extends Dialog<Void> {
 
                         Use **File → Print** to select fields, portrait or landscape orientation, and a columns or rows layout. Column headings can repeat on each printed page.
 
+                        After printer/page setup, PinDB shows the exact generated pages before they are submitted. Move between pages to review the layout, choose **Back to Settings** to make changes, or choose **Print** to continue.
+
                         Use **File → Export Visible Entries to CSV** to open database information in LibreOffice Calc or other spreadsheet software.
                         """),
                 updates,

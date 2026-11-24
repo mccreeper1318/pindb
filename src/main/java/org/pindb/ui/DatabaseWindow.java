@@ -52,6 +52,7 @@ import org.pindb.model.DocumentData;
 import org.pindb.model.FieldDefinition;
 import org.pindb.model.FieldType;
 import org.pindb.model.FilterSpec;
+import org.pindb.model.PrintOptions;
 import org.pindb.model.RecordData;
 import org.pindb.model.SavedView;
 import org.pindb.service.CsvService;
@@ -682,17 +683,29 @@ public final class DatabaseWindow implements AutoCloseable {
     }
 
     private void printDatabase() {
-        new PrintOptionsDialog(stage, context.settings(), database, fields).showAndWait().ifPresent(options -> {
+        PrintOptions previous = null;
+        while (true) {
+            PrintOptions options = new PrintOptionsDialog(
+                    stage, context.settings(), database, fields, previous).showAndWait().orElse(null);
+            if (options == null) {
+                return;
+            }
+            previous = options;
             try {
-                boolean printed = PrintService.print(stage, database.info(), fields,
-                        new ArrayList<>(filtered), options);
-                if (!printed) {
+                PrintService.PrintResult result = PrintService.print(
+                        stage, database.info(), fields, new ArrayList<>(filtered), options);
+                if (result == PrintService.PrintResult.BACK_TO_SETTINGS) {
+                    continue;
+                }
+                if (result != PrintService.PrintResult.PRINTED) {
                     statusLabel.setText("Printing cancelled or unsuccessful");
                 }
+                return;
             } catch (RuntimeException exception) {
                 UiUtil.error(stage, "Printing Failed", "PinDB could not print this database.", exception);
+                return;
             }
-        });
+        }
     }
 
     private void checkIntegrity() {

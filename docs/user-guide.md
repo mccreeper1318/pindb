@@ -22,4 +22,4 @@ PinDB automatically creates timestamped snapshots before data-changing operation
 
 ## Printing and CSV
 
-Printing can arrange fields as columns or rows, use portrait or landscape orientation, repeat headings, select fields, and include database name, print date, and page numbers. CSV export uses the entries currently visible after search and filters.
+Printing can arrange fields as columns or rows, use portrait or landscape orientation, repeat headings, select fields, and include database name, print date, page numbers, and summaries. After printer/page setup, PinDB shows the exact generated pages in a preview with page navigation. Choose **Back to Settings** to adjust formatting and preview again before printing. CSV export uses the entries currently visible after search and filters.

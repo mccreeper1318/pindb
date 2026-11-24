@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0
+
+### Added
+- Added a page-by-page print preview using the same generated page layout as the final print job, with page count/navigation and the ability to return to print settings, make changes, and preview again before submitting the job (Issue #140).
+
 ## 0.4.0
 
 ### Added
