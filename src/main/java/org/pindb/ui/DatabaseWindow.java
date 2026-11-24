@@ -52,6 +52,7 @@ import org.pindb.model.DocumentData;
 import org.pindb.model.FieldDefinition;
 import org.pindb.model.FieldType;
 import org.pindb.model.FilterSpec;
+import org.pindb.model.PrintOptions;
 import org.pindb.model.RecordData;
 import org.pindb.model.SavedView;
 import org.pindb.service.CsvService;
