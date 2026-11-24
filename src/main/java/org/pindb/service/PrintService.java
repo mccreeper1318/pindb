@@ -633,6 +633,6 @@ public final class PrintService {
         return label;
     }
 
-    private record PrintArea(double width, double height) {
+    record PrintArea(double width, double height) {
     }
 }
